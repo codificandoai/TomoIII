@@ -1,0 +1,116 @@
+groups:
+  - name: uc-119-quality
+    rules:
+      - alert: HighHallucinationRate
+        expr: avg(llm_hallucination_rate) by (model) > 0.4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasa de alucinaciones elevada ({{ $labels.model }})"
+
+      - alert: LowGroundedness
+        expr: avg(llm_groundedness_score) by (model) < 0.4
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fundamentación (groundedness) baja ({{ $labels.model }})"
+
+      - alert: LowTaskCompletionRate
+        expr: |
+          sum(rate(llm_task_completion_total{status="completed"}[15m])) by (model)
+          / sum(rate(llm_task_completion_total[15m])) by (model) < 0.7
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasa de finalización de tareas baja ({{ $labels.model }})"
+
+  - name: uc-119-security
+    rules:
+      - alert: HighToxicityDetected
+        expr: llm_toxicity_score > 0.8
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Contenido tóxico crítico detectado"
+
+      - alert: EvasionAttemptsSpike
+        expr: sum(rate(llm_evasion_attempts_total[5m])) by (model) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pico de intentos de evasión detectado ({{ $labels.model }})"
+
+      - alert: PIILeakDetected
+        expr: sum(increase(llm_pii_leak_total[5m])) by (model, pii_type) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Filtración de PII detectada ({{ $labels.pii_type }})"
+
+      - alert: PromptExtractionAttempt
+        expr: sum(rate(llm_prompt_extraction_attempts_total[5m])) by (model) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Intento de extracción de prompt de sistema ({{ $labels.model }})"
+
+      - alert: UnauthorizedAccessAttempt
+        expr: sum(rate(llm_unauthorized_access_total[5m])) by (model) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Intento de acceso no autorizado detectado ({{ $labels.model }})"
+
+  - name: uc-119-cost-performance
+    rules:
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(llm_inference_latency_seconds_bucket{phase="total"}[5m])) by (le, model)) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia P95 superior a 5 segundos ({{ $labels.model }})"
+
+      - alert: HighTTFT
+        expr: histogram_quantile(0.95, sum(rate(llm_ttft_seconds_bucket[5m])) by (le, model)) > 1.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TTFT P95 superior a 1.5 segundos ({{ $labels.model }})"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(llm_errors_total[5m])) by (model)
+          / sum(rate(llm_requests_total[5m])) by (model) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tasa de errores superior al 5% ({{ $labels.model }})"
+
+      - alert: LowTokensPerSecond
+        expr: avg(llm_tokens_per_second) by (model) < 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rendimiento de generación bajo ({{ $labels.model }})"
+
+  - name: uc-119-traceability
+    rules:
+      - alert: TracedRequestsDrop
+        expr: sum(rate(llm_traced_requests_total[10m])) by (model) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No se están registrando trazas para {{ $labels.model }}"

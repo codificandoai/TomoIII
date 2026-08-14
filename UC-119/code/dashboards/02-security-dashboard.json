@@ -1,0 +1,109 @@
+{
+  "title": "UC-119 · Seguridad LLM (Evasión, PII, Toxicidad, Sesgo, Guardarraíles)",
+  "uid": "uc119-security",
+  "tags": ["uc-119", "llm-observability", "security"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(llm_toxicity_score, model)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Intentos de prompt injection / jailbreak por minuto",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_evasion_attempts_total{model=~\"$model\"}[1m])) by (type)", "legendFormat": "{{type}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Intentos de extracción del prompt de sistema",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_prompt_extraction_attempts_total{model=~\"$model\"}[5m])) by (model)", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Toxicidad en tiempo real",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "llm_toxicity_score{model=~\"$model\"}", "legendFormat": "{{model}}-{{type}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "green", "value": 0 }, { "color": "yellow", "value": 0.3 }, { "color": "orange", "value": 0.6 }, { "color": "red", "value": 0.8 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Filtración de PII por tipo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_pii_leak_total{model=~\"$model\"}[5m])) by (pii_type)", "legendFormat": "{{pii_type}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Sesgo promedio detectado",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_bias_score{model=~\"$model\"}) by (category)", "legendFormat": "{{category}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "Incumplimiento de políticas",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_policy_violation_total{model=~\"$model\"}[5m])) by (model)", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Activaciones de guardarraíles",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_guardrail_activation_total{model=~\"$model\"}[1h])) by (guardrail)", "legendFormat": "{{guardrail}}" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Acceso no autorizado / uso inseguro de herramientas",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_unauthorized_access_total{model=~\"$model\"}[5m])) by (tool)", "legendFormat": "{{tool}}" }
+      ]
+    }
+  ]
+}

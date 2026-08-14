@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: "UC-119 Dashboards"
+    orgId: 1
+    folder: "UC-119 LLM Observability"
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

@@ -1,0 +1,129 @@
+version: "3.8"
+
+# UC-119 — Stack de observabilidad para monitoreo de LLMs.
+# Componentes: Prometheus (métricas), Grafana (dashboards), Loki+Promtail
+# (logs), Tempo (trazas), Envoy (proxy/gateway de entrada al API Flask).
+#
+# Uso:
+#   docker compose -f observability/docker-compose.yml up -d
+#
+# El servicio `uc119-api` construye la imagen del pipeline (ver
+# `../Dockerfile`) y expone /metrics para Prometheus y logs JSON en stdout
+# para Promtail.
+
+networks:
+  uc119-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  tempo-data:
+
+services:
+  uc119-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: uc119-api
+    environment:
+      LOG_JSON_FORMAT: "true"
+      TRACING_ENABLED: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://tempo:4318"
+      OTEL_SERVICE_NAME: "uc-119-llm-monitoring"
+    ports:
+      - "8000:8000"
+    networks:
+      - uc119-net
+    logging:
+      driver: json-file
+      options:
+        tag: "uc-119"
+
+  envoy:
+    image: envoyproxy/envoy:v1.29-latest
+    container_name: uc119-envoy
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    ports:
+      - "10000:10000"   # Gateway público hacia uc119-api
+      - "9901:9901"      # Admin/estadísticas de Envoy
+    depends_on:
+      - uc119-api
+    networks:
+      - uc119-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: uc119-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    networks:
+      - uc119-net
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: uc119-loki
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+    networks:
+      - uc119-net
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: uc119-promtail
+    volumes:
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    networks:
+      - uc119-net
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: uc119-tempo
+    user: root
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    command: -config.file=/etc/tempo.yaml
+    ports:
+      - "3200:3200"    # Tempo API
+      - "4318:4318"    # OTLP HTTP receiver
+    networks:
+      - uc119-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: uc119-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    networks:
+      - uc119-net

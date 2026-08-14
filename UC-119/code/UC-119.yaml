@@ -1,0 +1,36 @@
+# Proporciona monitoreo integral en tiempo real que cumple con NIST AI RMF,
+# FedRAMP e ISO 42001, garantizando seguridad, transparencia y cumplimiento
+# regulatorio.
+#
+# NOTA: este archivo se conserva por compatibilidad con la versión inicial
+# de UC-119. El conjunto completo y actualizado de reglas de alerta
+# (calidad, seguridad, coste/rendimiento y trazabilidad) vive ahora en
+# `observability/prometheus/alerts.yml`, que es el archivo cargado por
+# Prometheus en el stack de observabilidad (ver `observability/docker-compose.yml`).
+
+groups:
+  - name: uc-119-legacy
+    rules:
+      - alert: HighToxicityDetected
+        expr: llm_toxicity_score > 0.8
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Contenido tóxico crítico detectado"
+
+      - alert: EvasionAttemptsSpike
+        expr: sum(rate(llm_evasion_attempts_total[5m])) by (model) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pico de intentos de evasión detectado"
+
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, sum(rate(llm_inference_latency_seconds_bucket{phase="total"}[5m])) by (le, model)) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia P95 superior a 5 segundos"

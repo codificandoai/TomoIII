@@ -1,0 +1,119 @@
+{
+  "title": "UC-119 · Coste y Rendimiento LLM (Tokens, TTFT, Latencia, Errores)",
+  "uid": "uc119-cost-performance",
+  "tags": ["uc-119", "llm-observability", "cost", "performance"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(llm_tokens_per_second, model)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tokens por solicitud (P50 entrada/salida)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_input_tokens_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "input p50 {{model}}" },
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_output_tokens_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "output p50 {{model}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Coste por solicitud (P50/P95, USD)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_cost_per_request_usd_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p50 {{model}}" },
+        { "expr": "histogram_quantile(0.95, sum(rate(llm_cost_per_request_usd_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p95 {{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "TTFT (P50/P95/P99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(llm_ttft_seconds_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p50 {{model}}" },
+        { "expr": "histogram_quantile(0.95, sum(rate(llm_ttft_seconds_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p95 {{model}}" },
+        { "expr": "histogram_quantile(0.99, sum(rate(llm_ttft_seconds_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p99 {{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Latencia total P95",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(llm_inference_latency_seconds_bucket{phase=\"total\", model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "steps": [
+        { "color": "green", "value": 0 }, { "color": "yellow", "value": 2 }, { "color": "red", "value": 5 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Tokens generados por segundo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_tokens_per_second{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Tasa de errores y timeouts",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_errors_total{model=~\"$model\"}[5m])) by (error_type)", "legendFormat": "{{error_type}}" },
+        { "expr": "sum(rate(llm_rate_limit_total{model=~\"$model\"}[5m])) by (model)", "legendFormat": "rate_limit {{model}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Tasa de aciertos de caché",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_cache_hits_total{model=~\"$model\"}[5m])) / (sum(rate(llm_cache_hits_total{model=~\"$model\"}[5m])) + sum(rate(llm_cache_misses_total{model=~\"$model\"}[5m])))",
+          "legendFormat": "cache hit ratio"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "title": "Tokens desperdiciados",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_wasted_tokens_total{model=~\"$model\"}[5m])) by (model)", "legendFormat": "{{model}}" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "title": "UC-119 · Trazabilidad LLM (Prompts, Recuperaciones, Herramientas, Trazas)",
+  "uid": "uc119-traceability",
+  "tags": ["uc-119", "llm-observability", "traceability"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(llm_traced_requests_total, model)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Solicitudes con traza completa registrada",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_traced_requests_total{model=~\"$model\"}[5m])) by (model)", "legendFormat": "{{model}}" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Llamadas a herramientas/APIs por estado",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_tool_calls_total{model=~\"$model\"}[5m])) by (tool, status)", "legendFormat": "{{tool}}-{{status}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Pasos de agente (P50/P95)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_agent_steps_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p50 {{model}}" },
+        { "expr": "histogram_quantile(0.95, sum(rate(llm_agent_steps_bucket{model=~\"$model\"}[5m])) by (le, model))", "legendFormat": "p95 {{model}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Motivo de finalización (finish reason)",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_finish_reason_total{model=~\"$model\"}[1h])) by (finish_reason)", "legendFormat": "{{finish_reason}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Trazas en Tempo (Explore)",
+      "type": "text",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 16 },
+      "options": {
+        "mode": "markdown",
+        "content": "Para inspeccionar trazas individuales (spans `llm_monitor_request`, atributos `request_id`/`model`), use **Grafana Explore** con el datasource **Tempo** filtrando por `request_id`. Para logs estructurados JSON correlacionados, use el datasource **Loki** con `{job=\"uc-119\"} | json | request_id=\"<id>\"`."
+      }
+    }
+  ]
+}

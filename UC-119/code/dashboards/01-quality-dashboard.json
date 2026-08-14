@@ -1,0 +1,118 @@
+{
+  "title": "UC-119 · Calidad LLM (Alucinaciones, Fundamentación, Relevancia, Finalización)",
+  "uid": "uc119-quality",
+  "tags": ["uc-119", "llm-observability", "quality"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(llm_hallucination_rate, model)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Tasa de alucinaciones",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_hallucination_rate{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Fundamentación (Groundedness)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_groundedness_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "Relevancia",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_relevance_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Fidelidad (RAG)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_fidelity_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Coherencia",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_coherence_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "Tasa de finalización de tareas",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_task_completion_total{status=\"completed\", model=~\"$model\"}[5m])) / sum(rate(llm_task_completion_total{model=~\"$model\"}[5m]))",
+          "legendFormat": "completion rate"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "red", "value": 0 }, { "color": "yellow", "value": 0.7 }, { "color": "green", "value": 0.9 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "title": "Precisión de recuperación (RAG)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_retrieval_precision_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "title": "Satisfacción del usuario",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_user_satisfaction_score{model=~\"$model\"}) by (model)", "legendFormat": "{{model}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    }
+  ]
+}
