@@ -1,0 +1,67 @@
+version: "3.8"
+
+# UC-129 — Stack de observabilidad del sistema de métricas de resiliencia
+# LLMOps.
+# Componentes: Prometheus (scrapea `/metrics` y evalúa
+# `prometheus/alerts.yml`) y Grafana (dashboard "LLMOps Resilience Metrics
+# Tracker").
+#
+# Flujo: Langfuse/LangSmith/LangGraph -> webhook -> uc129-api
+# (`/api/v1/telemetry/*`) -> métricas Prometheus -> Grafana.
+#
+# Uso:
+#   docker compose -f observability/docker-compose.yml up -d --build
+
+networks:
+  uc129-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+services:
+  uc129-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: uc129-api
+    environment:
+      LOG_JSON_FORMAT: "true"
+    ports:
+      - "8002:8002"
+    networks:
+      - uc129-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: uc129-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9092:9090"
+    networks:
+      - uc129-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: uc129-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3002:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - uc129-net

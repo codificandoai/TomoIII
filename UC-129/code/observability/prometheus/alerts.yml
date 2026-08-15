@@ -1,0 +1,76 @@
+# Codificando.AI - UC-129
+# Reglas de alerta de degradación de resiliencia LLMOps. Evalúan las
+# métricas expuestas en `/metrics` (ver `prometheus_metrics.py`) para
+# detectar cuándo la propia capacidad de respuesta a incidentes se está
+# deteriorando (MTTD/MTTR en aumento, ruido de falsos positivos,
+# dependencia excesiva de HITL).
+
+groups:
+  - name: llm_resilience_degradation
+    rules:
+      # MTTD degradándose (detectamos más lento que antes)
+      - alert: MTTDDegradation
+        expr: |
+          histogram_quantile(0.5, sum(rate(llm_incident_mttd_seconds_bucket[1h])) by (le))
+          > 2 * histogram_quantile(0.5, sum(rate(llm_incident_mttd_seconds_bucket[7d] offset 7d)) by (le))
+        for: 30m
+        labels:
+          severity: warning
+          team: mlops-automation
+        annotations:
+          summary: "MTTD se ha duplicado respecto a la semana anterior"
+          action: "Revisar reglas de detección en Prometheus/Alertmanager"
+
+      # MTTR degradándose (tardamos más en resolver)
+      - alert: MTTRDegradation
+        expr: |
+          histogram_quantile(0.5, sum(rate(llm_incident_mttr_seconds_bucket[1h])) by (le))
+          > 1.5 * histogram_quantile(0.5, sum(rate(llm_incident_mttr_seconds_bucket[7d] offset 7d)) by (le))
+        for: 1h
+        labels:
+          severity: warning
+          team: mlops-oncall
+        annotations:
+          summary: "MTTR ha aumentado 50% respecto a la semana anterior"
+          action: "Revisar playbooks automatizados; verificar disponibilidad de modelos de respaldo"
+
+      # Tasa de falsos positivos crítica
+      - alert: HighFalsePositiveRate
+        expr: |
+          (
+            sum(rate(llm_incident_false_positives_total[1h]))
+            /
+            (sum(rate(llm_incident_resolutions_total[1h])) + sum(rate(llm_incident_false_positives_total[1h])))
+          ) > 0.30
+        for: 2h
+        labels:
+          severity: warning
+          team: mlops-guardrails
+        annotations:
+          summary: "Más del 30% de las alertas son falsos positivos"
+          action: "Ajustar umbrales de guardrails; revisar dataset de entrenamiento"
+
+      # Escalamiento HITL excesivo (la automatización no está funcionando)
+      - alert: ExcessiveHITLEscalation
+        expr: |
+          sum(rate(llm_incident_hitl_escalations_total[24h]))
+          /
+          sum(rate(llm_incidents_total[24h])) > 0.50
+        for: 6h
+        labels:
+          severity: warning
+          team: mlops-automation
+        annotations:
+          summary: "Más del 50% de incidentes requieren intervención humana"
+          action: "Revisar playbooks automatizados; capacitar al equipo en nuevos patrones"
+
+      # Disponibilidad del sistema degradada (telemetría de Langfuse/LangSmith/LangGraph)
+      - alert: SystemAvailabilityDegraded
+        expr: avg(llm_system_availability_ratio) by (source) < 0.95
+        for: 10m
+        labels:
+          severity: critical
+          team: mlops-oncall
+        annotations:
+          summary: "Disponibilidad del sistema por debajo del 95% ({{ $labels.source }})"
+          action: "Revisar el estado de los servicios de inferencia y herramientas del agente"

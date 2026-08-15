@@ -1,0 +1,17 @@
+# Codificando.AI - UC-129
+# Dependencias del sistema de métricas de resiliencia LLMOps
+
+flask>=3.0,<4.0
+prometheus-client>=0.19,<1.0
+
+# Testing
+pytest>=7.4,<9.0
+pytest-cov>=4.1,<6.0
+
+# --- Tracing opcional (activado via TRACING_ENABLED=true) ---
+# opentelemetry-api>=1.22
+# opentelemetry-sdk>=1.22
+# opentelemetry-exporter-otlp-proto-http>=1.22
+
+# --- Servidor WSGI de producción ---
+gunicorn>=21.2,<23.0

@@ -1,0 +1,182 @@
+{
+  "title": "UC-129 · LLMOps Resilience Metrics Tracker",
+  "uid": "uc129-resilience-metrics",
+  "tags": ["uc-129", "llmops", "resilience", "mttd", "mttr"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Incidentes Activos",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(llm_active_incidents)", "legendFormat": "activos" }]
+    },
+    {
+      "id": 2,
+      "title": "MTTD Global (P50)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_incident_mttd_seconds_bucket[1h])) by (le))", "legendFormat": "MTTD P50" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "title": "MTTR Global (P50)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_incident_mttr_seconds_bucket[1h])) by (le))", "legendFormat": "MTTR P50" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Tasa de Resolución",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_incident_resolutions_total{success=\"true\"}[24h])) / sum(rate(llm_incident_resolutions_total[24h]))" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "red", "value": 0 }, { "color": "yellow", "value": 0.6 }, { "color": "green", "value": 0.85 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "title": "Falsos Positivos",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(rate(llm_incident_false_positives_total[24h])) / (sum(rate(llm_incident_resolutions_total[24h])) + sum(rate(llm_incident_false_positives_total[24h])))" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "green", "value": 0 }, { "color": "yellow", "value": 0.15 }, { "color": "red", "value": 0.30 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "Frecuencia de Incidentes por Tipo (24h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_incidents_total[1h])) by (incident_type)", "legendFormat": "{{incident_type}}" }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "MTTD / MTTR — Tendencia (P50)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_incident_mttd_seconds_bucket[1h])) by (le, incident_type))", "legendFormat": "MTTD {{incident_type}}" },
+        { "expr": "histogram_quantile(0.5, sum(rate(llm_incident_mttr_seconds_bucket[1h])) by (le, incident_type))", "legendFormat": "MTTR {{incident_type}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "title": "Resolución por Método",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_incident_resolutions_total[7d])) by (resolution_type)", "legendFormat": "{{resolution_type}}" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Ratio de Escalamiento HITL por Tipo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_incident_hitl_escalations_total[24h])) by (incident_type) / sum(rate(llm_incidents_total[24h])) by (incident_type)",
+          "legendFormat": "{{incident_type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    },
+    {
+      "id": 10,
+      "title": "Costo de Incidentes: Tokens Consumidos",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_tokens_during_incident_total[1h])) by (incident_type)", "legendFormat": "{{incident_type}}" }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Top 5 Causas de Falsos Positivos (7d)",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "topk(5, sum by (incident_type, detection_method) (increase(llm_incident_false_positives_total[7d])))",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Evolución de Falsos Positivos",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_incident_false_positives_total[1h])) by (incident_type)", "legendFormat": "{{incident_type}}" }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Estado del Sistema: Disponibilidad por Fuente",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "avg(llm_system_availability_ratio) by (source)", "legendFormat": "{{source}}" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 14,
+      "title": "Latencia de Telemetría (P95) por Fuente",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(llm_telemetry_latency_seconds_bucket[1h])) by (le, source))",
+          "legendFormat": "{{source}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 15,
+      "title": "Tokens Ingeridos por Fuente (Langfuse/LangSmith/LangGraph)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_telemetry_tokens_total[24h])) by (source, token_type)", "legendFormat": "{{source}}-{{token_type}}" }
+      ]
+    }
+  ]
+}

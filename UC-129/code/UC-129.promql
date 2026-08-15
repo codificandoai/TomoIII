@@ -1,0 +1,123 @@
+# UC-129 — Consultas PromQL para el dashboard "LLMOps Resilience Metrics Tracker"
+
+Todas las métricas provienen de `prometheus_metrics.py`, expuestas en
+`/metrics` (scrapeadas por Prometheus, ver `observability/`).
+
+### Panel 1: Frecuencia de Incidentes por Tipo (Heatmap)
+```promql
+# Incidentes por tipo en las últimas 24h
+sum(increase(llm_incidents_total[24h])) by (incident_type)
+
+# Incidentes por tipo y severidad (apilado)
+sum(increase(llm_incidents_total[1h])) by (incident_type, severity)
+```
+
+### Panel 2: MTTD - Tiempo Medio de Detección
+```promql
+# MTTD promedio por tipo de incidente (últimos 7 días)
+histogram_quantile(0.50, 
+  sum(rate(llm_incident_mttd_seconds_bucket[7d])) by (le, incident_type)
+)
+
+# MTTD P95 (el 95% de los incidentes se detectan en este tiempo o menos)
+histogram_quantile(0.95, 
+  sum(rate(llm_incident_mttd_seconds_bucket[7d])) by (le, incident_type)
+)
+
+# Comparación: MTTD por método de detección
+histogram_quantile(0.50, 
+  sum(rate(llm_incident_mttd_seconds_bucket[1d])) by (le, detection_method)
+)
+```
+
+### Panel 3: MTTR - Tiempo Medio de Recuperación
+```promql
+# MTTR promedio por tipo y método de resolución
+histogram_quantile(0.50, 
+  sum(rate(llm_incident_mttr_seconds_bucket[7d])) by (le, incident_type, resolution_type)
+)
+
+# MTTR P95
+histogram_quantile(0.95, 
+  sum(rate(llm_incident_mttr_seconds_bucket[7d])) by (le, incident_type)
+)
+
+# Tendencia del MTTR en el tiempo (¿estamos mejorando?)
+histogram_quantile(0.50, 
+  sum(rate(llm_incident_mttr_seconds_bucket[1h])) by (le)
+)
+```
+
+### Panel 4: Tasa de Resolución y Falsos Positivos
+```promql
+# Tasa de resolución exitosa (%)
+sum(rate(llm_incident_resolutions_total{success="true"}[7d])) by (incident_type)
+/
+sum(rate(llm_incident_resolutions_total[7d])) by (incident_type)
+* 100
+
+# Tasa de falsos positivos por tipo de incidente
+sum(rate(llm_incident_false_positives_total[7d])) by (incident_type)
+/
+(
+  sum(rate(llm_incident_resolutions_total[7d])) by (incident_type)
+  + sum(rate(llm_incident_false_positives_total[7d])) by (incident_type)
+)
+* 100
+
+# Falsos positivos por método de detección (volumen absoluto)
+sum(increase(llm_incident_false_positives_total[7d])) by (incident_type, detection_method)
+```
+
+### Panel 5: Frecuencia de Escalamiento HITL
+```promql
+# Escalamientos por tipo de incidente
+sum(rate(llm_incident_hitl_escalations_total[24h])) by (incident_type)
+
+# Escalamientos por rol del revisor
+sum(rate(llm_incident_hitl_escalations_total[7d])) by (reviewer_role)
+
+# Ratio de escalamiento (¿cuántos incidentes requieren humano?)
+sum(rate(llm_incident_hitl_escalations_total[7d])) by (incident_type)
+/
+sum(rate(llm_incidents_total[7d])) by (incident_type)
+* 100
+```
+
+### Panel 6: Consumo de Recursos Durante Incidentes
+```promql
+# Tokens consumidos durante incidentes (costo del fallo)
+sum(increase(llm_tokens_during_incident_total[24h])) by (incident_type)
+
+# Latencia P95 durante incidentes
+histogram_quantile(0.95, sum(rate(llm_latency_during_incident_seconds_bucket[1h])) by (le, incident_type))
+```
+
+### Panel 7: Estado del Sistema, Latencia y Carga (Langfuse/LangSmith/LangGraph)
+```promql
+# Disponibilidad estimada por fuente de telemetría
+avg(llm_system_availability_ratio) by (source)
+
+# Carga relativa del sistema por fuente
+avg(llm_system_load_ratio) by (source)
+
+# Latencia P95 observada en la telemetría ingerida (post-incidente/normal)
+histogram_quantile(0.95, sum(rate(llm_telemetry_latency_seconds_bucket[1h])) by (le, source, model))
+
+# Tokens consumidos por fuente y tipo (entrada/salida)
+sum(increase(llm_telemetry_tokens_total[24h])) by (source, token_type)
+
+# Tasa de error observada por fuente de telemetría
+sum(rate(llm_telemetry_requests_total{status="error"}[1h])) by (source)
+/
+sum(rate(llm_telemetry_requests_total[1h])) by (source)
+```
+
+### Panel 8: Incidentes Activos y Reglas de Degradación de Resiliencia
+```promql
+# Incidentes activos (sin resolver) por tipo
+llm_active_incidents
+
+# Ver `observability/prometheus/alerts.yml` para las reglas de degradación
+# de MTTD/MTTR, falsos positivos y escalamiento HITL.
+```
