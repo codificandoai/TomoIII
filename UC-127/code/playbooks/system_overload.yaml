@@ -1,0 +1,48 @@
+# Codificando.AI - UC-127
+# Playbook B: Sobrecarga del Sistema (System Overload)
+# Disparador: llm_latency_p99 > 5s o error_rate > 10%.
+name: system_overload
+incident_type: SYSTEM_OVERLOAD
+description: >
+  Mitigación de sobrecarga del sistema de inferencia LLM: aplica rate
+  limiting agresivo para tráfico no crítico y escala horizontalmente los
+  pods de inferencia.
+trigger_description: "llm_latency_p99 > 5s OR error_rate > 10%"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: HIGH
+
+  - name: enable_aggressive_rate_limiting
+    integration: gateway
+    method: enable_rate_limiting
+    requires_approval: false
+    reversible: true
+    params:
+      scope: non_critical_users
+
+  - name: scale_inference_pods
+    integration: scaling
+    method: scale_out
+    requires_approval: false
+    reversible: true
+    params:
+      override_hpa: true
+
+  - name: notify_infra_channel
+    integration: collaboration
+    method: notify_infra
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

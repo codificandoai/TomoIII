@@ -1,0 +1,40 @@
+# Codificando.AI - UC-127
+# Playbook: Degradación de Calidad (Quality Degradation)
+# Disparador: quality_score <= 0.6 (warning) / <= 0.4 (critical).
+name: quality_degradation
+incident_type: QUALITY_DEGRADATION
+description: >
+  Respuesta ante una caída sostenida en las métricas de calidad
+  (relevancia, coherencia, finalización de tareas) del modelo, típicamente
+  causada por una regresión de prompt/modelo o degradación de las fuentes
+  de recuperación (RAG).
+trigger_description: "quality_score <= 0.6 (warning) / <= 0.4 (critical)"
+steps:
+  - name: notify_security_channel
+    integration: collaboration
+    method: notify_security
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: revert_prompt_version
+    integration: model_router
+    method: revert_prompt_version
+    requires_approval: true
+    reversible: true
+    params: {}
+
+  - name: file_ticket_if_recurrent
+    integration: ticketing
+    method: create_ticket
+    requires_approval: false
+    reversible: false
+    params:
+      priority: Medium
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

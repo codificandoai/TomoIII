@@ -1,0 +1,47 @@
+# Codificando.AI - UC-127
+# Playbook: Alucinaciones (Hallucination)
+# Disparador: hallucination_rate >= 20% (advertencia) / >= 40% (crítico).
+name: hallucination
+incident_type: HALLUCINATION
+description: >
+  Contención de un aumento anómalo en la tasa de alucinaciones/afirmaciones
+  no verificables del modelo, incluyendo reversión a una versión de
+  prompt/modelo previamente validada y refuerzo de la exigencia de
+  fundamentación (groundedness) en las respuestas.
+trigger_description: "hallucination_rate >= 0.20 (warning) / >= 0.40 (critical)"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: MEDIUM
+
+  - name: notify_security_channel
+    integration: collaboration
+    method: notify_security
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: enforce_grounding_mode
+    integration: model_router
+    method: enforce_grounding_mode
+    requires_approval: false
+    reversible: true
+    params: {}
+
+  - name: revert_prompt_version
+    integration: model_router
+    method: revert_prompt_version
+    requires_approval: true
+    reversible: true
+    params: {}
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

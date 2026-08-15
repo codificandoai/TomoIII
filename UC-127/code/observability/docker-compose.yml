@@ -1,0 +1,116 @@
+version: "3.8"
+
+# UC-127 — Stack de observabilidad para la orquestación de respuesta a
+# incidentes de LLMOps.
+# Componentes: Prometheus (métricas + reglas de alerta), Alertmanager
+# (enruta las alertas al webhook del orquestador), Grafana (dashboard de
+# resiliencia), Loki+Promtail (logs estructurados del orquestador).
+#
+# Flujo de integración de telemetría -> incidente -> playbook:
+#   UC-119 (o cualquier fuente) expone /metrics -> Prometheus evalúa
+#   `prometheus/alerts.yml` -> Alertmanager recibe la alerta ->
+#   Alertmanager reenvía el webhook a `uc127-api:8001/api/v1/alertmanager/webhook`
+#   -> el orquestador clasifica, ejecuta el playbook y notifica.
+#
+# Uso:
+#   docker compose -f observability/docker-compose.yml up -d --build
+
+networks:
+  uc127-net:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+
+services:
+  uc127-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: uc127-api
+    environment:
+      LOG_JSON_FORMAT: "true"
+      UC127_INTEGRATIONS_DRY_RUN: "true"
+    ports:
+      - "8001:8001"
+    networks:
+      - uc127-net
+    logging:
+      driver: json-file
+      options:
+        tag: "uc-127"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: uc127-prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9091:9090"
+    networks:
+      - uc127-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: uc127-alertmanager
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+    depends_on:
+      - uc127-api
+    networks:
+      - uc127-net
+
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: uc127-loki
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3101:3100"
+    networks:
+      - uc127-net
+
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: uc127-promtail
+    volumes:
+      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yaml
+    depends_on:
+      - loki
+    networks:
+      - uc127-net
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: uc127-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - uc127-net

@@ -1,0 +1,122 @@
+{
+  "title": "UC-127 · LLMOps Resilience & Automation Tracker",
+  "uid": "uc127-resilience-tracker",
+  "tags": ["uc-127", "llmops", "incident-response"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "MTTR promedio por tipo de incidente (automatizado)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "avg(rate(llm_incident_mttr_seconds_sum{automated=\"true\"}[1h]) / rate(llm_incident_mttr_seconds_count{automated=\"true\"}[1h])) by (incident_type)",
+          "legendFormat": "{{incident_type}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "title": "Incidentes por tipo y severidad (24h)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_incident_total[24h])) by (incident_type, severity)", "legendFormat": "{{incident_type}}-{{severity}}" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Tasa de éxito de ejecución de playbooks",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_playbook_execution_total{status=\"REMEDIATED\"}[1h])) / sum(rate(llm_playbook_execution_total[1h]))",
+          "legendFormat": "success rate"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "steps": [
+        { "color": "red", "value": 0 }, { "color": "yellow", "value": 0.6 }, { "color": "green", "value": 0.85 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "title": "Acciones pendientes de aprobación humana (HITL)",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "llm_hitl_pending_approvals", "legendFormat": "pendientes" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Reversiones (rollback) ejecutadas",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_incident_rollback_total[24h])) by (playbook)", "legendFormat": "{{playbook}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Salud del SOP: días desde última actualización",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "(time() - llm_sop_last_updated_timestamp) / 86400", "legendFormat": "{{playbook}}", "format": "table" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "d", "thresholds": { "steps": [
+        { "color": "green", "value": 0 }, { "color": "orange", "value": 90 }
+      ] } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "title": "Correlación SIEM: incidentes de seguridad LLM (1h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(increase(llm_incident_total{incident_type=~\"PROMPT_INJECTION|DATA_LEAK|UNSAFE_GENERATION\"}[1h])) by (incident_type)",
+          "legendFormat": "{{incident_type}}"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Resultado de simulacros de Game Day (7d)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(increase(llm_chaos_drill_total[7d])) by (scenario, status)", "legendFormat": "{{scenario}}-{{status}}" }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Tasa de fallo por paso de playbook (1h)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_playbook_step_total{status=\"FAILED\"}[1h])) by (playbook, step) / sum(rate(llm_playbook_step_total[1h])) by (playbook, step)",
+          "legendFormat": "{{playbook}}/{{step}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" }, "overrides": [] }
+    }
+  ]
+}

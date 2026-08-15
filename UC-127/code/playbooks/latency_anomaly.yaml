@@ -1,0 +1,48 @@
+# Codificando.AI - UC-127
+# Playbook: Anomalía de Latencia (Latency Anomaly)
+# Disparador: latency_p99 >= 3s (warning) / >= 5s (critical).
+name: latency_anomaly
+incident_type: LATENCY_ANOMALY
+description: >
+  Mitigación de un aumento anómalo en la latencia de inferencia (P99),
+  distinto de una sobrecarga total del sistema: activa caché agresivo y
+  reduce el tamaño máximo de contexto/tokens de salida temporalmente.
+trigger_description: "latency_p99_s >= 3s (warning) / >= 5s (critical)"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: MEDIUM
+
+  - name: notify_infra_channel
+    integration: collaboration
+    method: notify_infra
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: enable_aggressive_rate_limiting
+    integration: gateway
+    method: enable_rate_limiting
+    requires_approval: false
+    reversible: true
+    params:
+      scope: non_critical_users
+
+  - name: scale_inference_pods
+    integration: scaling
+    method: scale_out
+    requires_approval: false
+    reversible: true
+    params:
+      override_hpa: false
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

@@ -1,0 +1,106 @@
+# Codificando.AI - UC-127
+# Reglas de alerta que producen los `alertname` reconocidos por
+# `config.ALERT_NAME_TO_INCIDENT_TYPE` y que Alertmanager reenvía al
+# webhook del orquestador (`/api/v1/alertmanager/webhook`).
+#
+# Estas reglas evalúan las métricas de telemetría del pipeline de
+# monitoreo de LLMs (UC-119, `llm_*`). Para que Prometheus pueda
+# evaluarlas, añada el target de UC-119 (`uc119-api:8000`) a
+# `prometheus.yml` — ver `UC-127.md`, sección "Integración con UC-119".
+
+groups:
+  - name: uc-127-incident-triggers
+    rules:
+      - alert: HighHallucinationRate
+        expr: avg(llm_hallucination_rate) by (model) > 0.4
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tasa de alucinaciones elevada ({{ $labels.model }})"
+
+      - alert: EvasionAttemptsSpike
+        expr: sum(rate(llm_evasion_attempts_total[5m])) by (model) > 10
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Pico de intentos de evasión / jailbreak ({{ $labels.model }})"
+
+      - alert: PromptExtractionAttempt
+        expr: sum(rate(llm_prompt_extraction_attempts_total[5m])) by (model) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Intento de extracción del prompt de sistema ({{ $labels.model }})"
+
+      - alert: PIILeakDetected
+        expr: sum(increase(llm_pii_leak_total[5m])) by (model, pii_type) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Filtración de PII detectada ({{ $labels.pii_type }})"
+
+      - alert: UnauthorizedAccessAttempt
+        expr: sum(rate(llm_unauthorized_access_total[5m])) by (model) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Intento de acceso no autorizado detectado ({{ $labels.model }})"
+
+      - alert: LowGroundedness
+        expr: avg(llm_groundedness_score) by (model) < 0.4
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fundamentación (groundedness) baja ({{ $labels.model }})"
+
+      - alert: HighToxicityDetected
+        expr: llm_toxicity_score > 0.8
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Contenido tóxico crítico detectado"
+
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, sum(rate(llm_inference_latency_seconds_bucket{phase="total"}[5m])) by (le, model)) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latencia P95 superior a 5 segundos ({{ $labels.model }})"
+
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(llm_errors_total[5m])) by (model)
+          / sum(rate(llm_requests_total[5m])) by (model) > 0.10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Tasa de errores superior al 10% ({{ $labels.model }})"
+
+      - alert: ToolCallFailureSpike
+        expr: |
+          sum(rate(llm_tool_calls_total{status="error"}[5m])) by (model, tool)
+          / sum(rate(llm_tool_calls_total[5m])) by (model, tool) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tasa de fallo de herramienta superior al 10% ({{ $labels.tool }})"
+
+      - alert: CostAnomalyDetected
+        expr: |
+          (sum(rate(llm_cost_total_usd[1h])) by (model)
+          / sum(rate(llm_cost_total_usd[1h] offset 1d)) by (model)) - 1 > 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Incremento de coste superior al 50% respecto a ayer ({{ $labels.model }})"

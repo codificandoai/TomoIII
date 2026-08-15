@@ -1,0 +1,42 @@
+# Codificando.AI - UC-127
+# Playbook: Anomalía de Coste (Cost Anomaly)
+# Disparador: cost_increase_ratio >= 50% (warning) / >= 100% (critical)
+# respecto a la línea base horaria/diaria.
+name: cost_anomaly
+incident_type: COST_ANOMALY
+description: >
+  Contención de un incremento anómalo en el coste de inferencia (tokens
+  desperdiciados, bucles de agente, contexto excesivo o abuso de un
+  usuario/función), aplicando límites de cuota temporales antes de que el
+  incremento se traduzca en un impacto presupuestario significativo.
+trigger_description: "cost_increase_ratio >= 0.50 (warning) / >= 1.0 (critical)"
+steps:
+  - name: notify_infra_channel
+    integration: collaboration
+    method: notify_infra
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: enable_aggressive_rate_limiting
+    integration: gateway
+    method: enable_rate_limiting
+    requires_approval: false
+    reversible: true
+    params:
+      scope: top_cost_users
+
+  - name: file_ticket_if_recurrent
+    integration: ticketing
+    method: create_ticket
+    requires_approval: false
+    reversible: false
+    params:
+      priority: Medium
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

@@ -1,0 +1,56 @@
+# Codificando.AI - UC-127
+# Playbook: Filtración de Datos (Data Leak / PII Exposure)
+# Disparador: >= 1 evento de filtración de PII o acceso no autorizado.
+name: data_leak
+incident_type: DATA_LEAK
+description: >
+  Respuesta de máxima prioridad ante la exposición de información personal
+  (PII), credenciales o datos internos en una respuesta del modelo:
+  bloqueo inmediato, alerta al SIEM y a las partes interesadas, y apertura
+  de ticket obligatorio para revisión de cumplimiento (dado su impacto
+  regulatorio bajo NIST AI RMF/ISO 42001).
+trigger_description: "pii_leak_events >= 1 OR unauthorized_access_attempt"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: CRITICAL
+
+  - name: notify_security_channel
+    integration: collaboration
+    method: notify_security
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: block_response_pattern
+    integration: gateway
+    method: block_prompt_pattern
+    requires_approval: false
+    reversible: true
+    params: {}
+
+  - name: revert_prompt_version
+    integration: model_router
+    method: revert_prompt_version
+    requires_approval: true
+    reversible: true
+    params: {}
+
+  - name: create_compliance_ticket
+    integration: ticketing
+    method: create_ticket
+    requires_approval: false
+    reversible: false
+    params:
+      priority: Highest
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

@@ -1,0 +1,47 @@
+# Codificando.AI - UC-127
+# Playbook A: Generación No Segura (Unsafe Generation)
+# Disparador: guardrail_blocked_ratio > 5% en 2 minutos, toxicidad crítica
+# (>=0.8), o reporte de usuario por contenido tóxico.
+name: unsafe_generation
+incident_type: UNSAFE_GENERATION
+description: >
+  Contención y reversión ante generación de contenido tóxico, ofensivo o que
+  viola políticas de uso, detectada por los guardarraíles del pipeline de
+  monitoreo (UC-119) o reportada por un usuario/moderador.
+trigger_description: "guardrail_blocked_ratio > 5% (2m) OR toxicity_score >= 0.8"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: HIGH
+
+  - name: notify_security_channel
+    integration: collaboration
+    method: notify_security
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: filter_prompt_pattern
+    integration: gateway
+    method: block_prompt_pattern
+    requires_approval: false
+    reversible: true
+    params: {}
+
+  - name: revert_prompt_version
+    integration: model_router
+    method: revert_prompt_version
+    requires_approval: true
+    reversible: true
+    params: {}
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

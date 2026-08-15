@@ -1,0 +1,48 @@
+# Codificando.AI - UC-127
+# Playbook: Fallos en Herramientas (Tool/Function-Calling Failure)
+# Disparador: tool_error_rate >= 10% (warning) / >= 30% (critical).
+name: tool_failure
+incident_type: TOOL_FAILURE
+description: >
+  Respuesta ante fallos recurrentes de las herramientas/APIs invocadas por
+  el agente (function-calling), que pueden degradar la calidad de la
+  respuesta o dejar acciones a medio completar. Deshabilita temporalmente
+  la herramienta afectada y alerta al equipo de infraestructura.
+trigger_description: "tool_error_rate >= 0.10 (warning) / >= 0.30 (critical)"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: MEDIUM
+
+  - name: notify_infra_channel
+    integration: collaboration
+    method: notify_infra
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: disable_failing_tool
+    integration: gateway
+    method: disable_tool
+    requires_approval: true
+    reversible: true
+    params: {}
+
+  - name: file_ticket_if_recurrent
+    integration: ticketing
+    method: create_ticket
+    requires_approval: false
+    reversible: false
+    params:
+      priority: High
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

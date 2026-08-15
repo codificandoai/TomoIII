@@ -1,0 +1,48 @@
+# Codificando.AI - UC-127
+# Playbook: Prompt Injection / Jailbreak
+# Disparador: evasion_attempts_per_min >= 5 (warning) / >= 15 (critical),
+# o intento de extracción del prompt de sistema.
+name: prompt_injection
+incident_type: PROMPT_INJECTION
+description: >
+  Contención de intentos de jailbreak, prompt injection o extracción del
+  prompt de sistema, incluyendo bloqueo del patrón en el gateway y
+  correlación con el SIEM para descartar un ataque coordinado.
+trigger_description: "evasion_attempts_per_min >= 5 (warning) / >= 15 (critical)"
+steps:
+  - name: send_to_siem
+    integration: siem
+    method: send_event
+    requires_approval: false
+    reversible: false
+    params:
+      severity: HIGH
+
+  - name: notify_security_channel
+    integration: collaboration
+    method: notify_security
+    requires_approval: false
+    reversible: false
+    params: {}
+
+  - name: filter_prompt_pattern
+    integration: gateway
+    method: block_prompt_pattern
+    requires_approval: false
+    reversible: true
+    params: {}
+
+  - name: file_ticket_if_recurrent
+    integration: ticketing
+    method: create_ticket
+    requires_approval: false
+    reversible: false
+    params:
+      priority: High
+
+  - name: update_sop
+    integration: wiki
+    method: append_incident_note
+    requires_approval: false
+    reversible: false
+    params: {}

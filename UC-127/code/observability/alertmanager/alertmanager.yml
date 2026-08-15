@@ -1,0 +1,17 @@
+# Codificando.AI - UC-127
+# Alertmanager reenvía cada alerta como un webhook estándar al orquestador
+# de respuesta a incidentes, que la clasifica y ejecuta el playbook
+# codificado correspondiente.
+
+route:
+  receiver: uc127-orchestrator
+  group_by: ["alertname", "model"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+
+receivers:
+  - name: uc127-orchestrator
+    webhook_configs:
+      - url: "http://uc127-api:8001/api/v1/alertmanager/webhook"
+        send_resolved: false
