@@ -1,0 +1,10 @@
+# Codificando.AI - UC-179
+# Cronogramas de referencia para la orquestación con Airflow
+# (ver `workflows/*.py`). No es leído por el pipeline en tiempo de
+# ejecución vía API/CLI; documenta la cadencia recomendada de cada etapa.
+
+schedules:
+  data_collection: "0 */6 * * *"   # cada 6 horas
+  etl_pipeline: "0 0 * * *"        # diario a medianoche
+  training_check: "0 2 * * 0"      # semanal, domingo 2 AM
+  full_validation: "0 4 1 * *"     # mensual, día 1 a las 4 AM

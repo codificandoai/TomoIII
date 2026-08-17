@@ -1,0 +1,26 @@
+# Codificando.AI - UC-179
+# Umbrales que gobiernan el pipeline de reentrenamiento continuo:
+# cuándo disparar reentrenamiento completo vs. fine-tuning ligero, y qué
+# métricas mínimas debe cumplir un modelo candidato para ser desplegado.
+
+retraining_thresholds:
+  min_new_samples_since_last_training: 500
+  performance_degradation: 0.05      # caída de 5% en accuracy dispara reentrenamiento
+  max_age_days: 30                   # forzar reentrenamiento tras 30 días sin entrenar
+
+fine_tuning_thresholds:
+  min_samples: 100
+  confidence_threshold: 0.7
+  max_cost_per_epoch: 50             # USD, límite de costo de fine-tuning
+
+quality_metrics:
+  min_accuracy: 0.85
+  min_f1_score: 0.80
+  max_latency_ms: 500
+  max_metric_regression_pct: 5.0     # no permitir empeorar > 5% vs. baseline
+
+data_quality:
+  min_input_length: 10
+  min_output_length: 3
+  min_token_count: 3
+  semantic_duplicate_threshold: 0.85

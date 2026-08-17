@@ -1,0 +1,18 @@
+# Codificando.AI - UC-179
+# Dependencias del sistema autónomo de reentrenamiento continuo
+
+flask>=3.0,<4.0
+pyyaml>=6.0,<7.0
+numpy>=1.26,<2.0
+scikit-learn>=1.3,<1.6
+joblib>=1.3,<2.0
+
+# Testing
+pytest>=7.4,<9.0
+pytest-cov>=4.1,<6.0
+
+# --- Orquestación opcional (DAGs de referencia en workflows/) ---
+# apache-airflow>=2.8
+
+# --- Servidor WSGI de producción ---
+gunicorn>=21.2,<23.0
