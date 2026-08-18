@@ -32,20 +32,3 @@ mas este contexto que te indico:  " "
 todo el codigo debe estar almacenado en el folder /Users/utron/Documents/code-books/TomoIII/UC-xxx/code/, y debe validar el codigo, agrega API proceso de entrada un card view especificando parametros de entreda del ApiRest y card view con parametros de salida de la ApiRest Flask para exponer acceso al algoritmo y pipeline del modelo, incluye pruebas unitarias y test de integracion, documentar el codigo correctamente en UC-xxx.md. 
 
 
-
-
-
-
- en /Users/utron/Documents/code-books/TomoIII/UC-700/code/ vas a colocar la solucion, teniendo en cuenta los requerimientos por completo especificos en   /Users/utron/Documents/code-books/TomoIII/UC-700/UC-700.md , puedes reutilizar o apoyartye con codigo de los otros tomos en la base de la carpeta code-books/TomoI, TomoII, TomoIII, vamos a realizar una solucion de agentes bajo este contexto  "Con agentic Ai vas a crear un set de agentes AI que implementen a profundidad autosanación avanzada del entrenamiento debe complementar los pasos del 1 al 13 especificos en archivo UC-700.md , crear los dashboards respectivos para grafana stack y prometheus y lo necesario requerido con una profundidad tecnica avanzada
-1. Detectar la anomalía.
-2. Clasificar el fallo.
-3. Determinar su alcance.
-4. Aislar el componente.
-5. Reconfigurar el trabajo.
-6. Recuperar desde el último checkpoint válido.
-7. Reponer el componente defectuoso.
-8. Validar que el entrenamiento continúa correctamente.
-9. Medir la degradación de eficiencia.
-10. Escalar a un operador si no se cumple el objetivo.
-        " 
-todo el codigo debe estar almacenado en el folder /Users/utron/Documents/code-books/TomoIII/UC-700/code/, y debe validar el codigo, agrega API proceso de entrada un card view especificando parametros de entreda del ApiRest y card view con parametros de salida de la ApiRest Flask para exponer acceso al algoritmo y pipeline del modelo, incluye pruebas unitarias y test de integracion, documentar el codigo correctamente en UC-700.md. 
