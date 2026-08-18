@@ -28,6 +28,7 @@ import sys
 
 from api import app
 from core import analizar_empresa, ejecutar_pipeline
+from emis_scraper import EmisScraperError, scrape_multi_country, to_analyze_payload
 from forecasting import predecir
 from grafana_dashboards import write_dashboards
 
@@ -118,6 +119,68 @@ def cmd_batch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_analyze_from_emis(args: argparse.Namespace) -> int:
+    try:
+        preferred = [args.pais.upper(), None] if args.pais else None
+        scrape_result = scrape_multi_country(args.empresa, preferred_countries=preferred)
+        payload = to_analyze_payload(scrape_result, fecha_corte=args.fecha)
+        resultado = analizar_empresa(payload)
+        print(json.dumps({
+            "empresa": scrape_result["empresa"],
+            "pais": scrape_result["pais"],
+            "url_emis": scrape_result["url"],
+            "moneda": scrape_result["moneda"],
+            "indicadores_extraidos": scrape_result["indicadores"],
+            "analisis": resultado,
+        }, ensure_ascii=False, indent=2, default=str))
+        return 0
+    except EmisScraperError as e:
+        print(f"Error EMIS: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_predict_from_emis(args: argparse.Namespace) -> int:
+    import pandas as pd
+    from core import canonizar_indicador, parsear_numero
+
+    try:
+        preferred = [args.pais.upper(), None] if args.pais else None
+        scrape_result = scrape_multi_country(args.empresa, preferred_countries=preferred)
+        payload = to_analyze_payload(scrape_result, fecha_corte=args.fecha)
+        resultado = analizar_empresa(payload)
+
+        filas = []
+        for corte in payload.get("cortes", []):
+            fecha = pd.to_datetime(corte.get("fecha"), errors="coerce")
+            for nombre, valor in corte.get("indicadores", {}).items():
+                canonico = canonizar_indicador(nombre)
+                if canonico:
+                    filas.append({
+                        "empresa": scrape_result["empresa"],
+                        "fecha": fecha,
+                        "indicador": canonico,
+                        "valor": parsear_numero(valor),
+                        "unidad": None,
+                    })
+        historial = pd.DataFrame(filas)
+        prediccion = predecir(historial, horizonte_anios=args.horizonte)
+        prediccion["analisis_actual"] = resultado
+
+        print(json.dumps({
+            "empresa": scrape_result["empresa"],
+            "pais": scrape_result["pais"],
+            "url_emis": scrape_result["url"],
+            "moneda": scrape_result["moneda"],
+            "indicadores_extraidos": scrape_result["indicadores"],
+            "analisis": resultado,
+            "prediccion": prediccion,
+        }, ensure_ascii=False, indent=2, default=str))
+        return 0
+    except EmisScraperError as e:
+        print(f"Error EMIS: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_dashboards(_args: argparse.Namespace) -> int:
     output_dir = os.path.join(os.path.dirname(__file__), "dashboards")
     paths = write_dashboards(output_dir)
@@ -147,6 +210,19 @@ def main() -> int:
     p_predict.add_argument("--ejemplo", action="store_true", help="Usar datos de ejemplo")
     p_predict.add_argument("--horizonte", type=int, default=1, help="Horizonte de proyección en años")
     p_predict.set_defaults(func=cmd_predict)
+
+    p_analyze_emis = sub.add_parser("analyze-from-emis", help="Scrapea EMIS y analiza")
+    p_analyze_emis.add_argument("empresa", help="Nombre de la empresa")
+    p_analyze_emis.add_argument("--pais", default=None, help="Código de país preferido (ej: CO)")
+    p_analyze_emis.add_argument("--fecha", default=None, help="Fecha del corte (YYYY-MM-DD)")
+    p_analyze_emis.set_defaults(func=cmd_analyze_from_emis)
+
+    p_predict_emis = sub.add_parser("predict-from-emis", help="Scrapea EMIS y predice")
+    p_predict_emis.add_argument("empresa", help="Nombre de la empresa")
+    p_predict_emis.add_argument("--pais", default=None, help="Código de país preferido (ej: CO)")
+    p_predict_emis.add_argument("--fecha", default=None, help="Fecha del corte (YYYY-MM-DD)")
+    p_predict_emis.add_argument("--horizonte", type=int, default=1, help="Horizonte de proyección en años")
+    p_predict_emis.set_defaults(func=cmd_predict_from_emis)
 
     p_batch = sub.add_parser("batch", help="Procesa CSV/Excel multiempresa")
     p_batch.add_argument("archivo", help="Ruta al archivo CSV/Excel")

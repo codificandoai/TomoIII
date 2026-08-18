@@ -34,51 +34,81 @@ except ImportError:  # pragma: no cover
 INDICADORES = {
     "Ingresos netos por ventas": {
         "categoria": "Crecimiento", "unidad": "pct", "peso": 0.12,
-        "aliases": ["ingresos netos por ventas", "ventas netas", "ventas", "ingresos por ventas"],
+        "aliases": [
+            "ingresos netos por ventas", "ventas netas", "ventas", "ingresos por ventas",
+            "net sales revenue", "net revenue", "sales revenue", "revenue",
+        ],
     },
     "Total Ingreso Operativo": {
         "categoria": "Crecimiento", "unidad": "pct", "peso": 0.10,
-        "aliases": ["total ingreso operativo", "ingresos operativos", "ingreso operativo"],
+        "aliases": [
+            "total ingreso operativo", "ingresos operativos", "ingreso operativo",
+            "total operating revenue", "operating revenue", "total revenue",
+        ],
     },
     "Ganancia operativa (EBIT)": {
         "categoria": "Rentabilidad", "unidad": "pct", "peso": 0.20,
-        "aliases": ["ganancia operativa ebit", "ebit", "utilidad operativa"],
+        "aliases": [
+            "ganancia operativa ebit", "ebit", "utilidad operativa",
+            "operating profit", "operating income", "ebit earnings",
+        ],
     },
     "Ganancia (Pérdida) Neta": {
         "categoria": "Rentabilidad", "unidad": "pct", "peso": 0.08,
-        "aliases": ["ganancia perdida neta", "ganancia neta", "utilidad neta", "perdida neta"],
+        "aliases": [
+            "ganancia perdida neta", "ganancia neta", "utilidad neta", "perdida neta",
+            "net profit", "net loss", "net profit loss for the period", "net income",
+        ],
     },
     "Activos Totales": {
         "categoria": "Balance", "unidad": "pct", "peso": 0.06,
-        "aliases": ["activos totales", "total activos"],
+        "aliases": ["activos totales", "total activos", "total assets", "assets"],
     },
     "Total de patrimonio": {
         "categoria": "Balance", "unidad": "pct", "peso": 0.14,
-        "aliases": ["total de patrimonio", "patrimonio", "patrimonio total"],
+        "aliases": [
+            "total de patrimonio", "patrimonio", "patrimonio total",
+            "total equity", "shareholders equity", "equity",
+        ],
     },
     "Margen Operacional": {
         "categoria": "Rentabilidad", "unidad": "pct", "peso": 0.08,
-        "aliases": ["margen operacional", "margen operativo"],
+        "aliases": [
+            "margen operacional", "margen operativo",
+            "operating profit margin", "operating margin",
+        ],
     },
     "Margen Neto": {
         "categoria": "Rentabilidad", "unidad": "pct", "peso": 0.06,
-        "aliases": ["margen neto"],
+        "aliases": ["margen neto", "net profit margin", "net margin"],
     },
     "Rendimiento Sobre El Patrimonio (ROE)": {
         "categoria": "Rentabilidad", "unidad": "pct", "peso": 0.06,
-        "aliases": ["rendimiento sobre el patrimonio roe", "roe"],
+        "aliases": [
+            "rendimiento sobre el patrimonio roe", "roe",
+            "return on equity roe", "return on equity",
+        ],
     },
     "Relación Deuda/Capital": {
         "categoria": "Solvencia", "unidad": "pct", "peso": 0.08,
-        "aliases": ["relacion deuda capital", "deuda capital", "debt to equity"],
+        "aliases": [
+            "relacion deuda capital", "deuda capital", "debt to equity",
+            "debt equity ratio", "debt/equity",
+        ],
     },
     "Prueba Ácida": {
         "categoria": "Liquidez", "unidad": "ratio", "peso": 0.10,
-        "aliases": ["prueba acida", "quick ratio", "ratio acido"],
+        "aliases": [
+            "prueba acida", "quick ratio", "ratio acido",
+            "acid test ratio", "quick test ratio",
+        ],
     },
     "Coeficiente de Efectivo": {
         "categoria": "Liquidez", "unidad": "ratio", "peso": 0.12,
-        "aliases": ["coeficiente de efectivo", "cash ratio", "ratio de efectivo"],
+        "aliases": [
+            "coeficiente de efectivo", "cash ratio", "ratio de efectivo",
+            "cash ratio coefficient",
+        ],
     },
 }
 
@@ -113,7 +143,7 @@ def parsear_numero(valor: Any) -> float:
         return float(valor)
 
     texto = str(valor).strip()
-    if normalizar_texto(texto) in {"", "nd", "na", "n a", "no disponible", "none", "nan", "null", "-"}:
+    if normalizar_texto(texto) in {"", "nd", "na", "n a", "n/d", "n/a", "no disponible", "none", "nan", "null", "-"}:
         return np.nan
 
     texto = texto.replace("COP", "").replace("$", "").replace("%", "").strip()

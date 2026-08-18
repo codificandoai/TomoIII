@@ -5,8 +5,9 @@ Endpoints:
   GET  /api/v1/schema
   POST /api/v1/analyze          -> análisis rule-based
   POST /api/v1/predict          -> análisis + proyección de declive/sostenimiento
+  POST /api/v1/analyze-from-emis -> scrapea EMIS y analiza
+  POST /api/v1/predict-from-emis  -> scrapea EMIS y predice declive/sostenimiento
   POST /api/v1/batch            -> procesar CSV/XLSX multiempresa
-  POST /api/v1/ingest           -> ingesta de métricas para Prometheus
   GET  /api/v1/metrics          -> métricas Prometheus
   GET  /api/v1/dashboards       -> dashboards Grafana generados
 """
@@ -23,6 +24,7 @@ from typing import Any, Dict, List
 from flask import Flask, jsonify, request
 
 from core import analizar_empresa, ejecutar_pipeline, leer_datos
+from emis_scraper import EmisScraperError, scrape_multi_country, to_analyze_payload
 from forecasting import predecir
 from grafana_dashboards import write_dashboards
 from prometheus_metrics import UC701Metrics, CONTENT_TYPE_LATEST
@@ -61,6 +63,25 @@ INPUT_CARDS: List[Dict[str, Any]] = [
             {"name": "generar_pdf", "type": "boolean", "required": False, "example": True},
         ],
     },
+    {
+        "endpoint": "POST /api/v1/analyze-from-emis",
+        "description": "Busca la empresa en emis.com, extrae KPIs y ejecuta análisis financiero.",
+        "parameters": [
+            {"name": "empresa", "type": "string", "required": True, "example": "Evolution Technologies Group"},
+            {"name": "pais", "type": "string", "required": False, "example": "CO"},
+            {"name": "fecha_corte", "type": "string", "required": False, "example": "2024-12-31"},
+        ],
+    },
+    {
+        "endpoint": "POST /api/v1/predict-from-emis",
+        "description": "Busca la empresa en emis.com, extrae KPIs y predice declive/sostenimiento financiero.",
+        "parameters": [
+            {"name": "empresa", "type": "string", "required": True, "example": "Evolution Technologies Group"},
+            {"name": "pais", "type": "string", "required": False, "example": "CO"},
+            {"name": "fecha_corte", "type": "string", "required": False, "example": "2024-12-31"},
+            {"name": "horizonte_anios", "type": "integer", "required": False, "example": 1},
+        ],
+    },
 ]
 
 OUTPUT_CARDS: List[Dict[str, Any]] = [
@@ -92,6 +113,31 @@ OUTPUT_CARDS: List[Dict[str, Any]] = [
             {"name": "nivel_riesgo_proyectado", "type": "string"},
             {"name": "proyecciones_por_indicador", "type": "object"},
             {"name": "indicadores_en_declive", "type": "list"},
+        ],
+    },
+    {
+        "endpoint": "POST /api/v1/analyze-from-emis",
+        "description": "Resultado del análisis con datos scrapeados desde EMIS.",
+        "fields": [
+            {"name": "empresa", "type": "string"},
+            {"name": "pais", "type": "string"},
+            {"name": "url_emis", "type": "string"},
+            {"name": "moneda", "type": "string"},
+            {"name": "indicadores_extraidos", "type": "object"},
+            {"name": "analisis", "type": "object"},
+        ],
+    },
+    {
+        "endpoint": "POST /api/v1/predict-from-emis",
+        "description": "Predicción con datos scrapeados desde EMIS.",
+        "fields": [
+            {"name": "empresa", "type": "string"},
+            {"name": "pais", "type": "string"},
+            {"name": "url_emis", "type": "string"},
+            {"name": "moneda", "type": "string"},
+            {"name": "indicadores_extraidos", "type": "object"},
+            {"name": "analisis", "type": "object"},
+            {"name": "prediccion", "type": "object"},
         ],
     },
 ]
@@ -168,6 +214,97 @@ def predict():
         prediccion["analisis_actual"] = resultado_analisis
         metrics.record_prediction(prediccion)
         return _ok(prediccion)
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+def _scrape_and_build_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Scrapea EMIS y construye el payload para análisis/predicción."""
+    empresa = str(payload.get("empresa", "")).strip()
+    if not empresa:
+        raise ValueError("Se requiere el nombre de la empresa.")
+    pais = payload.get("pais")
+    fecha_corte = payload.get("fecha_corte")
+
+    # Si pais es None se hace búsqueda global; si se suministra se prueba ese primero.
+    preferred = None
+    if pais:
+        preferred = [str(pais).upper(), None]
+    scrape_result = scrape_multi_country(empresa, preferred_countries=preferred)
+    analyze_payload = to_analyze_payload(scrape_result, fecha_corte=fecha_corte)
+    return scrape_result, analyze_payload
+
+
+@app.route("/api/v1/analyze-from-emis", methods=["POST"])
+def analyze_from_emis():
+    payload = request.get_json(silent=True)
+    if not payload:
+        return _err("Se requiere un JSON en el body.")
+    try:
+        scrape_result, analyze_payload = _scrape_and_build_payload(payload)
+        resultado = analizar_empresa(analyze_payload)
+        metrics.record_analysis(resultado)
+        return _ok({
+            "empresa": scrape_result["empresa"],
+            "pais": scrape_result["pais"],
+            "url_emis": scrape_result["url"],
+            "moneda": scrape_result["moneda"],
+            "indicadores_extraidos": scrape_result["indicadores"],
+            "analisis": resultado,
+        })
+    except EmisScraperError as e:
+        return _err(str(e), 404)
+    except Exception as e:
+        return _err(str(e), 500)
+
+
+@app.route("/api/v1/predict-from-emis", methods=["POST"])
+def predict_from_emis():
+    payload = request.get_json(silent=True)
+    if not payload:
+        return _err("Se requiere un JSON en el body.")
+    try:
+        scrape_result, analyze_payload = _scrape_and_build_payload(payload)
+        horizonte = int(payload.get("horizonte_anios", 1))
+
+        resultado = analizar_empresa(analyze_payload)
+        metrics.record_analysis(resultado)
+
+        # Para forecasting reconstruimos un DataFrame con el corte disponible.
+        # EMIS publica tasas de crecimiento anual de los últimos dos años, por lo
+        # que un único corte es insuficiente para regresión; predecir informará la
+        # limitación y devolverá escenario basado en score actual.
+        import pandas as pd
+        from core import canonizar_indicador, parsear_numero
+        filas = []
+        for corte in analyze_payload.get("cortes", []):
+            fecha = pd.to_datetime(corte.get("fecha"), errors="coerce")
+            for nombre, valor in corte.get("indicadores", {}).items():
+                canonico = canonizar_indicador(nombre)
+                if canonico:
+                    filas.append({
+                        "empresa": scrape_result["empresa"],
+                        "fecha": fecha,
+                        "indicador": canonico,
+                        "valor": parsear_numero(valor),
+                        "unidad": None,
+                    })
+        historial = pd.DataFrame(filas)
+        prediccion = predecir(historial, horizonte_anios=horizonte)
+        prediccion["analisis_actual"] = resultado
+        metrics.record_prediction(prediccion)
+
+        return _ok({
+            "empresa": scrape_result["empresa"],
+            "pais": scrape_result["pais"],
+            "url_emis": scrape_result["url"],
+            "moneda": scrape_result["moneda"],
+            "indicadores_extraidos": scrape_result["indicadores"],
+            "analisis": resultado,
+            "prediccion": prediccion,
+        })
+    except EmisScraperError as e:
+        return _err(str(e), 404)
     except Exception as e:
         return _err(str(e), 500)
 

@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -88,6 +89,55 @@ class TestAPIIntegration(unittest.TestCase):
         resp = self.client.get("/api/v1/metrics")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("uc701", resp.get_data(as_text=True).lower())
+
+    @patch("api.scrape_multi_country")
+    def test_analyze_from_emis(self, mock_scrape):
+        mock_scrape.return_value = {
+            "empresa": "Evolution Technologies Group S A S (Colombia)",
+            "pais": "CO",
+            "url": "https://www.emis.com/php/company-profile/CO/Evolution_Technologies_Group_S_A_S_es_3560386.html",
+            "moneda": "COP",
+            "indicadores": {
+                "Ingresos netos por ventas": "-26.71%",
+                "Ganancia operativa (EBIT)": "-90.97%",
+                "Prueba Ácida": "0.32%",
+                "Total de patrimonio": "-57.93%",
+            },
+        }
+        resp = self.client.post(
+            "/api/v1/analyze-from-emis",
+            data=json.dumps({"empresa": "Evolution Technologies Group", "pais": "CO"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()["data"]
+        self.assertEqual(data["pais"], "CO")
+        self.assertIn("analisis", data)
+        self.assertIn("score_riesgo_financiero", data["analisis"])
+
+    @patch("api.scrape_multi_country")
+    def test_predict_from_emis(self, mock_scrape):
+        mock_scrape.return_value = {
+            "empresa": "Evolution Technologies Group S A S (Colombia)",
+            "pais": "CO",
+            "url": "https://www.emis.com/php/company-profile/CO/Evolution_Technologies_Group_S_A_S_es_3560386.html",
+            "moneda": "COP",
+            "indicadores": {
+                "Ingresos netos por ventas": "-26.71%",
+                "Ganancia operativa (EBIT)": "-90.97%",
+                "Prueba Ácida": "0.32%",
+                "Total de patrimonio": "-57.93%",
+            },
+        }
+        resp = self.client.post(
+            "/api/v1/predict-from-emis",
+            data=json.dumps({"empresa": "Evolution Technologies Group", "pais": "CO"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()["data"]
+        self.assertIn("prediccion", data)
+        self.assertIn("probabilidad_declive_pct", data["prediccion"])
 
 
 if __name__ == "__main__":
