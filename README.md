@@ -32,3 +32,8 @@ mas este contexto que te indico:  " "
 todo el codigo debe estar almacenado en el folder /Users/utron/Documents/code-books/TomoIII/UC-xxx/code/, y debe validar el codigo, agrega API proceso de entrada un card view especificando parametros de entreda del ApiRest y card view con parametros de salida de la ApiRest Flask para exponer acceso al algoritmo y pipeline del modelo, incluye pruebas unitarias y test de integracion, documentar el codigo correctamente en UC-xxx.md. 
 
 
+
+
+
+
+

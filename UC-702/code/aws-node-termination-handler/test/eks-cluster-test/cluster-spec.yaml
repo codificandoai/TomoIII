@@ -1,0 +1,25 @@
+---
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: nth-eks-cluster-test
+  region: us-west-2
+  version: '1.27'
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["*"]
+managedNodeGroups:
+  - name: linux-ng
+    instanceType: t3.medium
+    amiFamily: AmazonLinux2
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 2
+    spot: true
+nodeGroups:
+  - name: windows-ng
+    instanceType: m5.large
+    minSize: 1
+    maxSize: 1
+    volumeSize: 100
+    amiFamily: WindowsServer2022FullContainer

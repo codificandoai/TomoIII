@@ -1,0 +1,195 @@
+# Release automation, modelled on the singhangad.in pipeline and adapted to
+# GitHub. A human dispatches this on `main` with a VERSION_TYPE to cut a release
+# (promote develop -> main, bump, tag, publish); a hotfix/* merge into `main`
+# auto-cuts a PATCH release. Both push directly to protected `main` using
+# RELEASE_TOKEN (a PAT that bypasses the branch ruleset), then open an
+# auto-merging back-merge PR into the strictly-gated `develop`.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: Semantic version increment
+        required: true
+        type: choice
+        default: PATCH
+        options: [PATCH, MINOR, MAJOR]
+      release_as:
+        description: One-time explicit version such as 1.0.0 (overrides increment)
+        required: false
+        type: string
+  push:
+    branches: [main]
+
+concurrency:
+  group: dashboard-release
+  cancel-in-progress: false
+
+permissions: {}
+
+env:
+  IMAGE: ghcr.io/singhangadin/dgx-spark-dashboard
+
+jobs:
+  release:
+    name: Version, publish, and release
+    # Dispatched releases, or a hotfix/* merge landing on main. Never on forks,
+    # and never on the release/back-merge commits this job itself pushes.
+    if: >-
+      github.repository == 'singhangadin/DGX-Spark-Dashboard' &&
+      ( github.event_name == 'workflow_dispatch' ||
+        ( github.event_name == 'push' &&
+          startsWith(github.event.head_commit.message, 'Merge') &&
+          contains(github.event.head_commit.message, 'hotfix/') ) )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # GITHUB_TOKEN creates the GitHub Release.
+      packages: write # Publish the image to GHCR.
+      attestations: write
+      id-token: write
+      pull-requests: write # Open the back-merge PR into develop.
+    steps:
+      - name: Check out main with the release token
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+
+      - name: Version, promote, and tag
+        id: prepare
+        env:
+          VERSION_TYPE: ${{ inputs.version_type }}
+          RELEASE_AS: ${{ inputs.release_as }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main develop --tags
+          git checkout -B main origin/main
+
+          if [ "$EVENT_NAME" = "push" ]; then
+            # Hotfix is already on main — always a PATCH, no promotion.
+            VERSION_TYPE=PATCH
+            RELEASE_AS=""
+          elif [ -n "${RELEASE_AS:-}" ]; then
+            echo "Bootstrap release; tagging current main without promotion."
+          else
+            echo "Promoting develop -> main for release…"
+            git merge --no-ff origin/develop -m "Merge develop into main for release" \
+              || { echo "Conflict promoting develop -> main."; git merge --abort; exit 1; }
+          fi
+
+          NEW_VERSION=$(VERSION_TYPE="${VERSION_TYPE:-}" RELEASE_AS="${RELEASE_AS:-}" python3 scripts/release/bump.py)
+          TAG="v${NEW_VERSION}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag ${TAG} already exists." >&2; exit 1
+          fi
+
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          python3 scripts/release/changelog.py "$PREV_TAG" HEAD > notes.md
+          cat notes.md
+
+          if ! git diff --quiet -- VERSION; then
+            git add VERSION
+            git commit -m "chore(release): ${TAG}"
+          fi
+          git tag -a "$TAG" -F notes.md
+          git push origin main
+          git push origin "$TAG"
+
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate release source
+        run: |
+          python3 -m py_compile backend/app/main.py backend/app/serve.py scripts/release/bump.py scripts/release/changelog.py
+          node --check frontend/app.js
+          sh -n install.sh
+          docker compose config >/dev/null
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml config >/dev/null
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish DGX Spark image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          push: true
+          build-args: APP_VERSION=${{ steps.prepare.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.prepare.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.title=DGX Spark Dashboard
+            org.opencontainers.image.description=Lightweight host monitoring for NVIDIA DGX Spark
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.prepare.outputs.commit }}
+            org.opencontainers.image.version=${{ steps.prepare.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Package clone-free deployment bundle
+        env:
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist/deploy
+          cp install.sh docker-compose.yml docker-compose.gpu.yml docker-compose.cdi.yml .env.example dist/deploy/
+          printf '%s\n' "$VERSION" > dist/deploy/VERSION
+          touch dist/deploy/.dgx-dashboard-release
+          tar -czf dist/dgx-spark-dashboard-deploy.tar.gz -C dist/deploy .
+          cd dist
+          sha256sum dgx-spark-dashboard-deploy.tar.gz > dgx-spark-dashboard-deploy.tar.gz.sha256
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --verify-tag \
+            --title "Release $TAG" \
+            --notes-file notes.md \
+            dist/dgx-spark-dashboard-deploy.tar.gz \
+            dist/dgx-spark-dashboard-deploy.tar.gz.sha256
+
+      - name: Back-merge into develop
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch origin main develop
+          BRANCH="sync/${TAG}-into-develop"
+          git checkout -B "$BRANCH" origin/main
+          git push -f origin "$BRANCH"
+          # develop is strictly gated, so sync through an auto-merging PR: CI runs
+          # and GitHub merges it once the checks are green.
+          if gh pr create --base develop --head "$BRANCH" \
+               --title "chore: sync ${TAG} into develop" \
+               --body "Back-merge release ${TAG} into develop."; then
+            gh pr merge "$BRANCH" --merge --auto --delete-branch \
+              || gh pr merge "$BRANCH" --merge --delete-branch || true
+          else
+            echo "develop already contains ${TAG}; nothing to back-merge."
+          fi

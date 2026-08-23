@@ -1,0 +1,75 @@
+name: Feature Request
+description: Suggest a new feature or enhancement for the GPU Usage Monitor
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please fill out the form below to help us understand your request.
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Describe the feature you'd like to see added
+      placeholder: A clear and concise description of the feature...
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What problem does this feature solve? How would you use it?
+      placeholder: |
+        I'm trying to achieve [goal] but currently [limitation]...
+        This feature would help by...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: feature-area
+    attributes:
+      label: Feature Area
+      description: Which area does this feature relate to?
+      options:
+        - Dashboard Panel
+        - Metrics Collection
+        - Installation/Configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution
+      description: How do you think this feature should work?
+      placeholder: Describe your proposed implementation or approach...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternative Solutions
+      description: Have you considered any alternative solutions or workarounds?
+      placeholder: Describe any alternatives you've considered...
+
+  - type: textarea
+    id: mockup
+    attributes:
+      label: Mockups or Examples
+      description: |
+        If applicable, add mockups, screenshots from other tools, or examples showing what you have in mind.
+        Drag and drop images here or click to upload.
+      placeholder: Paste or drag images/examples here...
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Add any other context, links, or information about the feature request
+      placeholder: Any additional information that might help...

@@ -1,0 +1,50 @@
+services:
+  dashboard:
+    image: "${DASHBOARD_IMAGE:-ghcr.io/singhangadin/dgx-spark-dashboard}:${DASHBOARD_VERSION:-latest}"
+    restart: unless-stopped
+    # Host networking is required for genuine host-interface counters. The
+    # process still runs unprivileged with every Linux capability dropped.
+    network_mode: host
+    environment:
+      DASHBOARD_SETTINGS_PATH: /app/data/settings.json
+      # Comma/space-separated list of addresses or interface names to bind
+      # (e.g. "127.0.0.1,wg0,tailscale0"). Loopback is always bound as well.
+      DASHBOARD_BIND_ADDRESS: "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}"
+      DASHBOARD_PORT: "${DASHBOARD_PORT:-8787}"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: utility
+    volumes:
+      # Docker's API is mounted for read-only metric collection only. The app has
+      # no endpoint that changes Docker state.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data:/app/data
+      # Keep the displayed identity accurate without exposing the host root.
+      - /etc/hostname:/host-hostname:ro
+      # Explicit host CPU, memory, load, and uptime counters.
+      - /proc/stat:/host-proc-stat:ro
+      - /proc/cpuinfo:/host-proc-cpuinfo:ro
+      - /proc/meminfo:/host-meminfo:ro
+      - /proc/loadavg:/host-loadavg:ro
+      # Read host uplink counters from the shared host network namespace.
+      - /proc/net/dev:/host-network-dev:ro
+      - /proc/net/route:/host-network-route:ro
+      # Aggregate physical-disk I/O counters, not filesystem capacity data.
+      - /proc/diskstats:/host-diskstats:ro
+    # Docker sockets are normally group-owned; install.sh discovers this GID.
+    group_add:
+      - "${DOCKER_GID:-999}"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The launcher always binds loopback, so the in-container check can target it
+    # regardless of which external interfaces DASHBOARD_BIND_ADDRESS adds.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${DASHBOARD_PORT:-8787}/api/health')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

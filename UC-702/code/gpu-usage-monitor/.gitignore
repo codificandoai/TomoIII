@@ -1,0 +1,90 @@
+# Operating System
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.vim/
+*.sublime-*
+
+# Logs
+*.log
+logs/
+*.out
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Helm
+*.tgz
+charts/*/charts/
+requirements.lock
+
+# Kubernetes
+*.kubeconfig
+kubeconfig
+.kube/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Environment variables and secrets
+.env
+.env.local
+*.secret
+secrets.yaml
+secrets/
+*.pem
+*.key
+*.crt
+!*.key.example
+
+# Backup files
+*.bak
+*.backup
+*-backup
+*.orig
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Node modules (if any frontend tooling)
+node_modules/
+package-lock.json
+yarn.lock
+
+# Coverage and test reports
+coverage/
+*.cover
+.coverage
+htmlcov/
+.tox/

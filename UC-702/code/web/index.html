@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UC-702 · Cluster Capacity &amp; Spot Watch</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">QBEX.AI · UC-702</p>
+      <h1>Disponibilidad de Recursos Subutilizados</h1>
+    </div>
+    <div class="header-status">
+      <span id="connection" class="dot"></span>
+      <span id="last-updated">Conectando…</span>
+      <button id="refresh-btn" type="button">Actualizar</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="section-heading">
+      <h2>Overview del Clúster</h2>
+    </section>
+    <section id="summary-cards" class="metrics-grid"></section>
+
+    <section class="section-heading">
+      <h2>Nodos Registrados</h2>
+      <span id="node-count"></span>
+    </section>
+    <section id="nodes-table" class="panel"></section>
+
+    <section class="two-col">
+      <div>
+        <section class="section-heading"><h2>Solicitar Capacidad del Pool</h2></section>
+        <form id="allocate-form" class="panel form-panel">
+          <label>Requester <input type="text" name="requester" placeholder="mi-app-o-servicio" required /></label>
+          <label>CPU cores <input type="number" step="0.1" name="cpu_cores" value="0" /></label>
+          <label>Memoria (MB) <input type="number" step="1" name="memory_mb" value="0" /></label>
+          <label>Disco (GB) <input type="number" step="0.1" name="disk_gb" value="0" /></label>
+          <label>GPUs <input type="number" step="1" name="gpu_count" value="0" /></label>
+          <label>Memoria GPU (MB) <input type="number" step="1" name="gpu_memory_mb" value="0" /></label>
+          <label>Sitio preferido <input type="text" name="preferred_site" placeholder="opcional" /></label>
+          <button type="submit">Asignar</button>
+        </form>
+        <pre id="allocate-result" class="result-box"></pre>
+      </div>
+
+      <div>
+        <section class="section-heading"><h2>Interrupción de Instancias Spot</h2></section>
+        <form id="spot-form" class="panel form-panel">
+          <label>Node ID <input type="text" name="node_id" placeholder="node-ec2-spot-01" required /></label>
+          <button type="submit">Consultar aviso de terminación</button>
+        </form>
+        <pre id="spot-result" class="result-box"></pre>
+        <div id="spot-events" class="panel"></div>
+      </div>
+    </section>
+
+    <section class="section-heading">
+      <h2>Documentación de la API (card views)</h2>
+    </section>
+    <section id="schema-cards" class="two-col"></section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

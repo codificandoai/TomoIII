@@ -1,0 +1,217 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+    tags-ignore:
+      - "v*.*.*"
+  pull_request:
+  workflow_dispatch:
+  # Run M-F at 2pm CDT
+  schedule:
+    - cron: '0 19 * * 1-5'
+
+env:
+  DEFAULT_GO_VERSION: ^1.25.0
+  GITHUB_USERNAME: ${{ secrets.EC2_BOT_GITHUB_USERNAME }}
+  GITHUB_TOKEN: ${{ secrets.EC2_BOT_GITHUB_TOKEN }}
+  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+
+permissions:
+  contents: read
+
+jobs:
+  fastTests:
+    name: Fast Test
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: Unit Tests
+      run: make unit-test
+
+    - name: Lints
+      run: make spellcheck shellcheck helm-lint
+
+    - name: License Check
+      run: make license-test
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate K8s YAML
+      run: make generate-k8s-yaml
+
+  golangci:
+    # this action needs to run in its own job per setup
+    name: Lint Eastwood
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.DEFAULT_GO_VERSION }}
+          cache: false
+
+      - name: Set up golangci-lint
+        uses: golangci/golangci-lint-action@v7
+        with:
+          version: latest
+          args: --timeout=5m
+          skip-cache: true
+    
+  buildLinux:
+    name: Build Linux Binaries
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: Build Linux Binaries
+      run: make build-binaries
+
+  buildLinuxDocker:
+    name: Build Linux Docker Images
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Build Linux Docker Images
+      run: make build-docker-images
+
+  buildWindows:
+    name: Build Windows Binaries
+    strategy:
+      matrix:
+        version: [2022]
+    runs-on: windows-${{matrix.version}}
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: Build Windows Binaries
+      run: |
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
+
+        choco install make && choco install zip && make build-binaries-windows-${{matrix.version}}
+
+  buildWindowsDocker:
+    name: Build Windows Docker Images
+    strategy:
+      matrix:
+        version: [2022]
+    runs-on: windows-${{matrix.version}}
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: Build Windows Docker Images
+      run: |
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
+
+        choco install make && make build-docker-images-windows-${{matrix.version}}
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        k8sVersion: ["1.29", "1.30", "1.31", "1.32"]
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Restore go mod cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/go/bin/
+        key: gocache
+
+    - name: E2E Tests
+      run: test/k8s-local-cluster-test/run-test -v ${{ matrix.k8sVersion }}

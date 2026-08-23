@@ -1,0 +1,41 @@
+services:
+  sparkdash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/arm64
+    container_name: sparkDash
+    # always: come back after host reboot even if the container was stopped
+    # before shutdown (unlike unless-stopped, which stays down after a manual stop).
+    restart: always
+    # Auto-restart Node when ./server files change (no image rebuild)
+    command: ["node", "--watch", "server/index.js"]
+    # Host network so local LLM probes reach loopback-bound servers
+    # (ds4-server / start.sh default --host 127.0.0.1). Bridge NAT cannot
+    # reach the host's 127.0.0.1, and LAN-IP probes miss loopback binds.
+    network_mode: host
+    privileged: true
+    # Share host PID namespace so nvidia-smi compute-apps sees GPU processes
+    # (otherwise local VRAM falls back to minute-old config/gpu-memory.json).
+    pid: host
+    volumes:
+      # Live server code — edits apply after --watch reloads the process
+      - ./server:/app/server
+      # Mount host filesystem for local Spark metrics
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+      # Mount nvidia-smi + driver libs (fallback if nsenter host path fails)
+      - /usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro
+      - /usr/lib/aarch64-linux-gnu/libnvidia-ml.so.1:/usr/lib/aarch64-linux-gnu/libnvidia-ml.so.1:ro
+      # Config + encrypted secrets (passwords survive restarts)
+      - ./config:/app/config
+    environment:
+      - BIND_HOST=0.0.0.0
+      - PORT=5555
+      - LLM_PORT=8888
+      - NODE_ENV=production
+      - HOST_PROC_PATH=/host/proc
+      - HOST_SYS_PATH=/host/sys
+      - HOST_ROOT_PATH=/host/root

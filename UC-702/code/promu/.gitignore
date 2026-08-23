@@ -1,0 +1,6 @@
+/promu
+/promu-intermediate
+.build
+.tarballs
+testoutput
+/vendor

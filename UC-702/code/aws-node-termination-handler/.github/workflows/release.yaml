@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v1.*.*"
+
+permissions:
+  contents: write # required for uploading releases
+  id-token: write
+
+env:
+  DEFAULT_GO_VERSION: ^1.25.0
+  GITHUB_USERNAME: ${{ secrets.EC2_BOT_GITHUB_USERNAME }}
+  GITHUB_TOKEN: ${{ secrets.EC2_BOT_GITHUB_TOKEN }}
+  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+
+jobs:
+  releaseLinux:
+    name: Release Linux
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.WF_ROLE_ARN }}
+        role-session-name: "nth-release-linux-${{ github.run_id }}"
+        aws-region: us-east-1
+
+    - name: Release Linux Assets
+      run: make release
+
+  releaseWindows:
+    name: Release Windows
+    needs: [releaseLinux]
+    strategy:
+      matrix:
+        version: [2022]
+    runs-on: windows-${{matrix.version}}
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.WF_ROLE_ARN }}
+        role-session-name: "nth-release-windows-${{ github.run_id }}"
+        aws-region: us-east-1
+
+    - name: Release Windows Assets
+      run: |
+        $env:ChocolateyInstall = Convert-Path "$((Get-Command choco).Path)\..\.."
+        Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"
+        refreshenv
+
+        choco install make && choco install zip && make release-windows-${{matrix.version}}
+
+  release:
+    name: Release
+    runs-on: ubuntu-24.04
+    needs: [releaseLinux, releaseWindows]
+    steps:
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.DEFAULT_GO_VERSION }}
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.WF_ROLE_ARN }}
+        role-session-name: "nth-release-${{ github.run_id }}"
+        aws-region: us-east-1
+    
+    - name: Sync Helm Chart Catalog information
+      run: make sync-catalog-information-for-helm-chart
+    
+    - name: Sync Helm Chart to ECR Public
+      run: make push-helm-chart
+    
+    - name: Sync Readme to ECR Public
+      run: make sync-readme-to-ecr-public

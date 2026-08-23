@@ -1,0 +1,23 @@
+GPU Usage Monitor
+Copyright 2023-2026 NVIDIA Corporation & Affiliates
+
+This product includes software developed by the GPU Usage Monitor contributors
+and third-party components listed below.
+
+================================================================================
+THIRD-PARTY COMPONENTS
+================================================================================
+
+1. Prometheus
+   Copyright 2012-2015 The Prometheus Authors
+   Repository: https://github.com/prometheus/prometheus
+   License: Apache License 2.0
+   Full license text: https://www.apache.org/licenses/LICENSE-2.0
+
+2. Grafana
+   Copyright 2014-2024 Grafana Labs
+   Repository: https://github.com/grafana/grafana
+   License: GNU Affero General Public License v3.0 (AGPL-3.0)
+   Full license text: https://www.gnu.org/licenses/agpl-3.0.txt
+
+================================================================================
