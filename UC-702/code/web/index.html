@@ -3,10 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0e14" />
   <title>UC-702 · Cluster Capacity &amp; Spot Watch</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body data-theme="auto">
   <header>
     <div>
       <p class="eyebrow">QBEX.AI · UC-702</p>
@@ -15,11 +16,18 @@
     <div class="header-status">
       <span id="connection" class="dot"></span>
       <span id="last-updated">Conectando…</span>
+      <button id="add-node-btn" type="button">+ Nodo</button>
+      <button id="theme-switch" type="button" aria-label="Cambiar apariencia">
+        <span id="theme-icon">◐</span><span id="theme-label">Auto</span>
+      </button>
+      <button id="settings-btn" type="button" aria-label="Configuración">⚙ Ajustes</button>
       <button id="refresh-btn" type="button">Actualizar</button>
     </div>
   </header>
 
   <main>
+    <section id="status-bar" class="panel status-bar"></section>
+
     <section class="section-heading">
       <h2>Overview del Clúster</h2>
     </section>
@@ -30,6 +38,12 @@
       <span id="node-count"></span>
     </section>
     <section id="nodes-table" class="panel"></section>
+
+    <section class="section-heading">
+      <h2>GPUs del Clúster</h2>
+      <span id="gpu-count"></span>
+    </section>
+    <section id="gpu-cards" class="gpu-grid"></section>
 
     <section class="two-col">
       <div>
@@ -63,6 +77,62 @@
     </section>
     <section id="schema-cards" class="two-col"></section>
   </main>
+
+  <!-- Modal: detalle de nodo (CPU / Memoria / Disco / Red / GPU) -->
+  <div id="node-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="node-modal-title">Nodo</h2>
+        <button type="button" data-close-modal>✕</button>
+      </div>
+      <div id="node-modal-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- Modal: registrar nodo manualmente -->
+  <div id="add-node-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Registrar Nodo</h2>
+        <button type="button" data-close-modal>✕</button>
+      </div>
+      <form id="add-node-form" class="modal-body form-panel">
+        <label>Node ID <input type="text" name="node_id" required placeholder="node-rack07-01" /></label>
+        <label>Hostname <input type="text" name="hostname" placeholder="opcional" /></label>
+        <label>Plataforma
+          <select name="platform"><option value="linux">linux</option><option value="macos">macos</option><option value="windows">windows</option></select>
+        </label>
+        <label>Proveedor
+          <select name="provider"><option value="on-premise">on-premise</option><option value="aws">aws</option><option value="gcp">gcp</option><option value="azure">azure</option></select>
+        </label>
+        <label>Ciclo de vida
+          <select name="lifecycle"><option value="on-demand">on-demand</option><option value="spot">spot</option><option value="free-tier">free-tier</option><option value="reserved">reserved</option></select>
+        </label>
+        <label>Sitio <input type="text" name="site" placeholder="campus-a" /></label>
+        <label>Rack <input type="text" name="rack" placeholder="opcional" /></label>
+        <button type="submit">Registrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: ajustes de dashboard -->
+  <div id="settings-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Ajustes del Dashboard</h2>
+        <button type="button" data-close-modal>✕</button>
+      </div>
+      <form id="settings-form" class="modal-body form-panel">
+        <label>Intervalo de actualización (s)
+          <input type="number" name="refresh_seconds" min="2" max="60" value="5" />
+        </label>
+        <label>Tema
+          <select name="theme"><option value="auto">Auto</option><option value="light">Claro</option><option value="dark">Oscuro</option></select>
+        </label>
+        <button type="submit">Guardar</button>
+      </form>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

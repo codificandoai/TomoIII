@@ -11,12 +11,31 @@
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
+body[data-theme="light"] {
+  --bg: #f4f7fc;
+  --panel: #ffffff;
+  --border: #dde3ee;
+  --text: #10131a;
+  --muted: #5b6478;
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme="auto"] {
+    --bg: #f4f7fc;
+    --panel: #ffffff;
+    --border: #dde3ee;
+    --text: #10131a;
+    --muted: #5b6478;
+  }
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 header {
@@ -25,6 +44,8 @@ header {
   align-items: center;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .eyebrow {
@@ -37,8 +58,9 @@ header {
 
 h1 { margin: 0.2rem 0 0; font-size: 1.4rem; }
 h2 { margin: 0; font-size: 1.05rem; }
+h3 { margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--accent); }
 
-.header-status { display: flex; align-items: center; gap: 0.6rem; }
+.header-status { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 
 .dot {
   width: 10px; height: 10px; border-radius: 50%;
@@ -56,6 +78,16 @@ button {
   cursor: pointer;
 }
 button:hover { border-color: var(--accent); }
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  text-decoration: underline;
+  padding: 0;
+  font-size: 0.78rem;
+}
+.link-btn:hover { color: var(--danger); border: none; }
 
 main { padding: 1rem 1.5rem 3rem; }
 
@@ -90,8 +122,10 @@ main { padding: 1rem 1.5rem 3rem; }
 }
 
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); }
+th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
 th { color: var(--muted); font-weight: 500; }
+.node-row { cursor: pointer; }
+.node-row:hover { background: rgba(79, 209, 197, 0.06); }
 
 .two-col {
   display: grid;
@@ -101,6 +135,31 @@ th { color: var(--muted); font-weight: 500; }
 @media (max-width: 900px) {
   .two-col { grid-template-columns: 1fr; }
 }
+
+.gpu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+.gpu-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+.gpu-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; font-size: 0.85rem; }
+.gpu-card-usage { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.4rem; }
+.gpu-usage-value { font-size: 1.1rem; font-weight: 600; }
+.gpu-sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+.gpu-detail-row { border-top: 1px solid var(--border); padding-top: 0.5rem; margin-top: 0.5rem; }
+.gpu-detail-row:first-child { border-top: none; padding-top: 0; margin-top: 0; }
+
+.sparkline { display: block; }
+
+.metric-bar { margin: 0.4rem 0; }
+.metric-bar-head { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.2rem; }
+.metric-bar-track { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.metric-bar-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
 
 .form-panel {
   display: grid;
@@ -113,7 +172,8 @@ th { color: var(--muted); font-weight: 500; }
   color: var(--muted);
   gap: 0.25rem;
 }
-.form-panel input {
+.form-panel input,
+.form-panel select {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
@@ -131,6 +191,7 @@ th { color: var(--muted); font-weight: 500; }
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
+  color: #d6e2ff;
 }
 
 .badge {
@@ -153,3 +214,75 @@ th { color: var(--muted); font-weight: 500; }
 }
 .schema-card h3 { margin: 0 0 0.3rem; font-size: 0.85rem; color: var(--accent); }
 .schema-card ul { margin: 0.3rem 0 0; padding-left: 1.1rem; }
+
+/* Modales */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: min(720px, 92vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.modal-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.9rem 1.1rem; border-bottom: 1px solid var(--border);
+}
+.modal-header button { border: none; background: none; font-size: 1rem; }
+.modal-body { padding: 1rem 1.1rem; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Barra de estado del clúster (inspirada en sparkDash ClusterSummary) */
+.status-bar { margin-top: 0.5rem; }
+.status-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.status-dot {
+  width: 12px; height: 12px; border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.status-dot-healthy { background: var(--ok); box-shadow: 0 0 8px rgba(104, 211, 145, 0.6); }
+.status-dot-degraded { background: var(--warn); }
+.status-dot-down, .status-dot-unknown { background: var(--danger); }
+
+.status-badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.status-ok { background: rgba(104, 211, 145, 0.15); color: var(--ok); }
+.status-warn { background: rgba(246, 173, 85, 0.15); color: var(--warn); }
+.status-danger { background: rgba(252, 129, 129, 0.15); color: var(--danger); }
+
+.status-spacer { flex: 1; }
+.status-fact { color: var(--muted); font-size: 0.8rem; }
+
+.status-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.status-fact-item { display: flex; flex-direction: column; gap: 0.15rem; }
+.status-fact-item .label { font-size: 0.7rem; text-transform: uppercase; color: var(--muted); }
+.status-fact-item .value { font-size: 1rem; font-weight: 600; }
