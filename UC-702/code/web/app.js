@@ -293,6 +293,150 @@ function renderGpuCards(nodes) {
     : "<p>No se detectaron GPUs en los nodos registrados.</p>";
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Gauge radial — inspirado en Gauge.svelte de dgx-spark-status
+// ─────────────────────────────────────────────────────────────────────────
+function gauge(value, max = 100, label = "", size = 96, thickness = 9) {
+  const pct = Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (pct / 100) * circumference;
+  const center = size / 2;
+  const tone = toneFor(pct);
+  const color = TONE_COLORS[tone];
+  return `<div class="gauge" style="width:${size}px;height:${size}px">
+    <svg width="${size}" height="${size}">
+      <circle cx="${center}" cy="${center}" r="${radius}" fill="none" stroke="var(--border)" stroke-width="${thickness}" />
+      <circle cx="${center}" cy="${center}" r="${radius}" fill="none" stroke="${color}" stroke-width="${thickness}"
+        stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round"
+        transform="rotate(-90 ${center} ${center})" class="gauge-progress" />
+    </svg>
+    <div class="gauge-content"><div class="gauge-value">${value.toFixed(0)}${label}</div></div>
+  </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Asignaciones activas del pool
+// ─────────────────────────────────────────────────────────────────────────
+function renderAllocations(allocations) {
+  if (!allocations.length) {
+    $("#allocations-table").innerHTML = "<p>No hay asignaciones activas.</p>";
+    return;
+  }
+  const rows = allocations
+    .map((a) => `<tr>
+      <td>${a.requester}</td>
+      <td>${a.node_id}</td>
+      <td>${a.cpu_cores}</td>
+      <td>${a.memory_mb}</td>
+      <td>${a.gpu_count}</td>
+      <td>${a.released ? '<span class="badge stale">liberada</span>' : '<span class="badge">activa</span>'}</td>
+      <td>${a.released ? "" : `<button type="button" class="link-btn" data-release="${a.allocation_id}">liberar</button>`}</td>
+    </tr>`)
+    .join("");
+  $("#allocations-table").innerHTML = `<table>
+    <thead><tr><th>Requester</th><th>Nodo</th><th>CPU</th><th>Mem (MB)</th><th>GPUs</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  $$("[data-release]", $("#allocations-table")).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await apiPost("/api/v1/pool/release", { allocation_id: btn.dataset.release });
+      refreshAll();
+    });
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Analítica de interrupciones spot — inspirada en
+// sample-spot-interruption-insights (dashboards OpenSearch por ASG/AZ):
+// aquí se agrega por nodo y por proveedor a partir de los eventos ya
+// capturados por spot_watcher.py / la API.
+// ─────────────────────────────────────────────────────────────────────────
+function renderSpotInsights(events) {
+  if (!events.length) {
+    $("#spot-insights").innerHTML = "<p>Sin datos suficientes todavía. Los eventos se acumulan al detectar interrupciones spot.</p>";
+    return;
+  }
+  const byProvider = {};
+  const byNode = {};
+  for (const e of events) {
+    byProvider[e.provider] = (byProvider[e.provider] || 0) + 1;
+    byNode[e.node_id] = (byNode[e.node_id] || 0) + 1;
+  }
+  const maxProvider = Math.max(...Object.values(byProvider), 1);
+  const maxNode = Math.max(...Object.values(byNode), 1);
+
+  const providerBars = Object.entries(byProvider)
+    .map(([k, v]) => metricBar(k, (v / maxProvider) * 100, `${v}`))
+    .join("");
+  const nodeBars = Object.entries(byNode)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([k, v]) => metricBar(k, (v / maxNode) * 100, `${v}`))
+    .join("");
+
+  $("#spot-insights").innerHTML = `
+    <div class="gpu-sub">Total de interrupciones registradas: <strong>${events.length}</strong></div>
+    <h3 class="inline-heading">Por proveedor</h3>
+    ${providerBars}
+    <h3 class="inline-heading">Por nodo (top 8)</h3>
+    ${nodeBars}
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Dashboards Grafana — catálogo navegable (inspirado en
+// grafana-dashboards-kubernetes / gpu-usage-monitor: múltiples dashboards
+// JSON empaquetados) con vista y descarga directa desde el dashboard.
+// ─────────────────────────────────────────────────────────────────────────
+async function loadDashboards() {
+  try {
+    const resp = await apiGet("/api/v1/dashboards");
+    const dashboards = resp.data;
+    const rows = Object.entries(dashboards)
+      .map(([name, def]) => {
+        const panelCount = (def.panels || []).filter((p) => p.type !== "row").length;
+        return `<tr>
+          <td>${def.title || name}</td>
+          <td>${name}</td>
+          <td>${panelCount}</td>
+          <td>${(def.tags || []).join(", ")}</td>
+          <td>
+            <button type="button" class="link-btn" data-view-dashboard="${name}">ver JSON</button>
+            <button type="button" class="link-btn" data-download-dashboard="${name}">descargar</button>
+          </td>
+        </tr>`;
+      })
+      .join("");
+    $("#dashboards-list").innerHTML = `<table>
+      <thead><tr><th>Título</th><th>Nombre</th><th>Paneles</th><th>Tags</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+    $$("[data-view-dashboard]", $("#dashboards-list")).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const box = $("#dashboard-json");
+        box.textContent = JSON.stringify(dashboards[btn.dataset.viewDashboard], null, 2);
+        box.classList.remove("hidden");
+      });
+    });
+    $$("[data-download-dashboard]", $("#dashboards-list")).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.dataset.downloadDashboard;
+        const blob = new Blob([JSON.stringify(dashboards[name], null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${name}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    });
+  } catch (err) {
+    $("#dashboards-list").innerHTML = `<p>No se pudieron cargar los dashboards: ${err.message}</p>`;
+  }
+}
+
 function renderSpotEvents(events) {
   if (!events.length) {
     $("#spot-events").innerHTML = "<p>Sin eventos de interrupción registrados.</p>";
@@ -337,7 +481,7 @@ function openNodeModal(nodeId) {
     <div class="detail-grid">
       <section class="panel">
         <h3>CPU</h3>
-        ${sparkline(hist.cpu || [], toneFor(snap.cpu_percent), 220, 48)}
+        <div class="gauge-row">${gauge(snap.cpu_percent ?? 0, 100, "%")}${sparkline(hist.cpu || [], toneFor(snap.cpu_percent), 150, 60)}</div>
         ${metricBar("Uso de CPU", snap.cpu_percent ?? 0)}
         ${metricBar("CPU disponible (idle)", snap.cpu_idle_pct ?? 0)}
         <div class="gpu-sub">${snap.cpu_count_physical ?? "?"} núcleos físicos · ${snap.cpu_count_logical ?? "?"} lógicos · load avg 1m: ${snap.load_avg_1m ?? "N/D"}</div>
@@ -345,7 +489,7 @@ function openNodeModal(nodeId) {
       </section>
       <section class="panel">
         <h3>Memoria</h3>
-        ${sparkline(hist.mem || [], toneFor(100 - (snap.memory_available_pct ?? 0)), 220, 48)}
+        <div class="gauge-row">${gauge(100 - (snap.memory_available_pct ?? 0), 100, "%")}${sparkline(hist.mem || [], toneFor(100 - (snap.memory_available_pct ?? 0)), 150, 60)}</div>
         ${metricBar("Memoria disponible", snap.memory_available_pct ?? 0, `${Math.round(snap.memory_available_mb ?? 0)} / ${Math.round(snap.memory_total_mb ?? 0)} MB`)}
       </section>
       <section class="panel">
@@ -425,6 +569,8 @@ async function refreshAll() {
     renderNodes(nodes.data);
     renderGpuCards(nodes.data);
     renderSpotEvents(events.data);
+    renderSpotInsights(events.data);
+    renderAllocations(allocations.data);
     setConnection(true);
     $("#last-updated").textContent = `Actualizado ${new Date().toLocaleTimeString()}`;
   } catch (err) {
@@ -526,5 +672,6 @@ applyTheme(settings.theme);
 bindModals();
 bindForms();
 loadSchema();
+loadDashboards();
 refreshAll();
 restartRefreshLoop();

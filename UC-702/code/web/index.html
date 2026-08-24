@@ -25,6 +25,16 @@
     </div>
   </header>
 
+  <nav id="main-nav" class="main-nav">
+    <a href="#status-bar">Estado</a>
+    <a href="#nodes-table">Nodos</a>
+    <a href="#gpu-cards">GPUs</a>
+    <a href="#pool-section">Pool</a>
+    <a href="#spot-section">Spot</a>
+    <a href="#dashboards-section">Dashboards Grafana</a>
+    <a href="#schema-cards">API</a>
+  </nav>
+
   <main>
     <section id="status-bar" class="panel status-bar"></section>
 
@@ -45,7 +55,7 @@
     </section>
     <section id="gpu-cards" class="gpu-grid"></section>
 
-    <section class="two-col">
+    <section id="pool-section" class="two-col">
       <div>
         <section class="section-heading"><h2>Solicitar Capacidad del Pool</h2></section>
         <form id="allocate-form" class="panel form-panel">
@@ -62,14 +72,33 @@
       </div>
 
       <div>
-        <section class="section-heading"><h2>Interrupción de Instancias Spot</h2></section>
-        <form id="spot-form" class="panel form-panel">
-          <label>Node ID <input type="text" name="node_id" placeholder="node-ec2-spot-01" required /></label>
-          <button type="submit">Consultar aviso de terminación</button>
-        </form>
-        <pre id="spot-result" class="result-box"></pre>
-        <div id="spot-events" class="panel"></div>
+        <section class="section-heading"><h2>Asignaciones Activas</h2></section>
+        <div id="allocations-table" class="panel"></div>
       </div>
+    </section>
+
+    <section id="spot-section">
+      <section class="section-heading"><h2>Interrupción de Instancias Spot</h2></section>
+      <div class="two-col">
+        <div>
+          <form id="spot-form" class="panel form-panel">
+            <label>Node ID <input type="text" name="node_id" placeholder="node-ec2-spot-01" required /></label>
+            <button type="submit">Consultar aviso de terminación</button>
+          </form>
+          <pre id="spot-result" class="result-box"></pre>
+          <div id="spot-events" class="panel"></div>
+        </div>
+        <div>
+          <h3 class="inline-heading">Analítica de Interrupciones</h3>
+          <div id="spot-insights" class="panel"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="dashboards-section">
+      <section class="section-heading"><h2>Dashboards Grafana</h2></section>
+      <div id="dashboards-list" class="panel"></div>
+      <pre id="dashboard-json" class="result-box hidden"></pre>
     </section>
 
     <section class="section-heading">
