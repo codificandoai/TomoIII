@@ -1,0 +1,14 @@
+# Core
+flask==3.0.3
+requests==2.32.3
+
+# Frameworks de agentes (opcionales; el código tiene fallback determinista)
+semantic-kernel==1.2.0
+pyautogen==0.2.35
+
+# LLM provider (producción)
+openai==1.37.1
+
+# Tests
+pytest==8.3.2
+pytest-cov==5.0.0
