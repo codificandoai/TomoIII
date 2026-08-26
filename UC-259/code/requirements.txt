@@ -1,0 +1,4 @@
+langgraph==1.0.10
+langchain-core==1.2.10
+Flask==3.0.3
+pytest==8.2.1
