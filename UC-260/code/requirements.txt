@@ -1,0 +1,6 @@
+langgraph==1.0.10
+langchain-core==1.2.10
+pydantic>=2.7.4
+Flask==3.0.3
+requests==2.32.2
+pytest==8.2.1
