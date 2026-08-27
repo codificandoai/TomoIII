@@ -1,0 +1,14 @@
+{
+  "flights": [{
+    "OPERA": "AA",
+    "TIPOVUELO": "I", 
+    "MES": 4,
+    "DIA": 20,
+    "DIANOM": "Lunes",
+    "SIGLAORI": "BOG",
+    "SIGLAPOS": "SCL",
+    "NROVUELO": "123",
+    "CLASEVUELO": "Y",
+    "TIPOPLANO": "B738"
+  }]
+}

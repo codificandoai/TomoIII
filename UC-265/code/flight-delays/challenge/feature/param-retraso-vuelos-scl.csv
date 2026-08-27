@@ -1,0 +1,46 @@
+﻿Categoría (Posible causa retraso),Subcategoría,Causa Específica,Tipo,Severidad (1-5),% de Afectación Global,% Prob. Retraso Despegue,% Prob. Retraso Aterrizaje,Mitigación Típica
+MANO DE OBRA (Personas),Tripulación,Conexiones de tripulación insuficientes en bancos de vuelo,Humana,3,7%,12%,5%,Reprogramación de rotaciones y buffers operativos.
+MANO DE OBRA (Personas),Controladores aéreos,Saturación en franjas pico y en secuencias de aproximación,Humana,4,8%,14%,13%,Refuerzo de turnos y mejor secuenciación ATC.
+MANO DE OBRA (Personas),Personal de tierra,"Retrasos en pushback, carga, limpieza y abastecimiento",Operacional,3,6%,11%,4%,SLA más estrictos y coordinación digital.
+MANO DE OBRA (Personas),Pasajeros,"Embarque tardío, documentación incompleta, pasajeros en conexión",Humana,2,4%,9%,3%,Pre-boarding digital y control anticipado de puertas.
+MÉTODOS (Procesos),Embarque/desembarque,Secuencias lentas por alta ocupación de puertas y buses,Operacional,3,6%,10%,6%,Mejoras en turnarounds y gestión de puertas.
+MÉTODOS (Procesos),Coordinación,"Desalineación entre aerolínea, handling y torre",Operacional,4,8%,13%,10%,A-CDM y AODB compartida en tiempo real.
+MÉTODOS (Procesos),Slots y secuenciación,Slots asignados vs. reales por saturación en hora punta,Operacional,4,9%,15%,11%,Reglas más finas de priorización y buffers.
+MÁQUINAS (Tecnología/Aeronaves),Aeronave,Fallas MEL/CDL que requieren inspecciones o limitaciones,Técnica,4,6%,11%,5%,Mantenimiento predictivo y stock de repuestos.
+MÁQUINAS (Tecnología/Aeronaves),Navegación,Degradación temporal de ILS/RNAV por meteorología o mantenimiento,Técnica,4,7%,9%,14%,Redundancia de procedimientos instrumentales.
+MÁQUINAS (Tecnología/Aeronaves),Soporte en tierra,"Fallas de GPU, finger, loaders o aire acondicionado de rampa",Técnica,3,5%,10%,4%,Mantenimiento preventivo y monitoreo de activos.
+MATERIALES,Combustible,Reabastecimiento lento por congestión de camiones y stands,Operacional,3,5%,10%,3%,Ventanas dedicadas y planificación de fuel.
+MATERIALES,Equipaje,Carga tardía y re-cálculo de peso y balance,Operacional,3,5%,9%,6%,Automatización de equipaje y cierre más temprano.
+MATERIALES,Carga,Documentación aduanera y manejo de carga especial,Regulatoria,4,7%,8%,9%,Pre-despacho digital y coordinación con aduana.
+MEDIO AMBIENTE (Factores externos),Clima inmediato,"Viento, lluvia y techos bajos que reducen separación",Externa,5,14%,11%,18%,Mejor pronóstico microclimático y gestión de meteo.
+MEDIO AMBIENTE (Factores externos),Niebla,Baja visibilidad matinal en periodos fríos,Externa,4,9%,8%,15%,Procedimientos de baja visibilidad y mayores márgenes.
+MEDIO AMBIENTE (Factores externos),Ruido,Restricciones nocturnas y preferencia por ciertos usos de pista,Regulatoria,4,8%,14%,9%,Programación más estricta de movimientos nocturnos.
+MEDIO AMBIENTE (Factores externos),Fauna,Riesgo de bird strike en el entorno aeroportuario,Externa,4,5%,7%,10%,Wildlife management y dispersión activa.
+MEDICIÓN (Datos/Regulación),Performance,Cálculo de performance de pista y aircraft performance tables,Regulatoria,5,8%,16%,7%,EFB con performance automatizada y verificación doble.
+MEDICIÓN (Datos/Regulación),Normativa,"Reglas DGAC/ICAO para separación, visibilidad y operación nocturna",Regulatoria,4,7%,10%,11%,Procedimientos estandarizados y compliance en tiempo real.
+MEDICIÓN (Datos/Regulación),ATFM,Gestión imperfecta del flujo aéreo y reasignación tardía,Operacional,4,7%,12%,13%,Predicción de demanda y slot management dinámico.
+MONEY (Factores económicos),Costos,Penalización por conexiones perdidas y efecto cascada,Operacional,3,4%,8%,5%,Márgenes de conexión y buffers por banco.
+MONEY (Factores económicos),Mantenimiento,Presión presupuestaria sobre mantenimiento preventivo,Financiera,4,5%,9%,6%,Programas de reliability-centered maintenance.
+MONEY (Factores económicos),Priorización,Priorización de vuelos rentables o de mayor carga,Operacional,3,4%,7%,5%,Reglas de asignación transparentes y KPI comunes.
+MOTHER NATURE EXTENDED (Geografía/Infraestructura),Pista,"Dos pistas, pero capacidad limitada en picos y movimientos cruzados",Infraestructura,5,13%,18%,16%,Secuenciación más agresiva y expansión planificada.
+MOTHER NATURE EXTENDED (Geografía/Infraestructura),Terminal,Saturación por crecimiento de pasajeros y puertas limitadas,Infraestructura,4,10%,12%,8%,Redistribución de stands y expansión modular.
+MOTHER NATURE EXTENDED (Geografía/Infraestructura),Accesos,Congestión vial y llegada tardía de tripulaciones/personal,Infraestructura,3,4%,6%,3%,Transporte dedicado y buffers de acceso.
+SEGURIDAD Y EMERGENCIAS,AVSEC,Inspecciones reforzadas o alertas de seguridad,Seguridad,4,6%,8%,7%,Filtros previos y colas separadas de inspección.
+SEGURIDAD Y EMERGENCIAS,Emergencias médicas,MEDA a bordo que obliga prioridad o espera en tierra,Seguridad,3,4%,5%,8%,Protocolos médicos y coordinación con ambulancia.
+SEGURIDAD Y EMERGENCIAS,Incidentes en pista,"Runway incursions, FOD o cierre temporal por incidente",Seguridad,5,7%,10%,12%,"A-SMGCS, inspecciones FOD y alertas tempranas."
+INTERFAZ SISTEMA-AEROPUERTO,AODB/A-CDM,Datos compartidos incompletos entre actores operativos,Operacional,4,8%,13%,10%,Integración de sistemas y tableros compartidos.
+INTERFAZ SISTEMA-AEROPUERTO,Taxi y rodaje,"Congestión en calle de rodaje, puntos de espera y plataforma",Operacional,4,9%,16%,14%,Surface management y reglas de pushback.
+INTERFAZ SISTEMA-AEROPUERTO,Secuenciación,Separación por estela y secuencia de aproximación/despegue,Operacional,4,8%,11%,15%,Optimización de spacing y arrival management.
+Lectura operativa,,,,,,,,
+"Aeropuerto Arturo Merino Benítez de Santiago de Chile (SCL/SCEL), considerando su rol como gran hub regional con alta demanda, dos pistas, restricciones nocturnas por ruido y crecimiento de carga y pasajeros. SCL tenía una capacidad anunciada de 38 millones de pasajeros al año y registró 26.25 millones en 2024; además, mejoró su OTP a 87.04% en 2025 pese a presiones de capacidad",,,,,,,,
+"En Santiago, los retrasos de despegue tienden a concentrarse más en capacidad de pista, coordinación operativa y turnarounds de plataforma, mientras que los retrasos de aterrizaje se amplifican por meteorología, visibilidad y secuenciación en aproximación. La existencia de dos pistas ayuda, pero no elimina la congestión cuando coinciden picos de demanda, restricciones nocturnas por ruido y presión de carga/terminal; además, el aeropuerto sigue en expansión y se proyecta una gran ampliación de capacidad hacia 2050.cirium+4",,,,,,,,
+Causas más dominantes,,,,,,,,
+"Si priorizas las variables con mayor peso, las más influyentes suelen ser estas:",,,,,,,,
+Capacidad y configuración de pista.,,,,,,,,
+Clima y baja visibilidad.,,,,,,,,
+Saturación de terminal y plataforma.,,,,,,,,
+Coordinación ATC/handling/aerolínea.,,,,,,,,
+Restricciones operativas nocturnas por ruido.boeing+2,,,,,,,,
+Ajuste del modelo,,,,,,,,
+"despegue y aterrizaje. Dentro de cada rama, las categorías con más peso en Santiago deberían ser infraestructura, medio ambiente, métodos y interfaz sistema-aeropuerto, porque son las que mejor explican la combinación de crecimiento, meteorología y restricciones operativas.aviacionline+2",,,,,,,,
+,,,,,,,,

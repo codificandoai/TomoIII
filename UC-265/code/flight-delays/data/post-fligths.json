@@ -1,0 +1,87 @@
+{
+  "flights": [
+    {
+      "OPERA": "American Airlines",
+      "TIPOVUELO": "I",
+      "MES": 1,
+      "DIA": 30,
+      "DIANOM": "Lunes",
+      "SIGLAORI": "Santiago",
+      "SIGLAPOS": "SCEL",
+      "NROVUELO": "226",
+      "CLASEVUELO": "Y",
+      "TIPOPLANO": "B738"
+    },
+    {
+      "OPERA": "Grupo LATAM",
+      "TIPOVUELO": "I", 
+      "MES": 6,
+      "DIA": 9,
+      "DIANOM": "Viernes",
+      "SIGLAORI": "Santiago",
+      "SIGLAPOS": "SCEL",
+      "NROVUELO": "602",
+      "CLASEVUELO": "Y",
+      "TIPOPLANO": "B738"
+    },
+    {
+      "OPERA": "Grupo LATAM",
+      "TIPOVUELO": "I",
+      "MES": 6,
+      "DIA": 29,
+      "DIANOM": "Jueves",
+      "SIGLAORI": "Santiago", 
+      "SIGLAPOS": "SCEL",
+      "NROVUELO": "622",
+      "CLASEVUELO": "Y",
+      "TIPOPLANO": "B738"
+    },
+    {
+      "OPERA": "Grupo LATAM",
+      "TIPOVUELO": "I",
+      "MES": 6,
+      "DIA": 5,
+      "DIANOM": "Lunes",
+      "SIGLAORI": "Santiago",
+      "SIGLAPOS": "SCEL", 
+      "NROVUELO": "642",
+      "CLASEVUELO": "Y",
+      "TIPOPLANO": "B738"
+    },
+    {
+      "OPERA": "JetSmart SPA",
+      "TIPOVUELO": "N",
+      "MES": 9,
+      "DIA": 6,
+      "DIANOM": "Miércoles",
+      "SIGLAORI": "Santiago",
+      "SIGLAPOS": "SCEL",
+      "NROVUELO": "88",
+      "CLASEVUELO": "Y",
+      "TIPOPLANO": "B738"
+    },
+    {
+      "OPERA": "Sky Airline",
+      "TIPOVUELO": "N",
+      "MES": 11,
+      "DIA": 5,
+      "DIANOM": "Domingo",
+      "SIGLAORI": "Santiago",
+      "SIGLAPOS": "SCEL",
+      "NROVUELO": "43",
+      "CLASEVUELO": "Y", 
+      "TIPOPLANO": "B738"
+    }
+  ]
+}
+
+{
+    "predict": [
+        1,
+        1,
+        1,
+        1,
+        0,
+        0
+    ]
+}

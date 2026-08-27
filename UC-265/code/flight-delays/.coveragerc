@@ -1,0 +1,6 @@
+[run]
+source = challenge
+omit = tests/*
+
+[report]
+show_missing = true
