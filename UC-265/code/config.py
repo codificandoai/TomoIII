@@ -56,6 +56,9 @@ class ProbabilisticModelConfig:
     model_type: str = _env_str("UC265_WORLD_MODEL_TYPE", "neural")  # neural | gp | hybrid
     min_samples_to_train: int = _env_int("UC265_MIN_SAMPLES_TO_TRAIN", 5)
     retrain_after: int = _env_int("UC265_RETRAIN_AFTER", 10)
+    uncertainty_retrain_threshold: float = _env_float("UC265_UNCERTAINTY_RETRAIN_THRESHOLD", 0.5)
+    prediction_error_retrain_threshold: float = _env_float("UC265_PREDICTION_ERROR_RETRAIN_THRESHOLD", 0.3)
+    prediction_error_window: int = _env_int("UC265_PREDICTION_ERROR_WINDOW", 20)
     embedding_dim: int = _env_int("UC265_EMBEDDING_DIM", 16)
     # Neural network
     hidden_layers: tuple = field(default_factory=lambda: (64, 32))
@@ -73,6 +76,9 @@ class MCTSConfig:
     ucb_constant: float = _env_float("UC265_MCTS_UCB_CONSTANT", 1.414)
     max_depth: int = _env_int("UC265_MCTS_MAX_DEPTH", 5)
     rollout_count: int = _env_int("UC265_MCTS_ROLLOUT_COUNT", 10)
+    enable_persistent_tree: bool = _env_bool("UC265_MCTS_ENABLE_PERSISTENT_TREE", True)
+    persistent_tree_path: str = _env_str("UC265_MCTS_PERSISTENT_TREE_PATH", "")
+    tree_similarity_threshold: float = _env_float("UC265_MCTS_TREE_SIMILARITY_THRESHOLD", 0.9)
 
 
 @dataclass
@@ -122,6 +128,10 @@ class AppConfig:
     model: ModelConfig = field(default_factory=ModelConfig)
     agent: AgentConfig = field(default_factory=AgentConfig)
     port: int = _env_int("UC265_PORT", 5265)
+    flight_delays_model_path: str = _env_str(
+        "UC265_FLIGHT_DELAYS_MODEL_PATH",
+        os.path.join(os.path.dirname(__file__), "flight-delays", "challenge", "model.pkl"),
+    )
 
 
 def get_config() -> AppConfig:

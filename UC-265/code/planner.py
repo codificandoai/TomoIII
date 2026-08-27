@@ -89,7 +89,12 @@ class PlanGenerator:
         if world_model is not None and initial_state is not None:
             levels = self._action_levels(outbound, hotels, return_flights, request, rng)
             mcts = MCTSPlanner(world_model, self.config.mcts)
-            mcts_plan = mcts.search(initial_state, levels, rng=rng)
+            mcts_plan = mcts.search(
+                initial_state,
+                levels,
+                rng=rng,
+                request=request.to_state(),
+            )
             if mcts_plan:
                 candidates.insert(0, mcts_plan)
 

@@ -45,10 +45,38 @@ class StateEncoder:
         vec[1] = cost / 1000.0
         return self._normalize(vec)
 
-    def encode_transition(self, state: Dict[str, Any], action: Dict[str, Any]) -> np.ndarray:
+    def encode_belief(self, belief: Optional[Dict[str, Any]]) -> np.ndarray:
+        """Resume el belief state en features numéricas fijas.
+
+        Devuelve: [mean_market_pressure, std_market_pressure, p_sunny, p_cloudy, p_rainy, p_stormy]
+        """
+        if not belief:
+            return np.zeros(6)
+        particles = belief.get("particles", [])
+        if not particles:
+            return np.zeros(6)
+        market_pressures = [p.get("market_pressure", 0.0) for p in particles]
+        mean_mp = float(np.mean(market_pressures))
+        std_mp = float(np.std(market_pressures)) if len(market_pressures) > 1 else 0.0
+        weathers = [p.get("weather_condition", "unknown") for p in particles]
+        total = len(weathers)
+        counts = {"sunny": 0, "cloudy": 0, "rainy": 0, "stormy": 0}
+        for w in weathers:
+            if w in counts:
+                counts[w] += 1
+        probs = [counts[k] / total for k in ("sunny", "cloudy", "rainy", "stormy")]
+        return np.array([mean_mp, std_mp] + probs, dtype=np.float64)
+
+    def encode_transition(
+        self,
+        state: Dict[str, Any],
+        action: Dict[str, Any],
+        belief: Optional[Dict[str, Any]] = None,
+    ) -> np.ndarray:
         s = self.encode_state(state)
         a = self.encode_action(action)
-        return np.concatenate([s, a])
+        b = self.encode_belief(belief)
+        return np.concatenate([s, a, b])
 
     @staticmethod
     def _hash(text: str) -> int:
@@ -67,20 +95,19 @@ class NeuralTransitionModel:
     def __init__(self, config: ProbabilisticModelConfig) -> None:
         self.config = config
         self.encoder = StateEncoder(config.embedding_dim)
-        input_dim = config.embedding_dim * 2
+        self.belief_dim = 6
+        input_dim = config.embedding_dim * 2 + self.belief_dim
         self.model_success = MLPRegressor(
             hidden_layer_sizes=config.hidden_layers,
             max_iter=config.max_iter,
             random_state=42,
-            early_stopping=True,
-            validation_fraction=0.1,
+            early_stopping=False,
         )
         self.model_reward = MLPRegressor(
             hidden_layer_sizes=config.hidden_layers,
             max_iter=config.max_iter,
             random_state=43,
-            early_stopping=True,
-            validation_fraction=0.1,
+            early_stopping=False,
         )
         self._trained = False
         self._X: List[np.ndarray] = []
@@ -94,8 +121,9 @@ class NeuralTransitionModel:
         next_state: Dict[str, Any],
         reward: float,
         success: bool,
+        belief: Optional[Dict[str, Any]] = None,
     ) -> None:
-        x = self.encoder.encode_transition(state, action)
+        x = self.encoder.encode_transition(state, action, belief)
         self._X.append(x)
         self._y_success.append(1.0 if success else 0.0)
         self._y_reward.append(reward)
@@ -109,12 +137,15 @@ class NeuralTransitionModel:
         self._trained = True
 
     def predict(
-        self, state: Dict[str, Any], action: Dict[str, Any]
+        self,
+        state: Dict[str, Any],
+        action: Dict[str, Any],
+        belief: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, float]:
         """Devuelve (success_prob, reward, uncertainty)."""
-        if not self._trained or len(self._X) < self.config.min_samples_to_train:
+        if not self._trained:
             return 0.95, 0.0, 1.0  # alta incertidumbre por defecto
-        x = self.encoder.encode_transition(state, action).reshape(1, -1)
+        x = self.encoder.encode_transition(state, action, belief).reshape(1, -1)
         success_prob = float(np.clip(self.model_success.predict(x)[0], 0.0, 1.0))
         reward = float(self.model_reward.predict(x)[0])
         # Incertidumbre proxy: inversamente proporcional al tamaño del dataset
@@ -149,8 +180,9 @@ class GPTransitionModel:
         next_state: Dict[str, Any],
         reward: float,
         success: bool,
+        belief: Optional[Dict[str, Any]] = None,
     ) -> None:
-        x = self.encoder.encode_transition(state, action)
+        x = self.encoder.encode_transition(state, action, belief)
         self._X.append(x)
         self._y.append(reward)
 
@@ -165,12 +197,15 @@ class GPTransitionModel:
         self._trained = True
 
     def predict(
-        self, state: Dict[str, Any], action: Dict[str, Any]
+        self,
+        state: Dict[str, Any],
+        action: Dict[str, Any],
+        belief: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, float]:
         """Devuelve (reward_pred, std, success_prob_proxy)."""
-        if not self._trained or len(self._X) < self.config.min_samples_to_train:
+        if not self._trained:
             return 0.0, 1.0, 0.95
-        x = self.encoder.encode_transition(state, action).reshape(1, -1)
+        x = self.encoder.encode_transition(state, action, belief).reshape(1, -1)
         mean, std = self.model.predict(x, return_std=True)
         std = float(std[0]) if isinstance(std, np.ndarray) else float(std)
         reward = float(mean[0]) if isinstance(mean, np.ndarray) else float(mean)

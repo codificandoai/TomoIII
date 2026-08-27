@@ -66,6 +66,7 @@ class WorldModelState(BaseModel):
     preferences: Dict[str, Any] = Field(default_factory=dict)
     constraints: List[str] = Field(default_factory=list)
     completed: bool = False
+    belief_state: Optional[Dict[str, Any]] = None
 
     def copy(self) -> "WorldModelState":
         return WorldModelState(**self.model_dump())

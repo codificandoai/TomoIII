@@ -8,11 +8,13 @@ from langgraph.graph.state import CompiledStateGraph
 
 from config import AppConfig, get_config
 from critic import PlanCritic
+from model_persistence import ModelPersistence
 from models import TravelPlanRequest
 from nodes import ModelBasedNodes
 from planner import PlanGenerator
 from simulator import MonteCarloSimulator
 from state import ModelBasedState
+from train import load_trained_model
 from travel_world import TravelWorldSimulator
 from world_model import TravelWorldModel
 
@@ -45,6 +47,11 @@ def build_agent(config: Optional[AppConfig] = None) -> CompiledStateGraph:
     cfg = config or get_config()
     simulator_env = TravelWorldSimulator(cfg.world)
     world_model = TravelWorldModel(cfg.model, simulator_env, app_config=cfg)
+    # Cargar modelos previamente entrenados si existen
+    try:
+        load_trained_model(world_model)
+    except Exception:
+        pass
     simulator = MonteCarloSimulator(world_model, cfg.model)
     critic = PlanCritic(cfg.model)
     planner = PlanGenerator(simulator_env, cfg.model)

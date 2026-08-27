@@ -56,14 +56,20 @@ class PlanCritic:
         if not candidates:
             return None
         evaluations = self.evaluate(candidates)
+        eval_by_id = {e.plan_id: e for e in evaluations}
+        # Actualizar todos los candidatos con sus puntuaciones evaluadas
+        for c in candidates:
+            e = eval_by_id.get(c.plan_id)
+            if e is not None:
+                c.final_score = e.final_score
+                c.expected_utility = e.expected_utility
+                c.risk_score = e.risk_score
+                c.alignment_score = e.alignment_score
+                if not c.reasoning:
+                    c.reasoning = e.explanation
         best_id = evaluations[0].plan_id
         for c in candidates:
             if c.plan_id == best_id:
-                c.final_score = evaluations[0].final_score
-                c.expected_utility = evaluations[0].expected_utility
-                c.risk_score = evaluations[0].risk_score
-                c.alignment_score = evaluations[0].alignment_score
-                c.reasoning = evaluations[0].explanation
                 return c
         return None
 

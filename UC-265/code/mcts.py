@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from config import MCTSConfig
+from mcts_store import MCTSPersistentStore
 from models import PlanAction, WorldModelState
 from world_model import TravelWorldModel
 
@@ -56,12 +57,16 @@ class MCTSPlanner:
     ) -> None:
         self.world_model = world_model
         self.config = config
+        self.store = None
+        if self.config.enable_persistent_tree:
+            self.store = MCTSPersistentStore(self.config.persistent_tree_path)
 
     def search(
         self,
         initial_state: WorldModelState,
         available_actions: List[List[PlanAction]],
         rng: Optional[np.random.Generator] = None,
+        request: Optional[Dict[str, Any]] = None,
     ) -> List[PlanAction]:
         """Ejecuta MCTS y devuelve la mejor secuencia de acciones (raíz -> mejor hijo).
 
@@ -71,12 +76,18 @@ class MCTSPlanner:
         root = MCTSNode(initial_state)
         root.untried_actions = available_actions[0] if available_actions else []
 
+        if self.store and request:
+            self._seed_root(root, available_actions, request)
+
         for _ in range(self.config.num_iterations):
             node = self._select(root)
             if not node.fully_expanded() and not node.is_terminal:
                 node = self._expand(node, available_actions)
             reward = self._simulate(node, available_actions, rng)
             self._backpropagate(node, reward)
+
+        if self.store and request:
+            self._save_root_children(root, request)
 
         if not root.children:
             return []
@@ -88,6 +99,53 @@ class MCTSPlanner:
             plan.append(current.action)
             current = max(current.children, key=lambda c: c.visits) if current.children else None
         return plan
+
+    def _seed_root(
+        self,
+        root: MCTSNode,
+        available_actions: List[List[PlanAction]],
+        request: Dict[str, Any],
+    ) -> None:
+        """Inicializa la raíz con estadísticas de búsquedas previas similares."""
+        prior = self.store.get(request) if self.store else None
+        if not prior or not available_actions:
+            return
+        action_map = {a.item_id: a for a in available_actions[0]}
+        for child_data in prior:
+            item_id = child_data.get("item_id")
+            if item_id not in action_map:
+                continue
+            action = action_map[item_id]
+            if action not in root.untried_actions:
+                continue
+            root.untried_actions.remove(action)
+            transition = self.world_model.predict_transition(root.state, action)
+            child_state = WorldModelState(**transition.next_state)
+            child = MCTSNode(child_state, parent=root, action=action, depth=1)
+            child.visits = int(child_data.get("visits", 0))
+            child.value = float(child_data.get("value", 0.0))
+            depth_child = 1
+            child.untried_actions = (
+                available_actions[depth_child].copy() if depth_child < len(available_actions) else []
+            )
+            if not child.untried_actions and depth_child >= len(available_actions):
+                child.is_terminal = True
+            root.children.append(child)
+
+    def _save_root_children(
+        self, root: MCTSNode, request: Dict[str, Any]
+    ) -> None:
+        if not self.store:
+            return
+        children = [
+            {
+                "item_id": child.action.item_id if child.action else "",
+                "visits": child.visits,
+                "value": round(child.value, 4),
+            }
+            for child in root.children if child.action
+        ]
+        self.store.save(request, children)
 
     def _select(self, node: MCTSNode) -> MCTSNode:
         while node.fully_expanded() and node.children:

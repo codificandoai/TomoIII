@@ -15,10 +15,58 @@ from typing import Any, Dict
 from config import get_config
 from graph import run_agent
 from models import TravelPlanRequest
+from train import train_world_model
 
 
 def _print_json(data: Any) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+def cmd_train(args: argparse.Namespace) -> int:
+    result = train_world_model(
+        n_samples=args.samples,
+        config=get_config(),
+        output_dir=args.output_dir,
+    )
+    _print_json(result)
+    return 0
+
+
+def cmd_infer(args: argparse.Namespace) -> int:
+    from world_model import TravelWorldModel
+    from travel_world import TravelWorldSimulator
+    from model_persistence import ModelPersistence
+    from train import load_trained_model
+    from models import PlanAction, WorldModelState
+
+    cfg = get_config()
+    simulator_env = TravelWorldSimulator(cfg.world)
+    world_model = TravelWorldModel(cfg.model, simulator_env, app_config=cfg)
+    persistence = ModelPersistence(args.output_dir)
+    if not persistence.exists():
+        print("No trained model found. Run 'train' first.")
+        return 1
+    load_trained_model(world_model, args.output_dir)
+
+    state = WorldModelState(
+        remaining_budget=args.budget,
+        step=0,
+        preferences={"airline": args.airline, "direct_only": args.direct},
+    )
+    action = PlanAction(
+        action_type=args.action_type,
+        item_id=args.item_id,
+        estimated_cost=args.cost,
+    )
+    success_prob, reward, uncertainty = world_model._predict_success_and_reward(state, action)
+    _print_json({
+        "state": state.to_dict(),
+        "action": action.to_dict(),
+        "predicted_success_probability": success_prob,
+        "predicted_reward": reward,
+        "uncertainty": uncertainty,
+    })
+    return 0
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
@@ -81,12 +129,30 @@ def main(argv: list[str] | None = None) -> int:
     serve_parser = subparsers.add_parser("serve", help="Start the Flask API")
     serve_parser.add_argument("--port", type=int)
 
+    train_parser = subparsers.add_parser("train", help="Train the probabilistic world model on synthetic data")
+    train_parser.add_argument("--samples", type=int, default=500)
+    train_parser.add_argument("--output-dir", default=None)
+
+    infer_parser = subparsers.add_parser("infer", help="Run inference with a trained model")
+    infer_parser.add_argument("--output-dir", default=None)
+    infer_parser.add_argument("--budget", type=float, default=2000.0)
+    infer_parser.add_argument("--airline", default="Delta")
+    infer_parser.add_argument("--direct", action="store_true")
+    infer_parser.add_argument("--action-type", default="flight")
+    infer_parser.add_argument("--item-id", default="FL-TEST")
+    infer_parser.add_argument("--cost", type=float, default=300.0)
+
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
         return 1
 
-    dispatch = {"plan": cmd_plan, "serve": cmd_serve}
+    dispatch = {
+        "plan": cmd_plan,
+        "serve": cmd_serve,
+        "train": cmd_train,
+        "infer": cmd_infer,
+    }
     return dispatch[args.command](args)
 
 

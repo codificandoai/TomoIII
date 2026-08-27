@@ -79,6 +79,7 @@ class ModelBasedNodes:
         )
 
         belief = self.world_model.initialize_belief(request)
+        initial_state.belief_state = belief.to_dict()
 
         return {
             "status": "generating",
@@ -107,6 +108,7 @@ class ModelBasedNodes:
             currency=request.currency,
             preferences=request.preferences,
             constraints=request.constraints,
+            belief_state=state.get("belief_state"),
         )
 
         action_sequences, meta = self.planner.generate(
@@ -150,6 +152,7 @@ class ModelBasedNodes:
             currency=request.currency,
             preferences=request.preferences,
             constraints=request.constraints,
+            belief_state=state.get("belief_state"),
         )
         candidate_actions: List[List[PlanAction]] = []
         for c in state.get("candidates", []):

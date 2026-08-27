@@ -12,12 +12,14 @@ from __future__ import annotations
 import json
 import os
 import threading
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from config import AppConfig, ModelConfig, get_config
+from flight_delay_adapter import FlightDelayAdapter
 from models import (
     BeliefState,
     HiddenState,
@@ -99,9 +101,13 @@ class TravelWorldModel:
                 dim=self.config.storage.vector_dim,
                 path=self.config.storage.vector_store_path,
             )
+        self.flight_delay_adapter = FlightDelayAdapter(self.app_config.flight_delays_model_path)
         self.estimates: Dict[str, EmpiricalEstimate] = {}
         self.transitions: List[Dict[str, Any]] = []
         self.observations_since_train = 0
+        self.last_uncertainty = 1.0
+        window = self.config.probabilistic.prediction_error_window
+        self.prediction_errors: deque[float] = deque(maxlen=max(1, window))
         self.belief_tracker = BeliefStateTracker(num_particles=100)
 
         if self.config.probabilistic.model_type == "neural":
@@ -127,10 +133,20 @@ class TravelWorldModel:
     ) -> Transition:
         rng = rng or np.random.default_rng()
 
-        # Predicción probabilística + estimación empírica
+        # Predicción probabilística + estimación empírica, incluyendo belief state
+        belief = state.belief_state
         success_prob, reward_pred, uncertainty = self._predict_success_and_reward(
-            state, action
+            state, action, belief
         )
+        self.last_uncertainty = uncertainty
+
+        # Integrar modelo externo de retrasos de vuelos
+        delay_prob = 0.0
+        if action.action_type == "flight" and self.flight_delay_adapter.available:
+            delay_prob = self.flight_delay_adapter.predict_delay_probability(
+                action.to_dict()
+            )
+            success_prob = success_prob * (1.0 - delay_prob * 0.5)
 
         # Incertidumbre como ruido adicional sobre la probabilidad
         noise = rng.normal(0, 0.05 + uncertainty * 0.2)
@@ -178,12 +194,16 @@ class TravelWorldModel:
                 "predicted_reward": reward_pred,
                 "uncertainty": uncertainty,
                 "model_type": self.config.probabilistic.model_type,
+                "delay_probability": delay_prob,
             },
         )
         return transition
 
     def _predict_success_and_reward(
-        self, state: WorldModelState, action: PlanAction
+        self,
+        state: WorldModelState,
+        action: PlanAction,
+        belief: Optional[Dict[str, Any]] = None,
     ) -> Tuple[float, float, float]:
         # Prior empírico
         empirical = self._get_estimate(action.action_type, action.item_id)
@@ -194,11 +214,11 @@ class TravelWorldModel:
         try:
             if isinstance(self.probabilistic_model, NeuralTransitionModel):
                 p_success, r_pred, uncertainty = self.probabilistic_model.predict(
-                    state.to_dict(), action.to_dict()
+                    state.to_dict(), action.to_dict(), belief
                 )
             elif isinstance(self.probabilistic_model, GPTransitionModel):
                 r_pred, uncertainty, p_success = self.probabilistic_model.predict(
-                    state.to_dict(), action.to_dict()
+                    state.to_dict(), action.to_dict(), belief
                 )
             else:
                 p_success, r_pred, uncertainty = 0.95, 0.0, 1.0
@@ -279,16 +299,37 @@ class TravelWorldModel:
         return self.belief_tracker.initialize(request.to_state())
 
     def observe(self, item: Dict[str, Any], rng: Optional[np.random.Generator] = None) -> Observation:
-        """Genera una observación ruidosa de un item (precio/disponibilidad/retraso)."""
+        """Genera una observación ruidosa de un item (precio/disponibilidad/retraso).
+
+        Para vuelos, enriquece la observación con el modelo externo de retrasos de
+        flight-delays, generando retrasos más realistas cuando la probabilidad de
+        retraso es alta.
+        """
         rng = rng or np.random.default_rng()
         noise = self.app_config.world.observation_noise
         observed_price = float(item.get("price_usd") or item.get("price_per_night_usd", 0.0))
         observed_price *= float(rng.normal(1.0, noise))
+        item_id = item.get("flight_id") or item.get("hotel_id", "")
+
+        # Enriquecer observaciones de vuelos con el modelo de retrasos
+        is_flight = "flight_id" in item or "airline" in item
+        delay_prob = 0.0
+        observed_delay = max(0.0, float(rng.exponential(15)))
+        if is_flight and self.flight_delay_adapter.available:
+            delay_prob = self.flight_delay_adapter.predict_delay_probability(item)
+            # Si el modelo predice alto retraso, generamos retrasos con mayor media
+            if delay_prob > 0.5:
+                observed_delay = float(rng.exponential(45 + 60 * delay_prob))
+            else:
+                observed_delay = float(rng.exponential(5 + 20 * delay_prob))
+            # Presión de mercado implícita: retrasos altos correlacionan con mayor precio
+            observed_price *= 1.0 + delay_prob * 0.1
+
         return Observation(
-            item_id=item.get("flight_id") or item.get("hotel_id", ""),
+            item_id=item_id,
             observed_price=max(0, round(observed_price, 2)),
             observed_availability=max(0, int(item.get("seats_left") or item.get("rooms_left", 0)) + int(rng.normal(0, 1))),
-            observed_delay=max(0.0, float(rng.exponential(15))),
+            observed_delay=round(observed_delay, 2),
             weather=rng.choice(["sunny", "cloudy", "rainy", "stormy"]),
             noise_level=noise,
         )
@@ -313,9 +354,33 @@ class TravelWorldModel:
             success=observation.actual_success,
         )
         self.observations_since_train += 1
-        if self.observations_since_train >= self.config.probabilistic.retrain_after:
+
+        # KPI: error de predicción entre probabilidad estimada y resultado real
+        pred = observation.predicted_success_prob
+        actual = 1.0 if observation.actual_success else 0.0
+        self.prediction_errors.append(abs(pred - actual))
+
+        if self._should_retrain():
             self.retrain()
         self._persist_observation(observation)
+
+    def _should_retrain(self) -> bool:
+        cfg = self.config.probabilistic
+        # Trigger 1: conteo de observaciones acumuladas
+        if self.observations_since_train >= cfg.retrain_after:
+            return True
+        # Trigger 2: incertidumbre alta del GP
+        if (
+            isinstance(self.probabilistic_model, GPTransitionModel)
+            and self.last_uncertainty > cfg.uncertainty_retrain_threshold
+        ):
+            return True
+        # Trigger 3: error de predicción medio alto
+        if len(self.prediction_errors) >= 2:
+            avg_error = sum(self.prediction_errors) / len(self.prediction_errors)
+            if avg_error > cfg.prediction_error_retrain_threshold:
+                return True
+        return False
 
     def retrain(self) -> None:
         """Reentrena el modelo probabilístico con todas las experiencias acumuladas."""
@@ -324,12 +389,14 @@ class TravelWorldModel:
 
     def record_transition(self, transition: Transition) -> None:
         self.transitions.append(transition.to_dict())
+        belief = transition.prev_state.get("belief_state")
         self.probabilistic_model.add_experience(
             transition.prev_state,
             transition.action,
             transition.next_state,
             transition.reward,
             transition.info.get("sampled_success", True),
+            belief=belief,
         )
         if self.vector_store is not None:
             text = f"{transition.action.get('action_type')} {transition.action.get('item_id')} -> {transition.reward}"
@@ -376,11 +443,20 @@ class TravelWorldModel:
             self.observations_since_train = 0
 
     def to_dict(self) -> Dict[str, Any]:
+        avg_error = (
+            round(sum(self.prediction_errors) / len(self.prediction_errors), 4)
+            if self.prediction_errors
+            else 0.0
+        )
         return {
             "estimates": {k: v.to_dict() for k, v in self.estimates.items()},
             "num_transitions": len(self.transitions),
             "observations_since_train": self.observations_since_train,
+            "last_uncertainty": round(self.last_uncertainty, 4),
+            "avg_prediction_error": avg_error,
+            "prediction_error_window": self.config.probabilistic.prediction_error_window,
             "model_type": self.config.probabilistic.model_type,
             "has_sqlite": bool(self.sqlite and self.sqlite._path),
             "has_vector_store": bool(self.vector_store),
+            "flight_delay_model_available": self.flight_delay_adapter.available,
         }

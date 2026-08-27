@@ -78,6 +78,22 @@ INPUT_CARDS: List[Dict[str, Any]] = [
         ],
     },
     {
+        "endpoint": "POST /api/v1/model/train",
+        "description": "Genera datos sintéticos, entrena el world model probabilístico y guarda los modelos en disco.",
+        "parameters": [
+            {"name": "samples", "type": "integer", "required": False, "default": 500},
+            {"name": "output_dir", "type": "string", "required": False, "default": "models"}
+        ]
+    },
+    {
+        "endpoint": "POST /api/v1/model/infer",
+        "description": "Realiza inferencia con el modelo entrenado para un estado y acción dados.",
+        "parameters": [
+            {"name": "state", "type": "object", "required": True, "example": {"remaining_budget": 2000, "step": 0, "preferences": {"airline": "Delta"}}},
+            {"name": "action", "type": "object", "required": True, "example": {"action_type": "flight", "item_id": "FL-TEST", "estimated_cost": 300}}
+        ]
+    },
+    {
         "endpoint": "POST /api/v1/model/retrain",
         "description": "Fuerza el reentrenamiento del world model con todas las experiencias acumuladas.",
         "parameters": [],
@@ -90,6 +106,29 @@ INPUT_CARDS: List[Dict[str, Any]] = [
 ]
 
 OUTPUT_CARDS: List[Dict[str, Any]] = [
+    {
+        "endpoint": "POST /api/v1/model/train",
+        "description": "Estadísticas del entrenamiento y rutas de los modelos guardados.",
+        "fields": [
+            {"name": "status", "type": "string"},
+            {"name": "metadata.n_samples", "type": "integer"},
+            {"name": "metadata.n_transitions", "type": "integer"},
+            {"name": "metadata.n_observations", "type": "integer"},
+            {"name": "metadata.model_type", "type": "string"},
+            {"name": "saved_paths", "type": "object"},
+        ],
+    },
+    {
+        "endpoint": "POST /api/v1/model/infer",
+        "description": "Predicción del modelo entrenado: probabilidad de éxito, recompensa esperada e incertidumbre.",
+        "fields": [
+            {"name": "state", "type": "object"},
+            {"name": "action", "type": "object"},
+            {"name": "predicted_success_probability", "type": "number"},
+            {"name": "predicted_reward", "type": "number"},
+            {"name": "uncertainty", "type": "number"},
+        ],
+    },
     {
         "endpoint": "POST /api/v1/model/plan",
         "description": "Resultado de la planificación probabilística: candidatos, simulaciones, selección, ejecución y creencia.",
@@ -170,6 +209,60 @@ def feedback() -> tuple:
     world_model = TravelWorldModel(_config.model, TravelWorldSimulator(_config.world), app_config=_config)
     world_model.update_from_observation(obs)
     return _ok({"updated": True, "world_model": world_model.to_dict()})
+
+
+@app.route("/api/v1/model/train", methods=["POST"])
+def train() -> tuple:
+    from train import train_world_model
+
+    payload = flask_request.get_json(silent=True) or {}
+    try:
+        samples = int(payload.get("samples", 500))
+        output_dir = payload.get("output_dir")
+    except (TypeError, ValueError) as exc:
+        return _err(f"Invalid parameters: {exc}", 400)
+    try:
+        result = train_world_model(n_samples=samples, config=_config, output_dir=output_dir)
+    except Exception as exc:
+        return _err(str(exc), 500)
+    return _ok(result)
+
+
+@app.route("/api/v1/model/infer", methods=["POST"])
+def infer() -> tuple:
+    from train import load_trained_model
+    from world_model import TravelWorldModel
+    from travel_world import TravelWorldSimulator
+    from models import PlanAction, WorldModelState
+    from model_persistence import ModelPersistence
+
+    payload = flask_request.get_json(silent=True) or {}
+    try:
+        state_data = payload.get("state", {})
+        action_data = payload.get("action", {})
+        state = WorldModelState(**state_data)
+        action = PlanAction(**action_data)
+    except Exception as exc:
+        return _err(f"Invalid state/action: {exc}", 400)
+
+    simulator_env = TravelWorldSimulator(_config.world)
+    world_model = TravelWorldModel(_config.model, simulator_env, app_config=_config)
+    persistence = ModelPersistence(payload.get("output_dir"))
+    if not persistence.exists():
+        return _err("No trained model found. Run /train first.", 404)
+    try:
+        load_trained_model(world_model, payload.get("output_dir"))
+    except Exception as exc:
+        return _err(str(exc), 500)
+
+    success_prob, reward, uncertainty = world_model._predict_success_and_reward(state, action)
+    return _ok({
+        "state": state.to_dict(),
+        "action": action.to_dict(),
+        "predicted_success_probability": success_prob,
+        "predicted_reward": reward,
+        "uncertainty": uncertainty,
+    })
 
 
 @app.route("/api/v1/model/retrain", methods=["POST"])
