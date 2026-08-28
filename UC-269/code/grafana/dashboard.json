@@ -1,0 +1,77 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "UC-269 Contract Net Audit",
+    "tags": ["contract-net", "multi-agent", "uc269"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "refresh": "5s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Tasks Started vs Completed",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "contractnet_tasks_total",
+            "legendFormat": "{{status}}",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Proposals per Agent",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "contractnet_proposals_total",
+            "legendFormat": "{{agent}}",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Selection Score Distribution",
+        "type": "histogram",
+        "targets": [
+          {
+            "expr": "rate(contractnet_selection_score_bucket[5m])",
+            "format": "heatmap"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Execution Duration",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(contractnet_execution_duration_seconds_sum[5m]) / rate(contractnet_execution_duration_seconds_count[5m])",
+            "legendFormat": "avg duration",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Execution Results",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "contractnet_results_total",
+            "legendFormat": "{{status}}",
+            "format": "time_series"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  },
+  "overwrite": true
+}
