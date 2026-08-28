@@ -1,0 +1,9 @@
+﻿Variable,Tipo,Por qué afecta
+Visibilidad/niebla,Categórica o numérica,Reduce mínimos de aproximación y puede forzar esperas o aterrizajes más espaciados
+Viento cruzado / intensidad del viento,Numérica,Puede limitar la pista usable y aumentar separación entre aeronaves 
+Congestión de llegada,Categórica/numérica,"Si muchas aeronaves arriban juntas, el avión debe esperar en ruta o en aproximación"
+Capacidad de pista,Categórica,"Dos pistas ayudan, pero la capacidad efectiva baja con obras, secuenciación o clima"
+Hora del día,Categórica,Las franjas pico concentran más esperas por demanda y secuenciación
+Estado operativo del aeropuerto,Categórica,"Obras, reducción de mínimos o restricciones temporales impactan aterrizajes"
+Retraso acumulado del vuelo,Numérica,Un vuelo que ya viene tarde tiene más probabilidad de entrar en una cadena de demoras
+Tipo de operación,Categórica,"Pasajeros, carga o mezcla de ambos tienen perfiles distintos de prioridad y secuencia"

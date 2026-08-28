@@ -1,0 +1,17 @@
+langgraph==1.0.10
+langchain-core==1.2.10
+pydantic>=2.7.4
+numpy>=1.26.0
+scikit-learn>=1.5.0
+joblib>=1.4.0
+pandas>=2.0.0
+xgboost>=1.7.0
+Flask==3.0.3
+requests==2.32.2
+pytest==8.2.1
+# Producción: modelos en PyTorch y vector store FAISS/pgvector
+torch>=2.1.0
+gpytorch>=1.11
+faiss-cpu>=1.7.4
+psycopg2-binary>=2.9.9
+pgvector>=0.2.5
