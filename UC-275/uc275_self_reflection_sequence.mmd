@@ -1,0 +1,98 @@
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Arial", "primaryColor": "#e8f1ff", "primaryTextColor": "#102a43", "primaryBorderColor": "#2563eb", "lineColor": "#52606d", "secondaryColor": "#fff7ed", "tertiaryColor": "#ecfdf5"}}}%%
+sequenceDiagram
+    autonumber
+    actor Client as Cliente / API
+    participant API as Flask API
+    participant Agent as SelfReflectiveAgent
+    participant Orchestrator as ReflexionOrchestrator
+    participant Memory as ReflectionMemory
+    participant Env as Entorno / Ejecutor
+    participant Eval as MetricEvaluator
+    participant Critic as SelfCritic
+    participant Refiner as SelfRefiner
+    participant Ledger as On-chain Audit Ledger
+    participant Obs as OpenTelemetry
+
+    Client->>API: POST /api/v1/reflect/run\nagent_id, action_params, expected_outcome, context
+    API->>Agent: Iniciar ejecución reflexiva
+    Agent->>Memory: Recall episodios similares\nJaccard + similitud numérica
+    Memory-->>Agent: Lecciones y pre-ajustes disponibles
+
+    loop Hasta convergencia o max_iterations = 3
+        Agent->>Orchestrator: Ejecutar ciclo de 6 fases
+        Orchestrator->>Env: ACTUAR\nEjecutar acción con parámetros ajustados
+        Env-->>Orchestrator: Resultado real + métricas de ejecución
+
+        Orchestrator->>Eval: OBSERVAR / EVALUAR\nComparar actual_metrics vs expected_metrics
+        Eval-->>Orchestrator: score ponderado, outcome, deviations, severity
+        Note over Eval: correctness 40%\ncompleteness 25%\nclarity 20%\nefficiency 15%
+
+        alt Score >= 0.80 y criterios aceptables
+            Orchestrator->>Memory: Guardar episodio exitoso
+            Memory-->>Orchestrator: Patrón de éxito actualizado
+        else Score bajo o severidad >= 0.50
+            Orchestrator->>Critic: REFLEXIONAR\nAnalizar desviaciones y causa raíz
+            Critic-->>Orchestrator: Categoría, causa, factores y confidence
+            Note over Critic: model_error\ndata_stale\nstrategy_flaw\nexecution_error\nexternal_shock\nparameter_miscalibration
+
+            alt confidence < 0.30
+                Critic->>Critic: Aplicar fallback por severidad\ny número de desvíos
+                Critic-->>Orchestrator: Causa raíz fallback
+            end
+
+            Orchestrator->>Refiner: REFINAR\nGenerar propuestas ordenadas por beneficio neto
+            Refiner-->>Orchestrator: Refinements aplicables\n(máximo 3 pasos)
+            Orchestrator->>Agent: Aplicar refinamiento a la estrategia/parámetros
+            Agent-->>Orchestrator: Nueva configuración para repetir
+
+            alt Mejora < 0.10 o no quedan propuestas
+                Orchestrator-->>Agent: Detener refinamiento\nconvergencia no alcanzada
+            end
+        end
+    end
+
+    Agent->>Memory: FINALIZAR\nPersistir episodio completo, score y lessons
+    Memory-->>Agent: episode_id + patrones actualizados
+    Agent->>Ledger: Crear Security/Reflection record\ncon outcome, root_cause y refinements
+    Ledger->>Ledger: Calcular hash SHA-256\ny encadenar registro
+    Ledger-->>Agent: reflection_hash para auditoría
+    Agent->>Obs: Publicar métricas y trazas\nscore, iterations, duration, convergence
+    Obs-->>API: Eventos observables
+    API-->>Client: Response\nfinal_outcome, final_score, iterations,\nreflection_hash, root_cause
+
+    rect rgb(242, 247, 255)
+        Note over Client,Refiner: Flujo alternativo Self-Refine para tareas de texto
+        Client->>API: POST /api/v1/reflect/self-refine\nagent_id + task
+        API->>Agent: GENERATE primera versión
+        Agent-->>API: output inicial
+        loop Hasta score >= 0.80 o 3 iteraciones
+            API->>Eval: CRITIQUE contra criterios ponderados
+            Eval-->>API: score + failed_criteria + feedback
+            alt Score >= 0.80
+                API-->>Client: accepted = true\noutput final + history
+            else Score < 0.80
+                API->>Refiner: REFINE solo criterios fallidos
+                Refiner-->>Agent: Versión mejorada
+                Agent-->>API: Nuevo output
+            end
+        end
+    end
+
+    Client->>API: POST /api/v1/reflect/evaluate o /critique
+    API->>Eval: Evaluación standalone\n(opcional sin ejecutar acción)
+    Eval-->>API: score, deviations, severity, needs_reflection
+    opt Endpoint /critique
+        API->>Critic: Clasificar causa raíz
+        Critic-->>API: root_cause + confidence
+    end
+    API-->>Client: Resultado analítico JSON
+
+    Client->>API: GET /api/v1/memory/lessons/{action_type}
+    API->>Memory: Consultar lecciones aprendidas
+    Memory-->>API: success_rate, common_causes, advice
+    API-->>Client: Lessons response
+
+    Client->>API: GET /api/v1/system/status
+    API->>Memory: Consultar capacidad y patrones
+    Memory-->>API: episodes, success_patterns, failure_patterns
+    API-->>Client: System status
