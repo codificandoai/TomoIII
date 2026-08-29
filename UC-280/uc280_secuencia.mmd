@@ -1,0 +1,109 @@
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente / API Client
+    participant API as API REST
+    participant Orch as Orchestrator
+    participant Planner as Planner seleccionable
+    participant Validator as DAG Validator
+    participant Runtime as LangGraph Runtime
+    participant Registry as Agent Registry
+    participant Executor as Parallel Executor
+    participant Agent as Agente especializado
+    participant Store as SQLite Store
+    participant Audit as Event Audit\n+ SHA-256
+
+    Cliente->>API: POST /api/v1/goals\n{description, planner, context}
+    API->>Orch: Crear objetivo y plan
+    Orch->>Planner: Descomponer objetivo
+
+    alt planner = langgraph
+        Planner-->>Orch: StateGraph: clarify → research/design\n→ execute → validate → deliver
+    else planner = tdag
+        Planner-->>Orch: scope → [research || risk || prototype]\n→ merge → evaluate → deliver
+    else planner = reactree
+        Planner-->>Orch: reason → [primary action || alternative]\n→ evaluate → reflect
+    end
+
+    Planner->>Validator: Validar tareas y dependencias
+    Validator->>Validator: Comprobar referencias, self-dependencies\ny ciclos
+    alt DAG inválido
+        Validator-->>Orch: Errores de validación
+        Orch->>Store: Persistir plan rechazado y eventos
+        Store-->>Orch: Checkpoint guardado
+        Orch-->>API: Error: plan no ejecutable
+        API-->>Cliente: Respuesta de validación
+    else DAG válido
+        Validator-->>Orch: DAG válido + orden topológico
+        Orch->>Store: Persistir plan, oleadas y estado pending
+        Store-->>Orch: Goal ID + checkpoint inicial
+        Orch-->>API: Plan creado con waves y tasks
+        API-->>Cliente: 201 + plan
+
+        Cliente->>API: POST /api/v1/goals/{goal_id}/execute
+        API->>Orch: Ejecutar o reanudar objetivo
+        Orch->>Store: Cargar estado y checkpoints
+        Store-->>Orch: Tareas completed, pending, failed o blocked
+        Orch->>Runtime: Invocar StateGraph
+        Runtime->>Validator: Ejecutar nodo validate
+        Validator-->>Runtime: DAG validado
+        Runtime->>Executor: execute_parallel_dag
+
+        loop Por cada oleada topológica
+            Executor->>Registry: Solicitar agentes por capacidades
+            Registry-->>Executor: AgentSpec + handler asignado
+            par Tareas independientes de la oleada
+                Executor->>Agent: Ejecutar tarea con contexto
+                Agent-->>Executor: Resultado o error
+            and Otra rama independiente
+                Executor->>Agent: Ejecutar tarea en paralelo
+                Agent-->>Executor: Resultado o error
+            end
+
+            alt tarea completada
+                Executor->>Store: Checkpoint + task_completed
+                Store->>Audit: Registrar transición
+                Audit-->>Store: Evento con hash parcial
+            else timeout o error recuperable
+                Executor->>Agent: Reintentar hasta límite configurado
+                alt reintento exitoso
+                    Agent-->>Executor: Resultado recuperado
+                    Executor->>Store: Checkpoint + task_completed
+                else reintentos agotados
+                    Executor->>Store: Marcar tarea failed
+                    Store->>Audit: Registrar task_failed
+                    Audit-->>Store: Evento auditado
+                    Executor->>Executor: Propagar fallo a dependientes
+                    Executor->>Store: Marcar dependientes blocked
+                end
+            end
+        end
+
+        Executor-->>Runtime: DAG ejecutado por oleadas
+        Runtime->>Runtime: finalize
+        Runtime->>Store: Persistir resumen y estado final
+        Store->>Audit: Registrar resultado completo
+        Audit-->>Store: Hash SHA-256
+        Store-->>Orch: Estado, métricas, eventos y audit_hash
+        Orch-->>API: Resultado completed/failed + auditoría
+        API-->>Cliente: 200 + resumen de ejecución
+    end
+
+    opt Reanudar ejecución
+        Cliente->>API: POST /api/v1/goals/{goal_id}/execute
+        API->>Orch: Resume desde checkpoint
+        Orch->>Store: Leer tareas completadas
+        Store-->>Orch: Excluir tareas completed
+        Orch->>Runtime: Continuar oleadas pendientes
+        Runtime-->>Orch: Resultado reanudado
+        Orch-->>API: Estado actualizado + audit_hash
+        API-->>Cliente: Resumen de reanudación
+    end
+
+    opt Consultar auditoría
+        Cliente->>API: GET /api/v1/goals/{goal_id}/events
+        API->>Store: Consultar event log
+        Store-->>API: Transiciones, intentos y checkpoints
+        API-->>Cliente: Historial auditable
+    end
+
+    Note over Runtime,Audit: Producción: StateGraph compilado, ejecución determinista,\ncheckpoints persistentes y auditoría SHA-256.
