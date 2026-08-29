@@ -1,0 +1,8 @@
+terraform/
+.github/
+**/__pycache__/
+*.pyc
+.env
+.git/
+README.md
+cloudbuild.yaml

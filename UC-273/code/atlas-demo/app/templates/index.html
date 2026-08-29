@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atlas — Agent Security Demo Console</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="logo">▲</span>
+      <div>
+        <h1>Atlas</h1>
+        <p>Autonomous financial-ops agent · demo console <span class="ver">v{{ version }}</span></p>
+      </div>
+    </div>
+    <div class="identity">trusted planner identity: <code>{{ trusted_identity }}</code></div>
+  </header>
+
+  <main>
+    <!-- DEMO 1 -->
+    <section class="demo" data-demo="1">
+      <div class="demo-h">
+        <span class="n">01</span>
+        <div>
+          <h2>Prompt Hardening &amp; Authorization</h2>
+          <p>Process a support email. <code>msg-82</code> hides an injection targeting account 4471 (BOLA).</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label>Message
+          <select id="d1-msg">
+            {% for m in inbox %}
+            <option value="{{ m.id }}">{{ m.id }} — {{ m.subject }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div class="guards" id="d1-guards">
+          <label><input type="checkbox" data-g="enable_model_armor" /> Model Armor</label>
+          <label><input type="checkbox" data-g="enable_shieldgemma" /> ShieldGemma</label>
+          <label><input type="checkbox" data-g="enable_dlp_redaction" /> DLP redaction</label>
+          <label><input type="checkbox" data-g="enable_bola_guard" /> BOLA guard</label>
+          <label><input type="checkbox" data-g="enable_llm" /> Live Gemini Planner</label>
+        </div>
+        <div class="run-row">
+          <button class="run-selected" data-target="d1">▶ Run with selected guards</button>
+          <button class="attack" data-preset="off" data-target="d1">All off (attack)</button>
+          <button class="defend" data-preset="on" data-target="d1">All on (defended)</button>
+        </div>
+        <div class="single-guards-row">
+          <span class="sub-label">Test individual guardrail:</span>
+          <button class="guard-btn" data-preset="model_armor_only" data-target="d1">Only Model Armor</button>
+          <button class="guard-btn" data-preset="shieldgemma_only" data-target="d1">Only ShieldGemma</button>
+          <button class="guard-btn" data-preset="bola_only" data-target="d1">Only BOLA</button>
+          <button class="guard-btn" data-preset="dlp_only" data-target="d1">Only DLP</button>
+        </div>
+      </div>
+      <pre class="out" id="d1-out">Ready.</pre>
+    </section>
+
+    <!-- DEMO 2 -->
+    <section class="demo" data-demo="2">
+      <div class="demo-h">
+        <span class="n">02</span>
+        <div>
+          <h2>Tool Isolation &amp; Sandbox Enclaves</h2>
+          <p>Code-interpreter payload reaches the metadata server and exfiltrates the token.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label class="grow">Task
+          <input id="d2-task" value="Summarize yesterday's transactions" />
+        </label>
+        <div class="guards" id="d2-guards">
+          <label><input type="checkbox" data-g="enable_egress_policy" /> Egress policy</label>
+        </div>
+        <div class="run-row">
+          <button class="run-selected" data-target="d2">▶ Run with selected guards</button>
+          <button class="attack" data-preset="off" data-target="d2">Run attack (egress open)</button>
+          <button class="defend" data-preset="on" data-target="d2">Run defended (egress locked)</button>
+        </div>
+      </div>
+      <pre class="out" id="d2-out">Ready.</pre>
+    </section>
+
+    <!-- DEMO 3 -->
+    <section class="demo" data-demo="3">
+      <div class="demo-h">
+        <span class="n">03</span>
+        <div>
+          <h2>Cryptographic Identity &amp; Gateway Control</h2>
+          <p>Agent Gateway validates cryptographic SPIFFE tokens &amp; enforces tool-level IAM policies.</p>
+        </div>
+      </div>
+      <div class="controls">
+        <label>Caller persona &amp; identity token
+          <select id="d3-identity">
+            <option value="none">(none — unauthenticated rogue agent)</option>
+            <option value="rogue">spiffe://atlas/rogue (untrusted signature)</option>
+            <option value="forged">spiffe://atlas/planner (forged / untrusted key)</option>
+            <option value="expired">spiffe://atlas/planner (expired / replayed token)</option>
+            <option value="wrong_aud">spiffe://atlas/planner (wrong tool audience)</option>
+            <option value="planner" selected>{{ trusted_identity }} (cryptographically verified planner)</option>
+          </select>
+        </label>
+        <div class="guards" id="d3-guards">
+          <label><input type="checkbox" data-g="enable_agent_identity" /> Agent identity</label>
+        </div>
+        <div class="run-row">
+          <button class="run-selected" data-target="d3">▶ Run with selected guards</button>
+          <button class="attack" data-preset="off" data-target="d3">Run attack (no identity check)</button>
+          <button class="defend" data-preset="on" data-target="d3">Run defended (identity on)</button>
+        </div>
+      </div>
+      <pre class="out" id="d3-out">Ready.</pre>
+    </section>
+  </main>
+
+  <footer>
+    Demo app for “Securing Autonomous AI Agents on Google Cloud.” Guardrails toggle per-request —
+    no redeploy. Live Model Armor / Vertex calls used when configured, deterministic fallback otherwise.
+  </footer>
+
+  <script>
+    const PRESETS = {
+      d1: {
+        off: {},
+        on: { enable_model_armor: true, enable_shieldgemma: true, enable_dlp_redaction: true, enable_bola_guard: true },
+        model_armor_only: { enable_model_armor: true },
+        shieldgemma_only: { enable_shieldgemma: true },
+        bola_only: { enable_bola_guard: true },
+        dlp_only: { enable_dlp_redaction: true },
+      },
+      d2: { off: {}, on: { enable_egress_policy: true } },
+      d3: { off: {}, on: { enable_agent_identity: true } },
+    };
+
+    function collectGuards(id) {
+      const g = {};
+      document.querySelectorAll(`#${id}-guards input[data-g]`).forEach(cb => g[cb.dataset.g] = cb.checked);
+      return g;
+    }
+    function applyPreset(target, preset) {
+      const vals = PRESETS[target][preset] || {};
+      document.querySelectorAll(`#${target}-guards input[data-g]`).forEach(cb => {
+        cb.checked = !!vals[cb.dataset.g];
+      });
+    }
+
+    async function run(target, guardrails) {
+      const out = document.getElementById(`${target}-out`);
+      out.textContent = "Running…";
+      let url, payload;
+      if (target === "d1") {
+        url = "/api/inbox/process";
+        payload = { message_id: document.getElementById("d1-msg").value, guardrails };
+      } else if (target === "d2") {
+        url = "/api/code/run";
+        payload = { task: document.getElementById("d2-task").value, guardrails };
+      } else {
+        const idVal = document.getElementById("d3-identity").value;
+        let identity = null, token_preset = null;
+        if (idVal === "none") {
+          identity = null;
+          token_preset = "none";
+        } else if (idVal === "rogue") {
+          identity = "spiffe://atlas/rogue";
+          token_preset = "rogue_key";
+        } else if (idVal === "forged") {
+          identity = "{{ trusted_identity }}";
+          token_preset = "untrusted_signature";
+        } else if (idVal === "expired") {
+          identity = "{{ trusted_identity }}";
+          token_preset = "expired";
+        } else if (idVal === "wrong_aud") {
+          identity = "{{ trusted_identity }}";
+          token_preset = "wrong_audience";
+        } else if (idVal === "planner" || idVal.includes("planner")) {
+          identity = "{{ trusted_identity }}";
+          token_preset = "valid";
+        } else {
+          identity = idVal;
+        }
+        url = "/api/finance/transfer";
+        payload = { identity, token_preset, amount_usd: 5000, to_account: "4471", guardrails };
+      }
+      try {
+        const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload) });
+        const data = await res.json();
+        render(out, target, data);
+      } catch (e) {
+        out.textContent = "Request failed: " + e;
+      }
+    }
+
+    function render(out, target, data) {
+      out.className = "out " + (data.outcome || "");
+      let lines = [`outcome: ${(data.outcome||"?").toUpperCase()}`];
+      if (target === "d1") {
+        (data.transcript||[]).forEach(t => lines.push(`  [${t.status}] ${t.actor}: ${t.text}`));
+        if (data.outbox && data.outbox.length) {
+          lines.push("  outbox (what left the agent):");
+          data.outbox.forEach(o => lines.push(`    → ${o.to}: ${o.body.replace(/\n/g,' | ')}`));
+        }
+      } else if (target === "d2") {
+        (data.observations||[]).forEach(o => lines.push(
+          `  ${o.reached ? "REACHED" : "blocked"} ${o.url}` + (o.error ? ` (${o.error})` : ` [${o.status}]`)));
+        lines.push(`  token_stolen: ${data.token_stolen} · exfiltrated: ${data.exfiltrated}`);
+      } else {
+        lines.push(`  presented_identity: ${data.presented_identity || "(none)"}`);
+        if (data.verification) {
+          const v = data.verification;
+          lines.push(`  agent_gateway: ${v.crypto_status || (data.outcome === "authorized" ? "BYPASSED" : "ENFORCED")}`);
+          if (v.algorithm) {
+            lines.push(`  crypto: ${v.algorithm} | kid=${v.key_id || 'n/a'} | sig=${v.crypto_status}`);
+          }
+          if (v.subject || v.audience) {
+            lines.push(`  claims: sub=${v.subject || 'n/a'} | aud=${v.audience || 'n/a'}`);
+          }
+        }
+        if (data.detail) lines.push(`  ${data.label || 'gateway_notice'}: ${data.detail}`);
+        if (data.status) lines.push(`  transfer ${data.status}: $${data.amount_usd} → ${data.to_account}`);
+      }
+      out.textContent = lines.join("\n");
+    }
+
+    document.querySelectorAll("button[data-preset]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        applyPreset(btn.dataset.target, btn.dataset.preset);
+        run(btn.dataset.target, collectGuards(btn.dataset.target));
+      });
+    });
+
+    document.querySelectorAll("button.run-selected").forEach(btn => {
+      btn.addEventListener("click", () => {
+        run(btn.dataset.target, collectGuards(btn.dataset.target));
+      });
+    });
+  </script>
+</body>
+</html>

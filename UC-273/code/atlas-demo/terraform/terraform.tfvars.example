@@ -1,0 +1,24 @@
+# Copy to terraform.tfvars and edit.
+project_id = "your-demo-project"
+region     = "us-central1"
+
+# Bump after each `docker push` (or use an immutable tag / digest in real pipelines).
+image_tag = "latest"
+
+# Recommended on stage: deterministic planner (no live model dependency).
+enable_llm = false
+
+# Optional live Model Armor template; leave empty to use the heuristic fallback.
+model_armor_template = ""
+
+# Keep all guardrails OFF by default so the baseline attack lands; toggle per-request in the UI.
+default_guardrails = {
+  ENABLE_MODEL_ARMOR    = false
+  ENABLE_DLP_REDACTION  = false
+  ENABLE_SHIELDGEMMA    = false
+  ENABLE_BOLA_GUARD     = false
+  ENABLE_EGRESS_POLICY  = false
+  ENABLE_AGENT_IDENTITY = false
+}
+
+allow_unauthenticated = true

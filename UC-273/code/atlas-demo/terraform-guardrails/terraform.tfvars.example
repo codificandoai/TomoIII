@@ -1,0 +1,21 @@
+# Copy to terraform.tfvars and edit. Start with everything off, then enable one control per demo.
+project_id     = "your-demo-project"
+project_number = "123456789012"   # gcloud projects describe <id> --format='value(projectNumber)'
+region         = "us-central1"
+zone           = "us-central1-a"
+
+# --- Demo 2: isolation & egress ---
+enable_gke_sandbox = false        # gVisor node pool + Workload Identity (costs run while up)
+enable_vpc_sc      = false        # org-level; needs access_policy_id below
+access_policy_id   = ""           # gcloud access-context-manager policies list
+
+# --- Demo 4: CI/CD governance ---
+enable_binary_authorization = false
+enable_policy_controller    = false   # requires enable_gke_sandbox = true
+
+# Optional: PKIX public key for the attestor (else it's created without keys).
+attestor_public_key_pkix = ""
+attestor_public_key_id   = ""
+
+# Wire the app's runtime SA (from the app module) so it can read the demo secret.
+# app_service_account_email = "atlas-agent-sa@your-demo-project.iam.gserviceaccount.com"
