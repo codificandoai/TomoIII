@@ -1,0 +1,11 @@
+{
+  "n_samples": 200,
+  "n_transitions": 593,
+  "n_observations": 593,
+  "model_type": "neural",
+  "embedding_dim": 16,
+  "saved_files": [
+    "neural_success",
+    "neural_reward"
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "symbol": "AAPL",
+  "trained_model": true,
+  "training_samples": 600,
+  "test_samples": 100,
+  "mape_percent": 29.4069,
+  "rmse": 63.9691,
+  "directional_accuracy_percent": 0.0,
+  "within_1_percent": 0.0,
+  "within_5_percent": 0.0,
+  "within_10_percent": 0.0,
+  "mean_uncertainty": 0.1,
+  "consistency_checks": {
+    "has_snapshot": true,
+    "has_belief": true,
+    "has_price_prediction": true,
+    "has_risk_context": true,
+    "state_serializable": true
+  },
+  "consistency_percent": 100.0,
+  "sample_predictions": [
+    {
+      "actual": 214.2221,
+      "predicted": 280.8682,
+      "error_pct": 31.1107
+    },
+    {
+      "actual": 214.235,
+      "predicted": 280.8682,
+      "error_pct": 31.1029
+    },
+    {
+      "actual": 214.1687,
+      "predicted": 280.8682,
+      "error_pct": 31.1434
+    },
+    {
+      "actual": 214.2922,
+      "predicted": 280.8682,
+      "error_pct": 31.0679
+    },
+    {
+      "actual": 214.5195,
+      "predicted": 280.8682,
+      "error_pct": 30.929
+    },
+    {
+      "actual": 214.5775,
+      "predicted": 280.8682,
+      "error_pct": 30.8936
+    },
+    {
+      "actual": 214.7991,
+      "predicted": 280.8682,
+      "error_pct": 30.7586
+    },
+    {
+      "actual": 214.3678,
+      "predicted": 280.8682,
+      "error_pct": 31.0216
+    },
+    {
+      "actual": 214.5274,
+      "predicted": 280.8682,
+      "error_pct": 30.9242
+    },
+    {
+      "actual": 214.7335,
+      "predicted": 280.8682,
+      "error_pct": 30.7985
+    }
+  ]
+}

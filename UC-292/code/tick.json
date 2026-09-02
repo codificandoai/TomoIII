@@ -1,6 +1,3 @@
-
-# Ejemplo de datos brutos (tick de AAPL):**
-```json
 {
   "timestamp": "2026-07-09T06:25:00.123Z",
   "symbol": "AAPL",
@@ -12,4 +9,3 @@
   "volume": 45238921,
   "vwap": 233.89
 }
-```
