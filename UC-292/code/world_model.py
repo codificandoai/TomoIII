@@ -324,13 +324,14 @@ class TradingWorldModel:
         current_price: float,
         next_price: float,
         action: Optional[AgentAction] = None,
+        features: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Retroalimenta el world model con un par de ticks consecutivos reales."""
         self.update_price_history(symbol, current_price)
         self.update_price_history(symbol, next_price)
         action = action or AgentAction(symbol=symbol, side="HOLD", quantity=0.0, price=current_price)
-        state = WorldModelState(symbol=symbol, price=current_price).to_dict()
-        next_state = WorldModelState(symbol=symbol, price=next_price).to_dict()
+        state = WorldModelState(symbol=symbol, price=current_price, features=features or {}).to_dict()
+        next_state = WorldModelState(symbol=symbol, price=next_price, features=features or {}).to_dict()
         actual_return = (next_price - current_price) / current_price if current_price > 0 else 0.0
 
         self.probabilistic_model.add_experience(

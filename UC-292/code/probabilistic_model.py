@@ -85,6 +85,7 @@ class StateEncoder:
 
     @staticmethod
     def _normalize(vec: np.ndarray) -> np.ndarray:
+        vec = np.nan_to_num(vec, nan=0.0, posinf=1e9, neginf=-1e9)
         norm = float(np.linalg.norm(vec))
         return vec if norm == 0 else vec / norm
 

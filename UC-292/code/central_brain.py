@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from config import AppConfig, get_config
-from models import AgentAction, BeliefState, MarketSnapshot, TradingRequest, WorldModelState
+from models import AgentAction, BeliefState, MarketSnapshot, MarketTick, TradingRequest, WorldModelState, now_iso
 from perception import MarketPerceptionPipeline
 from world_model import TradingWorldModel
 
@@ -141,7 +141,29 @@ class CentralBrain:
     def learn_from_tick(
         self, symbol: str, current_price: float, next_price: float
     ) -> None:
-        self.world_model.update_from_tick(symbol, current_price, next_price)
+        # Observar el tick actual para disponer de features técnicos actualizadas
+        self.observe(
+            TradingRequest(
+                symbols=[symbol],
+                ticks=[
+                    MarketTick(
+                        timestamp=now_iso(),
+                        symbol=symbol,
+                        bid=current_price,
+                        ask=current_price,
+                        last_price=current_price,
+                    )
+                ],
+            )
+        )
+        features = (
+            self.snapshots[symbol].features.to_dict()
+            if symbol in self.snapshots
+            else {}
+        )
+        self.world_model.update_from_tick(
+            symbol, current_price, next_price, features=features
+        )
 
     def learn_from_observation(self, observation: Any) -> None:
         from models import WorldModelObservation

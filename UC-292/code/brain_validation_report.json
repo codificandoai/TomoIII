@@ -3,12 +3,17 @@
   "trained_model": true,
   "training_samples": 600,
   "test_samples": 100,
-  "mape_percent": 29.4069,
-  "rmse": 63.9691,
-  "directional_accuracy_percent": 0.0,
-  "within_1_percent": 0.0,
-  "within_5_percent": 0.0,
-  "within_10_percent": 0.0,
+  "mape_percent": 1.5024,
+  "baseline_mape_percent": 0.2348,
+  "mape_improvement_over_baseline_percent": -539.74,
+  "rmse": 4.0978,
+  "baseline_rmse": 0.7726,
+  "rmse_improvement_over_baseline_percent": -430.38,
+  "directional_accuracy_percent": 51.02,
+  "baseline_directional_accuracy_percent": 54.08,
+  "within_1_percent": 44.44,
+  "within_5_percent": 100.0,
+  "within_10_percent": 100.0,
   "mean_uncertainty": 0.1,
   "consistency_checks": {
     "has_snapshot": true,
@@ -21,53 +26,53 @@
   "sample_predictions": [
     {
       "actual": 214.2221,
-      "predicted": 280.8682,
-      "error_pct": 31.1107
+      "predicted": 212.2378,
+      "error_pct": 0.9263
     },
     {
       "actual": 214.235,
-      "predicted": 280.8682,
-      "error_pct": 31.1029
+      "predicted": 214.6509,
+      "error_pct": 0.1941
     },
     {
       "actual": 214.1687,
-      "predicted": 280.8682,
-      "error_pct": 31.1434
+      "predicted": 215.1147,
+      "error_pct": 0.4417
     },
     {
       "actual": 214.2922,
-      "predicted": 280.8682,
-      "error_pct": 31.0679
+      "predicted": 214.9813,
+      "error_pct": 0.3216
     },
     {
       "actual": 214.5195,
-      "predicted": 280.8682,
-      "error_pct": 30.929
+      "predicted": 215.924,
+      "error_pct": 0.6547
     },
     {
       "actual": 214.5775,
-      "predicted": 280.8682,
-      "error_pct": 30.8936
+      "predicted": 215.5867,
+      "error_pct": 0.4703
     },
     {
       "actual": 214.7991,
-      "predicted": 280.8682,
-      "error_pct": 30.7586
+      "predicted": 215.8795,
+      "error_pct": 0.503
     },
     {
       "actual": 214.3678,
-      "predicted": 280.8682,
-      "error_pct": 31.0216
+      "predicted": 209.5949,
+      "error_pct": 2.2265
     },
     {
       "actual": 214.5274,
-      "predicted": 280.8682,
-      "error_pct": 30.9242
+      "predicted": 208.2668,
+      "error_pct": 2.9183
     },
     {
       "actual": 214.7335,
-      "predicted": 280.8682,
-      "error_pct": 30.7985
+      "predicted": 209.1307,
+      "error_pct": 2.6092
     }
   ]
 }

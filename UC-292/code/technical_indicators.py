@@ -69,7 +69,7 @@ def atr_from_prices(
 ) -> pd.Series:
     """ATR simplificado usando solo cierres (aproximación para ticks sin high/low)."""
     c = _to_series(close)
-    tr = c.diff().abs()
+    tr = c.diff().abs().fillna(0.0)
     return tr.rolling(window=window, min_periods=1).mean()
 
 
@@ -85,7 +85,7 @@ def obv(close: pd.Series | List[float], volume: pd.Series | List[float]) -> pd.S
 
 def returns(series: pd.Series | List[float] | np.ndarray) -> pd.Series:
     s = _to_series(series)
-    return s.pct_change().fillna(0.0)
+    return s.pct_change(fill_method=None).fillna(0.0)
 
 
 def volatility(series: pd.Series | List[float] | np.ndarray, window: int = 20) -> pd.Series:

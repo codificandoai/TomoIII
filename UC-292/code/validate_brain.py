@@ -49,24 +49,30 @@ def evaluate_brain(symbol: str = "AAPL", n_train: int = 600, n_test: int = 100, 
 
     brain = CentralBrain(cfg)
 
-    # Fase 1: entrenar con pares consecutivos
+    # Fase 1: entrenar con pares consecutivos usando ventana deslizante
+    window = 50
     for i in range(len(train_ticks) - 1):
-        brain.learn_from_tick(
+        start = max(0, i - window + 1)
+        brain.observe(TradingRequest(symbols=[symbol], ticks=train_ticks[start : i + 1]))
+        features = brain.snapshots[symbol].features.to_dict()
+        brain.world_model.update_from_tick(
             symbol,
             train_ticks[i].last_price,
             train_ticks[i + 1].last_price,
+            features=features,
         )
 
     trained = brain.world_model._has_trained_return_model()
 
-    # Fase 2: predecir paso a paso en test (observar tick i, predecir i+1)
+    # Fase 2: predecir paso a paso en test (observar ventana, predecir i+1)
     predictions: List[float] = []
     baseline_preds: List[float] = []
     actuals: List[float] = []
     uncertainties: List[float] = []
 
     for i in range(len(test_ticks) - 1):
-        brain.observe(TradingRequest(symbols=[symbol], ticks=[test_ticks[i]]))
+        start = max(0, i - window + 1)
+        brain.observe(TradingRequest(symbols=[symbol], ticks=test_ticks[start : i + 1]))
         pred = brain.predict_next_price(symbol)
         predictions.append(pred["predicted_next_price"])
         baseline_preds.append(test_ticks[i].last_price)
