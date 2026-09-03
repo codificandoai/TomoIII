@@ -101,6 +101,7 @@ def _feed_sam_memory_to_world_model(
 def run_sam_aware_pipeline(
     request: TradingRequest,
     config: Optional[AppConfig] = None,
+    central_brain: Optional[Any] = None,
     recursion_limit: int = 50,
 ) -> Dict[str, Any]:
     """Pipeline completo: SAM -> BDI/Juice -> World Model -> Ejecución.
@@ -118,8 +119,8 @@ def run_sam_aware_pipeline(
 
     cfg = config or get_config()
 
-    # Fase 1: Crear el cerebro central único para todo el pipeline
-    brain = CentralBrain(cfg)
+    # Fase 1: Crear o reutilizar el cerebro central único para todo el pipeline
+    brain = central_brain or CentralBrain(cfg)
     snapshots = brain.observe(request)
     snap_payload = {s: snap.to_dict() for s, snap in snapshots.items()}
 

@@ -51,7 +51,10 @@ class CentralBrain:
         )
         self.latest_request_id = request.request_id
         for symbol, snapshot in self.snapshots.items():
-            self.world_model.update_price_history(symbol, snapshot.latest_price)
+            # Alimentar todo el historial de ticks al world model, no solo el último,
+            # para que la estimación empírica de retorno sea más informativa.
+            for tick in sorted(ticks_by_symbol.get(symbol, []), key=lambda t: t.timestamp):
+                self.world_model.update_price_history(symbol, tick.last_price)
             if symbol not in self.beliefs:
                 self.beliefs[symbol] = self.world_model.initialize_belief(symbol)
             self.beliefs[symbol] = self.world_model.update_belief(

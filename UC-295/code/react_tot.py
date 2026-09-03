@@ -166,7 +166,8 @@ class TickPredictionEnvironment:
                 brain.observe(request)
             pred = brain.predict_next_price(symbol)
             mid = float(pred["predicted_next_price"])
-            confidence = max(0.0, 1.0 - float(pred.get("uncertainty", 0.5)))
+            uncertainty = float(pred.get("uncertainty", 0.5))
+            confidence = 1.0 / (1.0 + uncertainty)
             spread = _estimate_spread(ctx, mid)
             return PredictorResult(
                 source="brain",
