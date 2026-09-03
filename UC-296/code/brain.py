@@ -10,7 +10,6 @@ Capas actuales:
 - UC-293: BDI + Filtro Adversarial Juice.
 - UC-294: Situational Awareness Middleware (SAM).
 - UC-295: ReAct Híbrido con Árbol de Pensamientos (ToT) para predicción ask/bid.
-- UC-296: Gestión de memoria AGI (persistencia, atención, autoevaluación, metacognición).
 """
 from __future__ import annotations
 
@@ -276,52 +275,6 @@ def demo_full_agi() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Capa UC-296 — Gestión de memoria AGI
-# ---------------------------------------------------------------------------
-def demo_memory() -> Dict[str, Any]:
-    """Demostración de la capa de gestión de memoria AGI (UC-296)."""
-    import os
-    sys.path.insert(
-        0,
-        os.path.abspath(
-            os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "UC-296", "code")
-        ),
-    )
-    from brain_memory_pipeline import BrainMemoryPipeline
-    from market_data import SyntheticMarketDataGenerator
-    from models import Portfolio, TradingRequest
-
-    console.print(
-        Panel(
-            "[bold cyan]UC-296 — Brain + Memory AGI Pipeline[/bold cyan]"
-        )
-    )
-
-    pipeline = BrainMemoryPipeline()
-    gen = SyntheticMarketDataGenerator(pipeline.config.market, seed=42)
-    ticks = gen.generate_ticks("AAPL", n=80, start_price=150.0)
-    request = TradingRequest(
-        symbols=["AAPL"],
-        ticks=ticks,
-        portfolio=Portfolio(cash=100_000.0),
-        mode="paper",
-        approved=False,
-    )
-    result = pipeline.run(request, propose_goal=True)
-    summary: Dict[str, Any] = {
-        "mode": "memory",
-        "status": result.get("status"),
-        "tot_prediction": result.get("tot_prediction", {}).get("final_prediction"),
-        "spotlight_count": len(result.get("spotlight", [])),
-        "goal_proposal": result.get("goal_proposal"),
-        "reflection": result.get("reflection"),
-        "self_model_goal": result.get("self_model", {}).get("current_goal"),
-    }
-    pprint(summary)
-    return summary
-
-
-# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def main(argv: List[str] | None = None) -> int:
@@ -330,12 +283,11 @@ def main(argv: List[str] | None = None) -> int:
     )
     parser.add_argument(
         "--mode",
-        choices=["sam", "trading", "tot", "full", "memory", "all"],
+        choices=["sam", "trading", "tot", "full", "all"],
         default="full",
         help=(
             "Modo de ejecución: sam (UC-294 standalone), trading (UC-293/294), "
-            "tot (UC-295), full (todas las capas unidas), memory (UC-296 gestión de memoria), "
-            "all (ejecuta todos los demos)."
+            "tot (UC-295), full (todas las capas unidas), all (ejecuta todos los demos)."
         ),
     )
     parser.add_argument(
@@ -353,8 +305,6 @@ def main(argv: List[str] | None = None) -> int:
         demo_tot(use_brain=args.use_brain)
     elif args.mode == "full":
         demo_full_agi()
-    elif args.mode == "memory":
-        demo_memory()
     elif args.mode == "all":
         demo_sam()
         console.print("\n")
@@ -363,8 +313,6 @@ def main(argv: List[str] | None = None) -> int:
         demo_tot(use_brain=False)
         console.print("\n")
         demo_full_agi()
-        console.print("\n")
-        demo_memory()
 
     return 0
 
