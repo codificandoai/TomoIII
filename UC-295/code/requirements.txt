@@ -1,0 +1,12 @@
+langgraph==1.0.10
+langchain-core==1.2.10
+pydantic>=2.7.4
+numpy>=1.26.0
+scikit-learn>=1.5.0
+joblib>=1.4.0
+pandas>=2.0.0
+scipy>=1.11.0
+Flask==3.0.3
+requests==2.32.2
+pytest==8.2.1
+rich>=13.0.0
