@@ -86,6 +86,7 @@ def build_agent(
     workflow = StateGraph(TradingAgentState)
 
     workflow.add_node("perceive", nodes.perceive_node)
+    workflow.add_node("tot_predict", nodes.tot_predict_node)
     workflow.add_node("analyze", nodes.analyze_node)
     workflow.add_node("validate", nodes.validate_node)
     workflow.add_node("plan", nodes.plan_node)
@@ -93,13 +94,15 @@ def build_agent(
     workflow.add_node("evaluate", nodes.evaluate_node)
     workflow.add_node("adversarial_confrontation", nodes.adversarial_confrontation_node)
     workflow.add_node("risk_gate", nodes.risk_gate_node)
+    workflow.add_node("safety_check", nodes.safety_check_node)
     workflow.add_node("confirm_or_execute", nodes.confirm_or_execute_node)
     workflow.add_node("execute", nodes.execute_node)
     workflow.add_node("learn", nodes.learn_node)
     workflow.add_node("finalize", nodes.finalize)
 
     workflow.set_entry_point("perceive")
-    workflow.add_edge("perceive", "analyze")
+    workflow.add_edge("perceive", "tot_predict")
+    workflow.add_edge("tot_predict", "analyze")
     workflow.add_edge("analyze", "validate")
     workflow.add_edge("validate", "plan")
     workflow.add_edge("plan", "simulate")
@@ -118,7 +121,29 @@ def build_agent(
         {"risk_gate": "risk_gate", "finalize": "finalize"},
     )
 
-    workflow.add_edge("risk_gate", "confirm_or_execute")
+    def route_after_risk_gate(state: TradingAgentState) -> str:
+        status = state.get("status", "")
+        if status in ("blocked", "failed", "awaiting_input"):
+            return "finalize"
+        return "safety_check"
+
+    workflow.add_conditional_edges(
+        "risk_gate",
+        route_after_risk_gate,
+        {"safety_check": "safety_check", "finalize": "finalize"},
+    )
+
+    def route_after_safety(state: TradingAgentState) -> str:
+        status = state.get("status", "")
+        if status in ("blocked", "failed", "awaiting_input"):
+            return "finalize"
+        return "confirm_or_execute"
+
+    workflow.add_conditional_edges(
+        "safety_check",
+        route_after_safety,
+        {"confirm_or_execute": "confirm_or_execute", "finalize": "finalize"},
+    )
 
     def route_after_confirm(state: TradingAgentState) -> str:
         status = state.get("status", "")

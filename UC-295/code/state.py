@@ -32,3 +32,5 @@ class TradingAgentState(TypedDict):
     safety_flags: Annotated[List[str], operator.add]
     missing_info: List[str]
     requires_confirmation: bool
+    safety_decision: Optional[Dict[str, Any]]
+    tot_prediction: Optional[Dict[str, Any]]

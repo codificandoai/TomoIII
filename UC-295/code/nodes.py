@@ -25,7 +25,9 @@ from models import (
 )
 from perception import MarketPerceptionPipeline
 from planner import StrategyGenerator
+from react_tot import ReActReasonactToTBrain, TickPredictionEnvironment
 from risk import RiskEngine
+from sam import SafetySupervisor
 from simulator import MonteCarloSimulator
 from trading_agents import (
     FundamentalAnalyst,
@@ -100,6 +102,74 @@ class TradingAgentNodes:
                 )
             ],
             "logs": [self._log("perception", f"Built market snapshots for {list(snapshots.keys())}")],
+        }
+
+    # ------------------------------------------------------------------
+    # 1.5 Capa AGI adicional: ReAct Híbrido + Tree of Thoughts (ToT)
+    # ------------------------------------------------------------------
+    def tot_predict_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Predice ask/bid del siguiente tick usando ToT como capa cognitiva.
+
+        Usa el mismo CentralBrain que el resto del grafo para que la predicción
+        sea coherente con el world model, beliefs y percepción ya calculadas.
+        """
+        request = TradingRequest.from_dict(state["request"])
+        if not request.ticks or not request.symbols:
+            return {
+                "tot_prediction": None,
+                "reflections": [
+                    self._reflection("tot", "No ticks or symbols for ToT prediction.")
+                ],
+                "logs": [self._log("tot", "Skipped ToT prediction")],
+            }
+
+        ticks_by_symbol: Dict[str, List[Any]] = {}
+        for tick in request.ticks:
+            ticks_by_symbol.setdefault(tick.symbol, []).append(tick)
+
+        predictions: Dict[str, Any] = {}
+        env = TickPredictionEnvironment(
+            brain=self.brain,
+            fallback_map={
+                "brain": ["ensemble"],
+                "world_model": ["technical", "ensemble"],
+                "technical": ["microstructure", "ensemble"],
+                "microstructure": ["sentiment", "ensemble"],
+                "sentiment": ["ensemble"],
+            },
+            latency_ms=0.0,
+        )
+        tot = ReActReasonactToTBrain(env, confidence_threshold=0.5, max_depth=2)
+
+        for symbol in request.symbols:
+            ticks = ticks_by_symbol.get(symbol, [])
+            if not ticks:
+                continue
+            try:
+                result = tot.predict(
+                    symbol=symbol,
+                    ticks=ticks,
+                    news=request.news,
+                    predictors=["brain", "technical", "microstructure"],
+                )
+                predictions[symbol] = {
+                    "final_prediction": result.get("final_prediction"),
+                    "tree_summary": result.get("tree_summary"),
+                    "selected_leaf": result.get("selected_leaf"),
+                    "trace": result.get("trace"),
+                }
+            except Exception as exc:
+                predictions[symbol] = {"error": str(exc)}
+
+        return {
+            "tot_prediction": predictions,
+            "reflections": [
+                self._reflection(
+                    "tot",
+                    f"ToT predictions computed for {len(predictions)} symbols.",
+                )
+            ],
+            "logs": [self._log("tot", f"Computed ToT predictions: {list(predictions.keys())}")],
         }
 
     # ------------------------------------------------------------------
@@ -377,6 +447,48 @@ class TradingAgentNodes:
         }
 
     # ------------------------------------------------------------------
+    # 7.5 Compuerta de seguridad (Safety Supervisor)
+    # ------------------------------------------------------------------
+    def safety_check_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Aplica el SafetySupervisor sobre la estrategia seleccionada."""
+        selected = state.get("selected_strategy") or {}
+        if not selected:
+            return {
+                "status": state.get("status", "awaiting_input"),
+                "reflections": [self._reflection("safety", "No strategy to check.")],
+            }
+
+        request = TradingRequest.from_dict(state["request"])
+        snapshots_data = state.get("snapshots", {})
+        safety = SafetySupervisor().check(selected, request, snapshots_data)
+
+        if not safety.get("allowed", True):
+            return {
+                "status": "blocked",
+                "safety_decision": safety,
+                "reflections": [
+                    self._reflection(
+                        "safety",
+                        f"Safety blocked strategy: {safety.get('issues')}.",
+                    )
+                ],
+                "logs": [self._log("safety", "Strategy blocked by safety supervisor")],
+            }
+
+        return {
+            "status": "awaiting_confirmation",
+            "safety_decision": safety,
+            "requires_confirmation": self.config.agent.require_confirmation,
+            "reflections": [
+                self._reflection(
+                    "safety",
+                    f"Safety passed. Rollback plan: {safety.get('rollback')}",
+                )
+            ],
+            "logs": [self._log("safety", "Safety supervisor passed")],
+        }
+
+    # ------------------------------------------------------------------
     # 8. Confirmación / Ejecución
     # ------------------------------------------------------------------
     def confirm_or_execute_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
@@ -496,6 +608,8 @@ class TradingAgentNodes:
             "candidates": state.get("candidates", []),
             "evaluations": state.get("evaluations", []),
             "risk_decision": state.get("risk_decision"),
+            "safety_decision": state.get("safety_decision"),
+            "tot_prediction": state.get("tot_prediction"),
             "execution_result": state.get("execution_result"),
             "portfolio": state.get("portfolio"),
             "world_model": state.get("world_model", {}),
