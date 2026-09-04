@@ -47,6 +47,10 @@ Este manual describe el flujo de procesos del cerebro AGI implementado en `/User
 
 ## 3. Diagrama general de flujo (mapa de proceso macro)
 
+![Arquitectura AGI Autoconsciente](../agi_brain_architecture.png)
+
+*Figura 1. Diagrama de arquitectura generado automáticamente desde el código (`code/generate_brain_image.py`). Muestra todas las capas del cerebro AGI, subsistemas de memoria, plasticidad sináptica digital y el bucle recursivo de autoconciencia.*
+
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          ENTRADAS EXTERNAS                                  │
@@ -788,3 +792,5 @@ python code/brain_memory_router.py --mode all
 - <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/curiosity_skill_loop.py" />
 - <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/self_awareness_loop.py" />
 - <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/compatibility_validator.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/generate_brain_image.py" />
+- `../agi_brain_architecture.png`
