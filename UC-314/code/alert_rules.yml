@@ -1,0 +1,42 @@
+### 2. Arquitectura de Alertas de Grafana (`alert_rules.yml`)
+### Esta regla es vital: si el LLM y el SCM entran en desacuerdo frecuentemente, significa que el sistema de prompts del agente está perdiendo la noción de causalidad.
+```yaml
+groups:
+  - name: neuro_symbolic_safety
+    rules:
+      # ALERTA CRÍTICA: El SCM tuvo que intervenir porque el LLM se equivocó
+      - alert: DesconexionCausalDelAgente
+        expr: |
+          (
+            sum(rate(neurosymbolic_scm_interventions_total[10m])) 
+            / 
+            sum(rate(neurosymbolic_breakdowns_total[10m]))
+          ) > 0.3
+        for: 2m
+        labels:
+          severity: critical
+          team: "ai-safety"
+        annotations:
+          summary: "El LLM y el Modelo Causal están en desacuerdo"
+          description: "El Modelo Causal Simbólico tuvo que corregir al LLM en más del 30% de las fallas recientes. El agente está perdiendo la comprensión de la cadena causal del entorno. Riesgo de entrar en un bucle de reparaciones inútiles (ej. reiniciar un servicio cuando la causa real es la pérdida de red). Requiere revisión humana del prompt de razonamiento del agente."
+
+      # ALERTA DE RENDIMIENTO: Trazado causal tomando demasiado tiempo
+      - alert: TrazabilidadCausalLenta
+        expr: histogram_quantile(0.95, rate(neurosymbolic_root_cause_trace_seconds_bucket[5m])) > 2.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "El grafo causal tarda demasiado en resolver la causa"
+          description: "El percentil 95 del tiempo de trazado supera los 2 segundos. El modelo causal (SCM) podría estar creciendo demasiado grande o contener ciclos inesperados. Considere simplificar las dependencias del agente."
+
+      # ALERTA INFORMATIVA: Consenso perfecto
+      - alert: RazonamientoCausalOptimo
+        expr: neurosymbolic_llm_scm_agreement == 1.0
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "El LLM comprende perfectamente la causalidad del entorno"
+          description: "En la última media hora, todas las hipótesis del LLM fueron validadas por el grafo causal. El agente está alineado con la realidad física del sistema."
+```

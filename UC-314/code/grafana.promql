@@ -1,0 +1,20 @@
+### 3. Dashboards en Grafana (Consultas PromQL)
+Para construir un panel que muestre la salud de esta arquitectura:
+**Panel 1: Intervenciones del SCM (La verdadera medida de seguridad)**
+```promql
+sum(increase(neurosymbolic_scm_interventions_total[1h]))
+```
+*(Si esto es alto, significa que el LLM, por sí solo, no es fiable para la depuración de fallos complejos).*
+
+**Panel 2: Confiabilidad Causal del LLM (Acuerdo LLM-SCM)**
+```promql
+avg_over_time(5m, neurosymbolic_llm_scm_agreement) * 100
+```
+*(Un porcentaje bajo indica que necesitas mejorar las instrucciones de "System Prompt" del agente para que entienda mejor las dependencias del entorno).*
+
+**Panel 3: Complejidad del Grafo (Nodos evaluados por trazado)**
+```promql
+histogram_quantile(0.99, rate(neurosymbolic_nodes_evaluated_total_bucket[10m]))
+```
+*(Si el número de nodos evaluados se dispara, significa que las dependencias del agente son excesivamente profundas, lo que dificulta la depuración tanto para el LLM como para el SCM).*
+
