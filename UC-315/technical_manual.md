@@ -794,3 +794,275 @@ python code/brain_memory_router.py --mode all
 - <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/compatibility_validator.py" />
 - <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-313/code/generate_brain_image.py" />
 - `../agi_brain_architecture.png`
+
+---
+
+# UC-315 — Capa SkillRegistry: cerebro general + habilidades especializadas por dominio
+
+## 1. Alcance y objetivo
+
+UC-315 extiende el cerebro AGI con una **capa de SkillRegistry** que permite
+utilizar un **núcleo cognitivo-orquestador común** mientras se mantienen
+**modelos, credenciales, herramientas, memorias, políticas y permisos separados**
+por dominio. Los dominios cubiertos inicialmente son:
+
+- **Trading (UC-313)**: aislamiento operacional estricto, latencia ultrabaja,
+  segregación entre señal, riesgo y ejecución.
+- **Reservas de viajes (UC-315)**: flujo de transporte, pago, identidad,
+  notificaciones, cambios y cancelaciones.
+
+No se asumen dos arquitecturas cognitivas distintas: se reutiliza el patrón de
+orquestación y se cambian los *skills*, el modelo de mundo, las fuentes de datos
+y las reglas de autorización.
+
+---
+
+## 2. Mapa de proceso UC-315
+
+![Skill Registry Brain](../skills_brain.png)
+
+*Figura 2. Capa SkillRegistry sobre el cerebro AGI. El `GeneralOrchestrator`
+reutiliza el núcleo cognitivo, pero delega acciones concretas a skills con
+contratos explícitos. Cada dominio tiene su propia memoria, modelo de mundo y
+política de seguridad.*
+
+### Macro proceso de orquestación por dominio
+
+```text
+Entrada: objetivo en lenguaje natural + dominio + roles del usuario
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.1  SELECCIÓN DE DOMINIO Y SEGREGACIÓN DE CONTEXTO                     │
+│   GeneralOrchestrator recibe (goal, domain, user_roles).                     │
+│   Carga el DomainMemoryManager aislado para ese dominio.                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.2  RECUPERACIÓN DE PLANTILLA ABSTRACTA (memoria episódica/semántica)   │
+│   domain_memory.retrieve_similar_template(goal) → plantilla genérica.      │
+│   Ejemplo: reserva de vuelo → estructura de reserva de transporte.          │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.3  ADAPTACIÓN DE LA PLANTILLA A SKILLS DEL DOMINIO                    │
+│   Para cada paso de la plantilla:                                            │
+│     - Seleccionar skill específica del dominio.                              │
+│     - Inferir entradas a partir del objetivo.                                │
+│     - No transferir credenciales, datos ni código de otro dominio.           │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.4  VALIDACIÓN SIMBÓLICA Y DE SEGURIDAD POR PASO                       │
+│   SafetySupervisor315 verifica:                                              │
+│     - action_class permitida en el dominio.                                  │
+│     - permisos y roles requeridos.                                           │
+│     - precondiciones (disponibilidad, riesgo, consentimiento, circuit breaker).│
+│     - límites de coste/latencia.                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.5  EJECUCIÓN CONTROLADA DE SKILLS                                     │
+│   Ejecutar solo pasos autorizados.                                            │
+│   Transacciones/ejecuciones/deletes requieren aprobación explícita.           │
+└─────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-315.6  REGISTRO DE EPISODIO Y ACTUALIZACIÓN DEL MODELO DE MUNDO           │
+│   Guardar resultado en memoria estructurada/vectorial del dominio.            │
+│   No propagar automáticamente a políticas sin validación humana.            │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. Skills por dominio
+
+### 3.1 Dominio Trading
+
+| Skill | Acción | Riesgo | Permisos / Roles | Precondiciones clave | Reversión |
+|---|---|---|---|---|---|
+| `MarketDataSkill` | `read` | low | — | Feed de mercado activo | N/A |
+| `MarketPredictionSkill` | `predict` | low | — | Datos de mercado recientes | N/A |
+| `FinancialRiskSkill` | `analyze` | medium | — | Exposición y límites definidos | N/A |
+| `MarketExecutionSkill` | `execute` | critical | `market.order.send` + rol `trader` | Validación de riesgo aprobada; circuit breaker abierto | `CancelOrderSkill` |
+
+### 3.2 Dominio Reservas
+
+| Skill | Acción | Riesgo | Permisos / Roles | Precondiciones clave | Reversión |
+|---|---|---|---|---|---|
+| `FlightBookingSkill` | `read` | low | — | Origen, destino y fecha válidos | N/A |
+| `RailBookingSkill` | `read` | low | — | Origen, destino y fecha válidos | N/A |
+| `IdentityValidationSkill` | `analyze` | medium | — | Identificación proporcionada | N/A |
+| `PaymentSkill` | `transact` | high | `payment.charge` + rol `payment_processor` | Disponibilidad, precio confirmado, consentimiento, medio autorizado | `RefundSkill` |
+| `NotificationSkill` | `read` | low | — | — | N/A |
+| `ChangeCancelSkill` | `delete` | medium | `reservation.modify` | Reserva existente; política aplicable | Reembolso parcial |
+
+### 3.3 Contrato SkillContract
+
+Cada skill expone:
+
+- `name`, `version`, `domain`
+- `purpose`
+- `inputs` / `outputs` con esquema de parámetros
+- `permissions` y `required_roles`
+- `action_class`: `read | predict | analyze | transact | execute | delete`
+- `estimated_cost`, `estimated_latency_ms`
+- `preconditions`, `postconditions`
+- `risk_level`: `low | medium | high | critical`
+- `reversible` y `compensation`
+
+---
+
+## 4. Flujo de adaptación semántica vs validación simbólica
+
+![Secuencia UC-315](../UC-315-secuencia.png)
+
+*Figura 3. El LLM generaliza semánticamente (vuelo ↔ tren) y recupera una
+plantilla abstracta; el orquestador adapta skills específicas y el Safety
+Supervisor valida simbólicamente cada paso.*
+
+```text
+Objetivo: "Reservar un tren de Madrid a Barcelona"
+    │
+    ▼ LLM: generalización semántica
+"Esto se parece a una reserva de transporte"
+    │
+    ▼ Recuperar plantilla abstracta
+[Validar → Consultar opciones → Filtrar → Seleccionar → Confirmar → Pagar → Verificar]
+    │
+    ▼ Adaptar skills
+[IdentityValidationSkill → RailBookingSkill → RailBookingSkill → RailBookingSkill → PaymentSkill → NotificationSkill]
+    │
+    ▼ Validar simbólicamente
+¿Disponibilidad confirmada? ¿Precio confirmado? ¿Consentimiento? ¿Rol/permiso de pago?
+    │
+    ▼ Ejecutar solo si pasa
+```
+
+---
+
+## 5. Safety Supervisor parametrizado por dominio
+
+El `SafetySupervisor315` aplica políticas de dominio específicas:
+
+### Política Trading
+
+- Latencia máxima sensible (< 50 ms para ejecución).
+- `execute` requiere rol `trader` + permiso `market.order.send`.
+- Segregación: predicción no puede ejecutar; riesgo debe validar antes de
+  ejecución.
+- Circuit breaker: 2 fallos consecutivos.
+
+### Política Reservas
+
+- Latencia permisiva (< 2000 ms).
+- `transact` y `delete` requieren confirmación/rol.
+- Pago requiere disponibilidad, precio confirmado, consentimiento y medio
+  autorizado.
+- Circuit breaker: 5 fallos.
+
+---
+
+## 6. Memoria separada por dominio
+
+`DomainMemoryManager` aisla físicamente:
+
+- `ShortTermNotepad` (memoria de trabajo).
+- `StructuredMemory` (SQLite por dominio).
+- `LongTermMemory` (vector store por dominio).
+- Plantillas de plan recuperables semánticamente.
+
+Ejemplo de rutas:
+
+```text
+code/uc315_trading_memory.db
+code/uc315_trading_vectors.json
+code/uc315_reservations_memory.db
+code/uc315_reservations_vectors.json
+```
+
+---
+
+## 7. Flujo detallado del orquestador
+
+![Flujo UC-315](../UC-315-flujo.png)
+
+*Figura 4. Flujo interno del `GeneralOrchestrator`: desde la entrada del objetivo
+hasta la ejecución validada y persistencia del episodio.*
+
+```text
+GeneralOrchestrator.build_plan(goal, domain, roles)
+    │
+    ├── domain_memory = get_memory(domain)
+    ├── template = domain_memory.retrieve_similar_template(goal)
+    ├── plan = Plan(plan_id, domain, goal, template)
+    │
+    └── for step in template.steps:
+            skill = select_skill_for_step(step, domain, goal)
+            inputs = infer_inputs(skill, goal, step)
+            plan.steps.append(ExecutionStep(skill, inputs))
+
+GeneralOrchestrator.validate_and_execute(plan, roles, domain_state, auto_approve)
+    │
+    └── for step in plan.steps:
+            decision = safety.check(skill, inputs, roles, domain_state)
+            if not decision.allowed:
+                step.status = "blocked"; record_failure(skill)
+            elif decision.requires_approval and not auto_approve:
+                step.status = "awaiting_approval"
+            else:
+                step.result = skill.executor(inputs, domain)
+                step.status = "executed"
+
+plan.status = aggregate(plan.steps)
+```
+
+---
+
+## 8. API REST adicional para UC-315
+
+Integrada en `api.py` junto con los endpoints heredados de UC-313/296:
+
+| Método | Endpoint | Proceso |
+|---|---|---|
+| GET | `/api/v1/skills?domain=...` | Listar skills por dominio |
+| GET | `/api/v1/domains` | Dominios y políticas |
+| POST | `/api/v1/plan` | MP-315.1 → MP-315.3 |
+| POST | `/api/v1/plan/execute` | MP-315.4 → MP-315.5 |
+| POST | `/api/v1/orchestrate` | MP-315.1 → MP-315.6 |
+| POST | `/api/v1/safety/check` | MP-315.4 |
+| POST | `/api/v1/memory/templates` | MP-315.2 |
+
+---
+
+## 9. Diferencia entre generalización semántica y razonamiento simbólico
+
+| Aspecto | Generalización semántica (LLM) | Razonamiento simbólico (SCM + Safety) |
+|---|---|---|
+| Naturaleza | Probabilística, basada en similitud de texto | Determinista, basado en reglas y estados |
+| Función | Detectar analogías y proponer estructuras de plan | Verificar permisos, precondiciones, límites y efectos |
+| Riesgo | Puede alucinar herramientas u omitir restricciones | Puede ser rígido ante casos no modelados |
+| Autoridad | Propone, nunca ejecuta acciones críticas | Aprueba/bloquea acciones con efecto externo |
+| Ejemplo | "Reservar un tren" ↔ "Reservar un vuelo" | Impide pagar sin disponibilidad ni consentimiento |
+
+---
+
+## 10. Referencias UC-315
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/UC-315.md" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/skill_contracts.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/domain_skills.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/general_orchestrator.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/safety_supervisor_315.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/domain_policy.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/domain_memory.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/api.py" />
+- `../skills_brain.png`
+- `../UC-315-secuencia.png`
+- `../UC-315-flujo.png`
