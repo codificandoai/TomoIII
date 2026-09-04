@@ -1,0 +1,4 @@
+scrape_configs:
+  - job_name: 'uc307_agent_evolution'
+    static_configs:
+      - targets: ['localhost:8000']

@@ -1,0 +1,33 @@
+#### Consultas PromQL de ejemplo para el dashboard UC-307 en Grafana
+
+**Tasa de éxito global (Time Series)**
+```promql
+rate(uc307_tasks_total{status="success"}[5m])
+/
+rate(uc307_tasks_total[5m])
+```
+
+**Calidad p95 evaluada por LLM Juez (Gauge)**
+```promql
+histogram_quantile(0.95, rate(uc307_quality_score_bucket[5m]))
+```
+
+**Latencia p95 de ejecución**
+```promql
+histogram_quantile(0.95, rate(uc307_execution_latency_seconds_bucket[5m]))
+```
+
+**Tokens consumidos por minuto**
+```promql
+rate(uc307_tokens_consumed_total[5m]) * 60
+```
+
+**Distribución de decisiones del orquestador (Bar chart)**
+```promql
+sum by (action) (rate(uc307_decisions_total[5m]))
+```
+
+**Fitness p95 de la población**
+```promql
+histogram_quantile(0.95, rate(uc307_fitness_score_bucket[5m]))
+```
