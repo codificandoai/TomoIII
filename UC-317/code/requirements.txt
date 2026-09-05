@@ -1,0 +1,14 @@
+# UC-317 — AIOS-style Agent Kernel & Runtime
+flask>=2.3.0
+pydantic>=2.0.0
+pyyaml>=6.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# AIOS/Cerebrum upstream (optional). The upstream package installs but many
+# internal modules are stubbed/commented out and require external services
+# (AgentHub, ToolHub). UC-317 implements a native AIOS-style kernel that
+# matches the documented architecture without depending on a running AIOS
+# kernel service.
+# -e ./Cerebrum
+# -e ./AIOS

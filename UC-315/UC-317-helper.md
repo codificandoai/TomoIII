@@ -1,0 +1,1521 @@
+# TomoIII
+## AI-Native Operations &amp; Agentic Patterns
+### CASE: UC-317
+
+#### USO: . EXTERNO
+
+#### EXECUTION
+```bash
+cd /Users/utron/Documents/code-books/TomoIII/UC-317/code
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+.venv/bin/python3 -m pytest tests/ -q
+.venv/bin/python3 UC-317.py --demo-all
+.venv/bin/python3 UC-317.py --server
+```
+
+# DESCRIPTION
+
+UC-317 implementa un **kernel AIOS-style** que actúa como capa de ejecución
+y orquestación para agentes de IA. Conecta agentes y aplicaciones con
+distintos backends de modelos —incluidos proveedores cloud (OpenAI) y
+modelos locales (Ollama, mock)— permitiendo experimentar con agentes que
+usan LLMs, herramientas y memoria bajo una interfaz común.
+
+Es **alterno al cerebro AGI** (UC-315): un "kernel" de agentes útil como
+plataforma de prototipado y plano de ejecución para:
+
+- Modelos intercambiables.
+- Entornos on-premise o híbridos.
+- Pruebas de arquitecturas multiagente.
+- Evaluación de modelos para cada rol.
+- Laboratorio de seguridad de agentes.
+
+No sustituye al motor de políticas ni al Safety Supervisor externo (UC-324).
+
+# API
+
+API REST Flask en `api_317.py`, puerto por defecto `5317`.
+
+| Método | Endpoint | Función |
+|---|---|---|
+| GET | `/health` | Health check |
+| GET | `/api/v1/schema` | Cards de entrada y salida |
+| GET | `/api/v1/kernel/models` | Lista de modelos disponibles |
+| GET | `/api/v1/kernel/tools` | Lista de herramientas registradas |
+| GET | `/api/v1/kernel/roles` | Lista de roles y permisos |
+| GET | `/api/v1/kernel/scheduler/status` | Estado del scheduler |
+| POST | `/api/v1/kernel/sessions` | Crear sesión de agente |
+| POST | `/api/v1/kernel/chat` | Conversar con el agente |
+| POST | `/api/v1/kernel/syscall` | Ejecutar syscall del kernel |
+| POST | `/api/v1/kernel/schedule` | Programar tarea de agente |
+| POST | `/api/v1/kernel/tools/call` | Invocar herramienta |
+| POST | `/api/v1/kernel/storage` | Guardar en storage |
+| GET | `/api/v1/kernel/storage/<key>` | Cargar de storage |
+
+---
+
+## 1. AIOS (AI Agent Operating System) — agiresearch/AIOS
+**Repositorio**: [github.com/agiresearch/AIOS](https://github.com/agiresearch/AIOS)  
+**Lenguaje**: Python  
+**Licencia**: Open source  
+
+### ¿Qué hace?
+AIOS es un **sistema operativo para agentes de IA** que integra LLMs (Large Language Models) directamente en la arquitectura del sistema operativo, proporcionando una capa de abstracción sobre el kernel tradicional para gestionar recursos específicos de agentes. 
+
+### Arquitectura
+| Capa | Componente | Función |
+|---|---|---|
+| **Application Layer** | Agent Applications (Travel, Rec, Coding, Math, Narrative) | Agentes que los usuarios ejecutan |
+| **SDK Layer** | AIOS SDK (Cerebrum) | Interfaz para desarrolladores de agentes |
+| **Kernel Layer** | AIOS Kernel | Núcleo del sistema operativo de agentes |
+| **Hardware Layer** | CPU, GPU, Memory, Disk | Recursos físicos |
+
+### Módulos del Kernel AIOS
+
+| Módulo | Función |
+|---|---|
+| **LLM Core(s)** | Gestión de modelos de lenguaje, colas de inferencia |
+| **Agent Scheduler** | Planificación y asignación de recursos entre agentes (similar a un scheduler de procesos) |
+| **Context Manager** | Cambio de contexto entre agentes, preservación de estado |
+| **Memory Manager** | Gestión de memoria a corto y largo plazo para agentes |
+| **Storage Manager** | Persistencia de datos, knowledge graphs |
+| **Tool Manager** | Registro, validación y ejecución de herramientas externas |
+| **Access Manager** | Control de permisos y autenticación |
+
+### ¿Cómo funciona?
+
+1. **System Calls de Agentes**: AIOS define "syscalls" específicos para agentes:
+   - `LSC` (LLM Syscall): Solicitudes de inferencia al LLM
+   - `MSC` (Memory Syscall): Operaciones de memoria
+   - `TSC` (Tool Syscall): Invocación de herramientas
+   - `SSC` (Storage Syscall): Persistencia de datos
+
+2. **Scheduling**: El scheduler gestiona múltiples agentes concurrentes, asignando tiempo de LLM y recursos computacionales.
+
+3. **Context Switching**: Cuando un agente pausa, su contexto (memoria, estado, historial) se preserva para reanudación posterior.
+
+### Casos de uso
+- Ejecutar múltiples agentes autónomos simultáneamente
+- Agentes de "computer-use" que interactúan con VMs
+- Sistemas multi-agente colaborativos
+
+---
+
+## 2. Agent OS — Microsoft (agent-governance-toolkit)
+**Repositorio**: [github.com/microsoft/agent-governance-toolkit](https://github.com/microsoft/agent-governance-toolkit)  
+**Lenguaje**: Python  
+**Licencia**: MIT  
+**Estado**: Public Preview  
+
+### ¿Qué hace?
+
+Agent OS de Microsoft es una **arquitectura de kernel para gobernar agentes autónomos**. No es un OS completo, sino una capa de middleware que aplica conceptos de sistemas operativos (kernel space / user space) a la gobernanza de agentes de IA. 
+
+### Filosofía
+
+> *"Prompt-based safety asks the LLM to follow rules. The LLM decides whether to comply. Kernel-based safety intercepts actions before execution. The policy engine decides, not the LLM."*
+
+### Componentes del Ecosistema
+
+| Paquete | Rol |
+|---|---|
+| **Agent OS** | Motor de políticas — evaluación determinística de acciones |
+| **AgentMesh** | Infraestructura de confianza — identidad, credenciales, puentes de protocolo |
+| **Agent Runtime** | Supervisor de ejecución — anillos de aislamiento, sesiones, sagas |
+| **Agent SRE** | Confiabilidad — SLOs, circuit breakers, chaos testing |
+| **Agent Compliance** | Cumplimiento regulatorio — GDPR, HIPAA, SOX |
+| **Agent Marketplace** | Ciclo de vida de plugins — descubrir, instalar, verificar, firmar |
+
+### Características clave
+
+- **Intercepción de acciones**: El kernel intercepta acciones del agente *durante* la ejecución, no antes ni después
+- **Latencia < 1ms**: Evaluación de políticas en tiempo real
+- **Cobertura OWASP**: Cubre los 10 riesgos de seguridad de aplicaciones agenticas
+- **Integraciones**: LangChain, OpenAI Assistants, AutoGen, CrewAI, Semantic Kernel, OpenAI Agents SDK
+
+---
+
+## 3. OpenFang — RightNow-AI
+
+**Repositorio**: [github.com/RightNow-AI/openfang](https://github.com/RightNow-AI/openfang)  
+**Lenguaje**: Rust  
+**Licencia**: MIT  
+**Estado**: v0.5.10 (pre-1.0)  
+
+### ¿Qué hace?
+
+OpenFang es un **Agent OS de código abierto construido desde cero en Rust**, diseñado para ejecutar agentes autónomos que trabajan 24/7 sin intervención humana. No es un framework de chatbot ni un wrapper de Python alrededor de un LLM. 
+
+### Diferenciadores
+
+| Característica | Especificación |
+|---|---|
+| **Binario único** | ~32MB, un solo ejecutable |
+| **Memoria idle** | 40 MB (vs 180-500 MB de competidores) |
+| **Proveedores LLM** | 27 proveedores, 123+ modelos (Anthropic, Gemini, OpenAI, Groq, etc.) |
+| **Hands** (agentes especializados) | Researcher, Browser, Coder, Social Media Manager |
+| **API compatible OpenAI** | Drop-in replacement para herramientas existentes |
+
+### Concepto de "Hands"
+
+Los "Hands" son agentes autónomos preconfigurados que operan continuamente:
+- **Researcher**: Monitorea fuentes, genera reportes
+- **Browser**: Navega web, extrae datos
+- **Coder**: Escribe y mantiene código
+- **Social**: Gestiona presencia en redes sociales
+
+---
+
+## Comparativa de Agent Operating Systems
+
+| Proyecto | Enfoque | Lenguaje | Uso Ideal | Madurez |
+|---|---|---|---|---|
+| **AIOS** | Kernel académico completo | Python | Investigación, multi-agente | Activo |
+| **Agent OS (Microsoft)** | Gobernanza empresarial | Python | Producción enterprise | Preview |
+| **OpenFang** | Agentes autónomos 24/7 | Rust | Productividad personal | Pre-1.0 |
+
+---
+
+## ¿Qué problema resuelven estos "Agent OS"?
+
+El problema fundamental que abordan es que los **agentes de IA tradicionales** (como los construidos con LangChain o CrewAI) carecen de:
+
+1. **Gestión de recursos**: No hay un scheduler que asigne tiempo de LLM entre múltiples agentes
+2. **Aislamiento**: Los agentes comparten espacio de memoria sin protección
+3. **Persistencia**: El estado del agente se pierde al reiniciar
+4. **Gobernanza**: No hay control sobre qué acciones puede ejecutar un agente
+5. **Observabilidad**: Difícil auditar qué hizo un agente y por qué
+
+Un **Agent OS** proporciona estas capacidades inspirándose en los sistemas operativos tradicionales:
+
+| Concepto de OS Tradicional | Equivalente en Agent OS |
+|---|---|
+| Procesos | Agentes |
+| Scheduler de CPU | Scheduler de LLM |
+| Memoria virtual | Memory Manager de agente |
+| System calls | LLM/Memory/Tool/Storage Syscalls |
+| Permisos de archivo | Access Manager |
+| Kernel space / User space | Policy engine / Agent code |
+
+---
+
+## ¿Cuál elegir?
+
+| Escenario | Recomendación |
+|---|---|
+| **Investigación académica** | AIOS (agiresearch) |
+| **Enterprise / compliance** | Agent OS (Microsoft) |
+| **Productividad personal** | OpenFang |
+| **Integración con frameworks existentes** | Agent OS (integra LangChain, CrewAI, etc.) |
+| **Desde cero, máximo rendimiento** | OpenFang (Rust, binario único) |
+
+---
+
+## 4. Implementación UC-317 — Kernel AIOS-style nativo
+
+### 4.1. Arquitectura
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│  Application Layer                                          │
+│  Agent Applications (chat, research, coding, math, etc.)   │
+└──────────┬─────────────────────────────────────────────────┘
+           │
+           ▼
+┌────────────────────────────────────────────────────────────┐
+│  SDK Layer — Cerebrum-style                                 │
+│  api_317.py (Flask REST) + UC-317.py (CLI)                  │
+└──────────┬─────────────────────────────────────────────────┘
+           │
+           ▼
+┌────────────────────────────────────────────────────────────┐
+│  Kernel Layer — AgentKernel                                 │
+│  ┌─────────────┐ ┌──────────────┐ ┌────────────────────┐   │
+│  │ LLM Core    │ │ Memory Mgr   │ │ Tool Manager       │   │
+│  │ (mock/OAI/  │ │ (short/long) │ │ (calculator, etc.) │   │
+│  │  ollama)    │ │              │ │                    │   │
+│  └─────────────┘ └──────────────┘ └────────────────────┘   │
+│  ┌─────────────┐ ┌──────────────┐ ┌────────────────────┐   │
+│  │ Storage Mgr │ │ Access Mgr   │ │ Agent Scheduler    │   │
+│  │ (local JSON)│ │ (roles/perm) │ │ (FIFO concurrent)  │   │
+│  └─────────────┘ └──────────────┘ └────────────────────┘   │
+└──────────┬─────────────────────────────────────────────────┘
+           │
+           ▼
+┌────────────────────────────────────────────────────────────┐
+│  Hardware Layer                                             │
+│  CPU, GPU, Memory, Disk                                     │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 4.2. Módulos del kernel
+
+| Módulo | Archivo | Función |
+|---|---|---|
+| **LLM Core** | `llm_core.py` | Enrutador de inferencia a backends mock, OpenAI y Ollama. |
+| **Memory Manager** | `memory_manager.py` | Memoria corto/largo plazo por agente con recuperación por keyword. |
+| **Tool Manager** | `tool_manager.py` | Registro, validación y ejecución de herramientas (calculator, search, weather, date). |
+| **Storage Manager** | `storage_manager.py` | Persistencia en disco (JSON local). |
+| **Access Manager** | `access_manager.py` | Roles, permisos y trust scoring (guest, user, developer, admin). |
+| **Agent Scheduler** | `agent_scheduler.py` | Scheduler FIFO con concurrencia limitada y status tracking. |
+| **Syscalls** | `syscalls.py` | Abstracción de operaciones del kernel (LSC, MSC, TSC, SSC). |
+| **Kernel Config** | `kernel_config.py` | Configuración de modelos y parámetros del kernel. |
+| **Agent Kernel** | `agent_kernel.py` | Punto único de acceso que integra todos los módulos. |
+
+### 4.3. Syscalls
+
+AIOS define "syscalls" específicos para agentes. UC-317 implementa:
+
+| Syscall | Operación | Descripción |
+|---|---|---|
+| `LSC` (LLM) | `llm.generate` | Solicitar inferencia al LLM |
+| `MSC` (Memory) | `memory.add` | Añadir entrada de memoria |
+| `MSC` (Memory) | `memory.retrieve` | Recuperar entradas de memoria |
+| `TSC` (Tool) | `tool.call` | Invocar herramienta externa |
+| `SSC` (Storage) | `storage.save` | Persistir datos |
+| `SSC` (Storage) | `storage.load` | Cargar datos persistidos |
+| `SCHED` | `schedule.agent` | Programar tarea de agente |
+
+### 4.4. Backends de LLM soportados
+
+| Backend | Provider | Descripción |
+|---|---|---|
+| Mock | `mock` | Determinista, para tests y demos. |
+| OpenAI | `openai` | API cloud (`OPENAI_API_KEY`). |
+| Ollama | `ollama` | Modelos locales (`OLLAMA_BASE_URL`). |
+
+### 4.5. Roles y permisos
+
+| Rol | Permisos | Max risk |
+|---|---|---|
+| `guest` | llm:call, memory:read | low |
+| `user` | llm:call, tool:use, memory:*, agent:run | medium |
+| `developer` | + storage:*, agent:schedule | high |
+| `admin` | todos | critical |
+
+### 4.6. API REST — Cards de entrada
+
+#### `POST /api/v1/kernel/sessions`
+
+```json
+{
+  "endpoint": "POST /api/v1/kernel/sessions",
+  "description": "Crea una sesión de agente con roles, modelo y system_prompt.",
+  "parameters": [
+    {"name": "name", "type": "string", "required": true, "example": "research-agent"},
+    {"name": "roles", "type": "list[string]", "required": false, "default": ["user"]},
+    {"name": "model", "type": "string", "required": false, "default": "mock"},
+    {"name": "system_prompt", "type": "string", "required": false},
+    {"name": "metadata", "type": "object", "required": false, "default": {}}
+  ]
+}
+```
+
+#### `POST /api/v1/kernel/chat`
+
+```json
+{
+  "endpoint": "POST /api/v1/kernel/chat",
+  "description": "Envía un mensaje al agente y obtiene respuesta del LLM.",
+  "parameters": [
+    {"name": "agent_id", "type": "string", "required": true},
+    {"name": "message", "type": "string", "required": true},
+    {"name": "use_tools", "type": "boolean", "required": false, "default": true}
+  ]
+}
+```
+
+#### `POST /api/v1/kernel/syscall`
+
+```json
+{
+  "endpoint": "POST /api/v1/kernel/syscall",
+  "description": "Ejecuta un syscall del kernel.",
+  "parameters": [
+    {"name": "agent_id", "type": "string", "required": true},
+    {"name": "syscall_type", "type": "string", "required": true, "enum": ["llm", "memory", "tool", "storage", "schedule"]},
+    {"name": "operation", "type": "string", "required": true},
+    {"name": "payload", "type": "object", "required": true}
+  ]
+}
+```
+
+### 4.7. API REST — Cards de salida
+
+#### `POST /api/v1/kernel/sessions` (respuesta)
+
+```json
+{
+  "agent_id": "agent_abc12345",
+  "name": "research-agent",
+  "roles": ["user"],
+  "model": "mock",
+  "system_prompt": "You are a helpful AI agent."
+}
+```
+
+#### `POST /api/v1/kernel/chat` (respuesta)
+
+```json
+{
+  "agent_id": "agent_abc12345",
+  "response": "Hello! How can I help?",
+  "model": "mock-llm",
+  "provider": "mock",
+  "tool_calls": [],
+  "tool_results": [],
+  "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+}
+```
+
+#### `POST /api/v1/kernel/syscall` (respuesta)
+
+```json
+{
+  "success": true,
+  "result": "LLMResponse(...)",
+  "error": null,
+  "metadata": {}
+}
+```
+
+### 4.8. Ejemplos de uso
+
+#### Crear sesión y conversar
+
+```bash
+# Crear sesión
+curl -X POST http://localhost:5317/api/v1/kernel/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "research-agent", "roles": ["user"], "model": "mock"}'
+
+# Conversar
+curl -X POST http://localhost:5317/api/v1/kernel/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"agent_id": "agent_abc12345", "message": "hello"}'
+```
+
+#### Invocar herramienta
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/tools/call \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "calculator", "args": {"expression": "2+2"}}'
+```
+
+#### Syscall de storage
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/syscall \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": "agent_abc12345",
+    "syscall_type": "storage",
+    "operation": "storage.save",
+    "payload": {"key": "state", "data": {"counter": 1}}
+  }'
+```
+
+### 4.9. CLI
+
+```bash
+.venv/bin/python3 UC-317.py --demo-basic-chat
+.venv/bin/python3 UC-317.py --demo-tool-use
+.venv/bin/python3 UC-317.py --demo-memory
+.venv/bin/python3 UC-317.py --demo-storage
+.venv/bin/python3 UC-317.py --demo-scheduler
+.venv/bin/python3 UC-317.py --demo-syscalls
+.venv/bin/python3 UC-317.py --demo-permission-denied
+.venv/bin/python3 UC-317.py --demo-all
+.venv/bin/python3 UC-317.py --server
+```
+
+### 4.10. Tests
+
+```bash
+.venv/bin/python3 -m pytest tests/ -q
+```
+
+- `tests/test_kernel.py`: tests unitarios de LLM Core, Memory, Tools, Storage, Access, Scheduler, Kernel y Syscalls.
+- `tests/test_api.py`: tests de integración de la API REST Flask.
+
+Resultado: **36 passed**.
+
+### 4.11. Integración con AIOS/Cerebrum upstream
+
+El repositorio upstream `agiresearch/Cerebrum` se instala como paquete
+editable (`pip install -e ./Cerebrum`), pero muchos de sus módulos internos
+están stubbed/comentados y requieren servicios externos (AgentHub, ToolHub).
+UC-317 implementa un **kernel nativo AIOS-style** que replica la arquitectura
+documentada (LLM Core, Memory Manager, Tool Manager, Storage Manager, Access
+Manager, Agent Scheduler, Syscalls) sin depender de un kernel AIOS en
+ejecución. Esto permite:
+
+- Prototipado local sin servicios externos.
+- Tests deterministas con backend mock.
+- Intercambio de modelos (mock → OpenAI → Ollama) sin cambiar código.
+- Compatibilidad con la filosofía AIOS de syscalls y scheduling.
+
+### 4.12. Archivos y referencias
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/UC-317.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/api_317.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/agent_kernel.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/kernel_config.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/llm_core.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/memory_manager.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/tool_manager.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/storage_manager.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/access_manager.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/agent_scheduler.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/syscalls.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/requirements.txt" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/tests/test_kernel.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/tests/test_api.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/AIOS/README.md" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-317/code/Cerebrum/README.md" />
+
+---
+
+## 5. Guía de integración AI-Native — Cómo invocar el API
+
+Esta sección documenta de forma exhaustiva cómo invocar el API REST de
+UC-317 desde otras soluciones AI-native (orquestadores, pipelines, otros
+kernels, frontends, gateways, etc.). Incluye parámetros de entrada,
+funcionamiento interno y parámetros de salida para cada endpoint.
+
+### 5.1. Convenciones generales
+
+| Aspecto | Valor |
+|---|---|
+| **Base URL** | `http://localhost:5317` (desarrollo) |
+| **Content-Type** | `application/json` |
+| **Formato** | JSON en body para POST; query params para GET |
+| **Autenticación** | Por sesión (`agent_id`); roles validados por Access Manager |
+| **Errores** | HTTP 400 (bad request), 404 (not found), 200 (success) |
+| **Health check** | `GET /health` → `{"status": "ok", "service": "uc-317-kernel"}` |
+| **Schema** | `GET /api/v1/schema` → todas las cards de entrada/salida |
+
+### 5.2. Flujo de integración típico
+
+```text
+1. GET  /health                          → verificar que el kernel está activo
+2. GET  /api/v1/kernel/models            → listar modelos disponibles
+3. POST /api/v1/kernel/sessions          → crear sesión de agente (obtener agent_id)
+4. POST /api/v1/kernel/chat              → conversar con el agente (N veces)
+5. POST /api/v1/kernel/tools/call        → invocar herramientas si se necesita
+6. POST /api/v1/kernel/syscall           → operaciones avanzadas (memory, storage, schedule)
+7. GET  /api/v1/kernel/scheduler/status  → monitorear tareas programadas
+```
+
+### 5.3. Endpoint: `POST /api/v1/kernel/sessions`
+
+**Propósito:** crear una nueva sesión de agente con identidad, roles,
+modelo asignado y system prompt.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Default | Descripción |
+|---|---|---|---|---|
+| `name` | `string` | Sí | — | Nombre descriptivo del agente. |
+| `roles` | `list[string]` | No | `["user"]` | Roles de acceso (`guest`, `user`, `developer`, `admin`). |
+| `model` | `string` | No | `"mock"` | Modelo a usar (`mock`, `openai`, `ollama`). |
+| `system_prompt` | `string` | No | `"You are a helpful AI agent."` | Prompt de sistema. |
+| `metadata` | `object` | No | `{}` | Metadatos arbitrarios de la sesión. |
+
+**Cómo funciona:**
+1. Genera un `agent_id` único (`agent_<8 hex chars>`).
+2. Registra la sesión en el kernel.
+3. El `agent_id` se usa en todas las llamadas posteriores.
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `agent_id` | `string` | Identificador único de la sesión. |
+| `name` | `string` | Nombre del agente. |
+| `roles` | `list[string]` | Roles asignados. |
+| `model` | `string` | Modelo configurado. |
+| `system_prompt` | `string` | Prompt de sistema. |
+
+**Ejemplo:**
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "research-agent",
+    "roles": ["user", "developer"],
+    "model": "mock",
+    "system_prompt": "You are a research assistant."
+  }'
+```
+
+Respuesta:
+```json
+{
+  "agent_id": "agent_a1b2c3d4",
+  "name": "research-agent",
+  "roles": ["user", "developer"],
+  "model": "mock",
+  "system_prompt": "You are a research assistant."
+}
+```
+
+### 5.4. Endpoint: `POST /api/v1/kernel/chat`
+
+**Propósito:** enviar un mensaje al agente y recibir la respuesta del LLM,
+con ejecución automática de tool_calls y persistencia en memoria.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Default | Descripción |
+|---|---|---|---|---|
+| `agent_id` | `string` | Sí | — | ID de la sesión creada. |
+| `message` | `string` | Sí | — | Mensaje del usuario. |
+| `use_tools` | `boolean` | No | `true` | Si se pasan herramientas al LLM. |
+
+**Cómo funciona:**
+1. Valida que `agent_id` exista (404 si no).
+2. Añade el mensaje del usuario a la memoria corto plazo.
+3. Construye el contexto: `system_prompt` + historial de memoria.
+4. Si `use_tools=true`, pasa las herramientas registradas al LLM.
+5. El LLM genera una respuesta y opcionalmente `tool_calls`.
+6. Cada `tool_call` se ejecuta automáticamente vía Tool Manager.
+7. Los resultados de tools se añaden a la memoria.
+8. La respuesta del LLM se añade a la memoria.
+9. Retorna el contenido, tool_calls, tool_results y usage.
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `agent_id` | `string` | ID de la sesión. |
+| `response` | `string` | Contenido de la respuesta del LLM. |
+| `model` | `string` | Modelo usado. |
+| `provider` | `string` | Provider del backend (`mock`, `openai`, `ollama`). |
+| `tool_calls` | `list[object]` | Tool calls generados por el LLM. |
+| `tool_results` | `list[object]` | Resultados de ejecutar cada tool_call. |
+| `usage` | `object` | Métricas de tokens (`prompt_tokens`, `completion_tokens`, `total_tokens`). |
+
+**Errores:**
+
+| HTTP | Causa |
+|---|---|
+| 400 | Falta `agent_id` o `message`. |
+| 404 | `agent_id` no existe. |
+
+**Ejemplo:**
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": "agent_a1b2c3d4",
+    "message": "What is 2+2?",
+    "use_tools": true
+  }'
+```
+
+Respuesta:
+```json
+{
+  "agent_id": "agent_a1b2c3d4",
+  "response": "Mock LLM response.",
+  "model": "mock-llm",
+  "provider": "mock",
+  "tool_calls": [
+    {
+      "id": "call_calculator",
+      "type": "function",
+      "function": {"name": "calculator", "arguments": "{}"}
+    }
+  ],
+  "tool_results": [
+    {"name": "calculator", "result": {"error": ["missing required parameter: expression"]}}
+  ],
+  "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+}
+```
+
+### 5.5. Endpoint: `POST /api/v1/kernel/syscall`
+
+**Propósito:** ejecutar un syscall del kernel para operaciones de bajo
+nivel (LLM, memoria, tools, storage, scheduling). Es la interfaz más
+flexible para integraciones programáticas.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `agent_id` | `string` | Sí | ID de la sesión. |
+| `syscall_type` | `string` | Sí | Tipo: `llm`, `memory`, `tool`, `storage`, `schedule`. |
+| `operation` | `string` | Sí | Operación específica (ver tabla de syscalls). |
+| `payload` | `object` | Sí | Datos de la operación. |
+
+**Operaciones soportadas por tipo:**
+
+| `syscall_type` | `operation` | `payload` requerido |
+|---|---|---|
+| `llm` | `llm.generate` | `{"messages": [...], "tools": [...], "model": "mock"}` |
+| `memory` | `memory.add` | `{"content": "...", "role": "user", "source": "conversation", "long_term": false}` |
+| `memory` | `memory.retrieve` | `{"query": "...", "top_k": 3}` |
+| `tool` | `tool.call` | `{"name": "calculator", "args": {"expression": "2+2"}}` |
+| `storage` | `storage.save` | `{"key": "state", "data": {...}}` |
+| `storage` | `storage.load` | `{"key": "state"}` |
+| `schedule` | `schedule.agent` | `{"goal": "..."}` |
+
+**Cómo funciona:**
+1. Verifica permisos del agente según sus roles.
+2. Si no tiene permiso → `{"success": false, "error": "Permission denied: ..."}`.
+3. Ejecuta la operación contra el módulo correspondiente.
+4. Retorna resultado estructurado.
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `success` | `boolean` | Si la operación tuvo éxito. |
+| `result` | `any` | Resultado de la operación (varía por tipo). |
+| `error` | `string\|null` | Mensaje de error si falló. |
+| `metadata` | `object` | Metadatos adicionales. |
+
+**Ejemplo — LLM generate:**
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/syscall \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": "agent_a1b2c3d4",
+    "syscall_type": "llm",
+    "operation": "llm.generate",
+    "payload": {
+      "messages": [{"role": "user", "content": "hello"}]
+    }
+  }'
+```
+
+**Ejemplo — Memory add:**
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/syscall \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": "agent_a1b2c3d4",
+    "syscall_type": "memory",
+    "operation": "memory.add",
+    "payload": {
+      "content": "User prefers responses in Spanish.",
+      "role": "user",
+      "long_term": true
+    }
+  }'
+```
+
+**Ejemplo — Storage save:**
+
+```bash
+curl -X POST http://localhost:5317/api/v1/kernel/syscall \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "agent_id": "agent_a1b2c3d4",
+    "syscall_type": "storage",
+    "operation": "storage.save",
+    "payload": {"key": "session_state", "data": {"step": 3, "completed": true}}
+  }'
+```
+
+### 5.6. Endpoint: `POST /api/v1/kernel/schedule`
+
+**Propósito:** programar una tarea para ejecución asíncrona por el scheduler.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `agent_id` | `string` | Sí | ID del agente. |
+| `goal` | `string` | Sí | Objetivo de la tarea. |
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `agent_id` | `string` | ID del agente. |
+| `task_id` | `string` | ID único de la tarea. |
+| `goal` | `string` | Objetivo. |
+| `status` | `string` | Estado inicial (`pending`). |
+
+### 5.7. Endpoint: `POST /api/v1/kernel/tools/call`
+
+**Propósito:** invocar una herramienta registrada directamente sin pasar
+por el LLM.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `name` | `string` | Sí | Nombre de la herramienta. |
+| `args` | `object` | No | Argumentos para la herramienta. |
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `success` | `boolean` | Si la ejecución tuvo éxito. |
+| `result` | `any` | Resultado de la herramienta. |
+| `error` | `string\|list\|null` | Error si falló. |
+
+**Herramientas disponibles:**
+
+| Nombre | Args | Descripción |
+|---|---|---|
+| `calculator` | `{"expression": "2+2"}` | Evaluación aritmética segura. |
+| `search` | `{"query": "AIOS"}` | Búsqueda mock con resultados. |
+| `weather` | `{"city": "Madrid"}` | Clima mock. |
+| `current_date` | `{}` | Fecha actual ISO. |
+
+### 5.8. Endpoint: `POST /api/v1/kernel/storage`
+
+**Propósito:** guardar datos en el storage del kernel.
+
+**Parámetros de entrada:**
+
+| Parámetro | Tipo | Requerido | Descripción |
+|---|---|---|---|
+| `key` | `string` | Sí | Clave de almacenamiento. |
+| `data` | `object` | Sí | Datos a persistir. |
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `saved` | `string` | Clave guardada. |
+
+### 5.9. Endpoint: `GET /api/v1/kernel/storage/<key>`
+
+**Propósito:** cargar datos persistidos.
+
+**Parámetros de salida (200 OK):**
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `key` | `string` | Clave cargada. |
+| `data` | `object` | Datos persistidos. |
+
+**Errores:** 404 si la clave no existe.
+
+### 5.10. Endpoints GET de introspección
+
+| Endpoint | Salida | Descripción |
+|---|---|---|
+| `GET /api/v1/kernel/models` | `{"models": [{"name", "provider", "model"}]}` | Modelos configurados. |
+| `GET /api/v1/kernel/tools` | `{"tools": [{"name", "description", "parameters", "required"}]}` | Herramientas registradas. |
+| `GET /api/v1/kernel/roles` | `{"roles": [{"name", "permissions", "max_risk"}]}` | Roles y permisos. |
+| `GET /api/v1/kernel/scheduler/status` | `{"pending", "running", "completed", "max_concurrent"}` | Estado del scheduler. |
+
+### 5.11. Integración desde Python
+
+```python
+import requests
+
+BASE = "http://localhost:5317"
+
+# 1. Health check
+assert requests.get(f"{BASE}/health").json()["status"] == "ok"
+
+# 2. Crear sesión
+session = requests.post(f"{BASE}/api/v1/kernel/sessions", json={
+    "name": "my-agent",
+    "roles": ["user"],
+    "model": "mock",
+}).json()
+agent_id = session["agent_id"]
+
+# 3. Conversar
+chat = requests.post(f"{BASE}/api/v1/kernel/chat", json={
+    "agent_id": agent_id,
+    "message": "hello",
+}).json()
+print(chat["response"])
+
+# 4. Invocar herramienta
+calc = requests.post(f"{BASE}/api/v1/kernel/tools/call", json={
+    "name": "calculator",
+    "args": {"expression": "10*10"},
+}).json()
+print(calc["result"])  # 100
+
+# 5. Guardar estado
+requests.post(f"{BASE}/api/v1/kernel/storage", json={
+    "key": "my_state",
+    "data": {"step": 1, "status": "running"},
+})
+
+# 6. Cargar estado
+state = requests.get(f"{BASE}/api/v1/kernel/storage/my_state").json()
+print(state["data"]["status"])  # "running"
+```
+
+### 5.12. Integración desde JavaScript/Node.js
+
+```javascript
+const BASE = "http://localhost:5317";
+
+// Crear sesión
+const session = await fetch(`${BASE}/api/v1/kernel/sessions`, {
+  method: "POST",
+  headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({name: "js-agent", roles: ["user"], model: "mock"}),
+}).then(r => r.json());
+
+const agentId = session.agent_id;
+
+// Conversar
+const chat = await fetch(`${BASE}/api/v1/kernel/chat`, {
+  method: "POST",
+  headers: {"Content-Type": "application/json"},
+  body: JSON.stringify({agent_id: agentId, message: "hello"}),
+}).then(r => r.json());
+
+console.log(chat.response);
+```
+
+### 5.13. Integración con orquestadores AI-native
+
+UC-317 está diseñado para integrarse con otros sistemas AI-native como:
+
+- **UC-324 (Protocolo de contención):** los agentes de UC-317 pueden ser
+  envueltos por UC-324 para añadir gates de seguridad pre/post-action.
+- **UC-315 (Cerebro AGI):** UC-317 es alterno; puede usarse como plano de
+  ejecución mientras UC-315 es el cerebro cognitivo.
+- **LangChain / CrewAI / AutoGen:** los endpoints de UC-317 pueden ser
+  expuestos como tools en estos frameworks.
+- **Gateways LLM (LiteLLM, OpenRouter):** el LLM Core de UC-317 puede
+  enrutar a través de gateways configurando `base_url`.
+- **MCP (Model Context Protocol):** las herramientas de UC-317 pueden
+  exponerse como MCP servers para compatibilidad con Claude, Cursor, etc.
+
+**Patrón de integración recomendado:**
+
+```text
+Solución AI-native externa
+        │
+        ▼  HTTP POST
+   UC-317 API REST (Flask :5317)
+        │
+        ▼
+   AgentKernel
+   ├── LLM Core (mock/openai/ollama)
+   ├── Memory Manager
+   ├── Tool Manager
+   ├── Storage Manager
+   ├── Access Manager
+   └── Agent Scheduler
+        │
+        ▼
+   Respuesta JSON estructurada
+```
+
+### 5.14. Configuración de variables de entorno
+
+| Variable | Default | Descripción |
+|---|---|---|
+| `OPENAI_API_KEY` | — | API key para backend OpenAI. |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Modelo OpenAI por defecto. |
+| `OLLAMA_MODEL` | `llama3.1` | Modelo Ollama por defecto. |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | URL del servidor Ollama. |
+
+### 5.15. Códigos de error
+
+| HTTP | Causa | Body |
+|---|---|---|
+| 200 | Success | JSON con resultado. |
+| 400 | Parámetros faltantes o inválidos | `{"error": "..."}` |
+| 404 | Recurso no encontrado (agent_id, storage key) | `{"error": "..."}` |
+| 500 | Error interno | Flask default error page |
+
+---
+
+## 6. Colaboración UC-317 ↔ UC-315 — Cómo trabajan juntos
+
+UC-315 y UC-317 son **entornos completamente separados**:
+
+- **UC-315** es el cerebro AGI cognitivo: percepción, planning recursivo,
+  BDI, metacognición, plasticidad, dominios, skills, SafetySupervisor315.
+  Su código vive en `TomoIII/UC-315/code/` y expone su propio API.
+- **UC-317** es un kernel AIOS-style de ejecución/orquestación: LLMs
+  intercambiables, tools, memoria operativa, storage, scheduler, syscalls.
+  Su código vive en `TomoIII/UC-317/code/` y expone su propio API REST
+  en el puerto `5317`.
+
+Ninguno copia ni modifica al otro. La colaboración es por **contrato de
+API** entre procesos separados. A continuación se listan las formas
+concretas en que UC-317 puede ayudar a UC-315 y cómo pueden trabajar
+juntos.
+
+### 6.1. Principios de separación
+
+| Principio | Descripción |
+|---|---|
+| **Sin memoria compartida** | UC-315 y UC-317 no comparten procesos ni estado en memoria. |
+| **Sin credenciales compartidas** | Cada uno gestiona sus propias API keys y configuración. |
+| **Contrato por API** | La única frontera de colaboración es HTTP REST JSON. |
+| **Sin suplantación de safety** | UC-317 no reemplaza a `SafetySupervisor315` ni a UC-324. |
+| **Reversibilidad** | UC-315 puede operar sin UC-317 y viceversa. |
+| **Auditable** | Toda colaboración deja trazas en ambos lados. |
+
+### 6.2. Capacidades de UC-317 que aportan valor a UC-315
+
+| Capacidad UC-317 | Cómo ayuda a UC-315 |
+|---|---|
+| **LLM Core multi-backend** | UC-315 puede delegar inferencia de LLM en UC-317 para evaluar modelos (mock/openai/ollama) sin acoplar su código a un provider. |
+| **Tool Manager** | UC-315 puede invocar herramientas deterministas (calculator, search, weather, date) vía API REST sin reimplementarlas. |
+| **Memory Manager** | UC-317 mantiene memoria operativa por `agent_id` utilizable como scratchpad externo para sub-tareas de UC-315. |
+| **Storage Manager** | UC-315 puede persistir snapshots de plan, estado BDI o resultados parciales en el storage de UC-317 como checkpointing externo. |
+| **Agent Scheduler** | UC-315 puede encolar sub-tareas que requieren ejecución asíncrona o concurrente (hasta `max_concurrent`) en UC-317. |
+| **Access Manager** | UC-317 valida roles/permisos por sesión, útil cuando UC-315 delega trabajo con identidades restringidas (guest, user, developer). |
+| **Syscalls** | UC-315 puede emitir syscalls (`llm.generate`, `tool.call`, `memory.add`, `storage.save`) como interfaz uniforme de bajo nivel. |
+| **Backend mock determinista** | Permite a UC-315 ejecutar pruebas y simulaciones sin consumir cuota cloud ni depender de red. |
+
+### 6.3. Patrones de colaboración
+
+#### Patrón A — Delegación de inferencia (LLM-as-a-service)
+
+UC-315 necesita evaluar un modelo específico para un rol (p. ej. un
+critic más barato) sin acoplar su pipeline a la SDK del provider.
+
+```text
+UC-315 emite:
+  POST http://localhost:5317/api/v1/kernel/syscall
+  {
+    "agent_id": "<sesión UC-317 creada para UC-315>",
+    "syscall_type": "llm",
+    "operation": "llm.generate",
+    "payload": {
+      "messages": [
+        {"role": "system", "content": "You are a critic..."},
+        {"role": "user", "content": "<plan de UC-315>"}
+      ],
+      "model": "ollama"
+    }
+  }
+
+UC-317 responde:
+  {"success": true, "result": "LLMResponse(content=..., provider='ollama')"}
+```
+
+**Beneficio:** UC-315 intercambia modelos (mock → openai → ollama) sin
+tocar su código; UC-317 absorbe la complejidad de providers.
+
+#### Patrón B — Ejecución de sub-tareas con tools
+
+UC-315 planifica una sub-tarea que requiere cálculo o búsqueda externa.
+En lugar de implementar tools en su propio entorno, delega a UC-317.
+
+```text
+UC-315 emite:
+  POST http://localhost:5317/api/v1/kernel/tools/call
+  {"name": "calculator", "args": {"expression": "42*7"}}
+
+UC-317 responde:
+  {"success": true, "result": 294}
+```
+
+**Beneficio:** Tools deterministas reutilizables, validados y auditados
+en un solo lugar; UC-315 no duplica lógica de tools.
+
+#### Patrón C — Scratchpad de memoria operativa
+
+UC-315 mantiene su propia `domain_memory` y `long_term_memory`, pero
+para sub-tareas efímeras puede usar la memoria operativa de UC-317 como
+scratchpad aislado por `agent_id`.
+
+```text
+UC-315 emite:
+  POST /api/v1/kernel/syscall
+  {
+    "agent_id": "agent_uc315_critic",
+    "syscall_type": "memory",
+    "operation": "memory.add",
+    "payload": {
+      "content": "Plan A scored 0.72; Plan B scored 0.88.",
+      "role": "system",
+      "source": "reflection",
+      "long_term": false
+    }
+  }
+```
+
+**Beneficio:** Aislamiento de memoria por sesión; UC-315 no contamina
+su memoria de dominio con basura efímera.
+
+#### Patrón D — Checkpointing externo
+
+UC-315 puede persistir snapshots de su estado (plan actual, BDI, scores)
+en el storage de UC-317 como puntos de recuperación.
+
+```text
+UC-315 emite:
+  POST /api/v1/kernel/storage
+  {
+    "key": "uc315_checkpoint_20260820_plan_b",
+    "data": {
+      "plan_id": "plan_b",
+      "steps": [...],
+      "bdi_state": {...},
+      "scores": {...}
+    }
+  }
+```
+
+**Beneficio:** Storage externo desacoplado del proceso de UC-315;
+recuperable vía `GET /api/v1/kernel/storage/<key>` tras reinicios.
+
+#### Patrón E — Scheduler de sub-tareas concurrentes
+
+UC-315 puede encolar sub-tareas independientes (p. ej. evaluación
+paralela de 4 hipótesis) en el scheduler de UC-317.
+
+```text
+UC-315 emite (N veces):
+  POST /api/v1/kernel/schedule
+  {"agent_id": "agent_uc315_hypothesis_eval", "goal": "evaluate hypothesis N"}
+
+UC-315 consulta:
+  GET /api/v1/kernel/scheduler/status
+  → {"pending": 0, "running": 0, "completed": 4, "max_concurrent": 8}
+```
+
+**Beneficio:** UC-315 no implementa su propio pool de threads; UC-317
+gestiona la concurrencia y el status tracking.
+
+#### Patrón F — Laboratorio de modelos por rol
+
+UC-315 tiene roles cognitivos (perception, planner, critic, metacog).
+UC-317 puede servir como **laboratorio** para evaluar qué modelo es
+mejor para cada rol sin tocar UC-315.
+
+```text
+Para cada rol R en UC-315 y cada modelo M en UC-317:
+  1. POST /api/v1/kernel/sessions  → crear sesión con model=M
+  2. POST /api/v1/kernel/chat       → enviar prompt de test del rol R
+  3. Medir: response, usage.total_tokens, latencia, calidad
+  4. Comparar M1 vs M2 vs M3 para rol R
+  5. UC-315 adopta el ganador configurando su propio backend
+```
+
+**Beneficio:** Evaluación empírica de modelos por rol sin acoplar
+UC-315 a la infraestructura de evaluación.
+
+### 6.4. Diagrama de colaboración
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  UC-315 — Cerebro AGI                                       │
+│  ┌──────────┐ ┌─────────┐ ┌────────┐ ┌──────────────────┐  │
+│  │Perception│ │ Planner │ │ Critic │ │ Metacog + Safety │  │
+│  └────┬─────┘ └────┬────┘ └───┬────┘ └────────┬─────────┘  │
+│       │            │          │               │            │
+│       └────────────┴──────────┴───────────────┘            │
+│                    │ HTTP REST JSON                        │
+└────────────────────┼────────────────────────────────────────┘
+                     │
+        ┌────────────┴───────────────┐
+        │  Frontera de colaboración  │
+        │  (sin memoria compartida)  │
+        └────────────┬───────────────┘
+                     │
+┌────────────────────┼────────────────────────────────────────┐
+│  UC-317 — Kernel AIOS-style                                │
+│  ┌─────────┐ ┌──────────┐ ┌─────────┐ ┌────────────────┐   │
+│  │LLM Core │ │Tool Mgr  │ │Memory   │ │Storage/Sched   │   │
+│  │mock/OAI │ │calc/...  │ │scratch  │ │checkpoint/queue│   │
+│  │/ollama  │ │          │ │pad      │ │                │   │
+│  └─────────┘ └──────────┘ └─────────┘ └────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                     │
+        ┌────────────┴───────────────┐
+        │  UC-324 (boundary externo) │
+        │  SafetySupervisor + gates  │
+        └────────────────────────────┘
+```
+
+### 6.5. Tabla de delegación UC-315 → UC-317
+
+| Necesidad UC-315 | Endpoint UC-317 | Syscall |
+|---|---|---|
+| Inferir con modelo X | `POST /syscall` | `llm.generate` |
+| Calcular expresión | `POST /tools/call` | `tool.call` (calculator) |
+| Buscar información | `POST /tools/call` | `tool.call` (search) |
+| Guardar nota efímera | `POST /syscall` | `memory.add` |
+| Recuperar notas | `POST /syscall` | `memory.retrieve` |
+| Checkpoint de plan | `POST /storage` | `storage.save` |
+| Restaurar checkpoint | `GET /storage/<key>` | `storage.load` |
+| Encolar sub-tarea | `POST /schedule` | `schedule.agent` |
+| Status de sub-tareas | `GET /scheduler/status` | — |
+| Listar modelos | `GET /models` | — |
+| Listar tools | `GET /tools` | — |
+| Health check | `GET /health` | — |
+
+### 6.6. Reglas de no-interferencia
+
+1. **UC-317 nunca invoca a UC-315** salvo configuración explícita del
+   operador. La colaboración por defecto es unidireccional: UC-315
+   delega, UC-317 ejecuta.
+2. **UC-317 no reemplaza a `SafetySupervisor315`**. Las verificaciones
+   de safety de UC-315 siguen siendo autoritativas; UC-317 es plano de
+   ejecución, no plano de gobernanza.
+3. **UC-324 sigue siendo el boundary externo**. Si la colaboración
+   UC-315 ↔ UC-317 produce acciones externas, UC-324 debe interceptarlas
+   con sus gates A–K antes de cualquier efecto real.
+4. **Sin secrets cruzados**. UC-315 no comparte sus credenciales con
+   UC-317; cada uno usa las suyas.
+5. **Sin suplantación de identidad**. UC-317 no se hace pasar por
+   UC-315; las sesiones de UC-317 tienen su propio `agent_id`.
+
+### 6.7. Ejemplo de integración UC-315 → UC-317
+
+```python
+# Código que vive en UC-315 (no en UC-317).
+import requests
+
+UC317_BASE = "http://localhost:5317"
+
+
+def uc317_evaluate_with_model(model: str, prompt: str, system: str = "") -> str:
+    """UC-315 delega inferencia a UC-317 con un modelo específico."""
+    # 1. Crear sesión efímera
+    session = requests.post(
+        f"{UC317_BASE}/api/v1/kernel/sessions",
+        json={"name": "uc315-delegated", "roles": ["user"], "model": model},
+    ).json()
+    agent_id = session["agent_id"]
+
+    # 2. Generar respuesta
+    resp = requests.post(
+        f"{UC317_BASE}/api/v1/kernel/syscall",
+        json={
+            "agent_id": agent_id,
+            "syscall_type": "llm",
+            "operation": "llm.generate",
+            "payload": {
+                "messages": [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ]
+            },
+        },
+    ).json()
+
+    if not resp["success"]:
+        raise RuntimeError(f"UC-317 LLM call failed: {resp.get('error')}")
+    return resp["result"]["content"]
+
+
+def uc317_checkpoint(plan_id: str, state: dict) -> None:
+    """UC-315 persiste un checkpoint en UC-317."""
+    requests.post(
+        f"{UC317_BASE}/api/v1/kernel/storage",
+        json={"key": f"uc315_checkpoint_{plan_id}", "data": state},
+    )
+
+
+def uc317_restore_checkpoint(plan_id: str) -> dict | None:
+    """UC-315 restaura un checkpoint desde UC-317."""
+    resp = requests.get(f"{UC317_BASE}/api/v1/kernel/storage/uc315_checkpoint_{plan_id}")
+    if resp.status_code == 404:
+        return None
+    return resp.json()["data"]
+```
+
+### 6.8. Cuándo NO usar UC-317 con UC-315
+
+| Escenario | Recomendación |
+|---|---|
+| UC-315 necesita razonamiento simbólico verificable | Mantener en UC-315; UC-317 no aporta verificación simbólica. |
+| UC-315 necesita safety supervision | Usar `SafetySupervisor315` + UC-324; UC-317 no es safety layer. |
+| UC-315 necesita plasticidad adaptativa | Mantener en UC-315; UC-317 no implementa plasticidad. |
+| UC-315 necesita memoria de dominio persistente | Mantener en UC-315 (`domain_memory`); UC-317 es scratchpad efímero. |
+| Latencia < 1ms por operación | No delegar vía HTTP; mantener en proceso en UC-315. |
+
+### 6.9. Resumen
+
+UC-317 ayuda a UC-315 siendo un **plano de ejecución desacoplado** que:
+
+1. Absorbe la complejidad de múltiples backends de LLM.
+2. Provee tools deterministas reutilizables vía API.
+3. Ofrece memoria operativa aislada como scratchpad.
+4. Provee storage para checkpointing externo.
+5. Provee scheduler para sub-tareas concurrentes.
+6. Sirve como laboratorio para evaluar modelos por rol cognitivo.
+
+La colaboración es **siempre por contrato HTTP REST**, sin memoria
+compartida, sin secrets cruzados, sin suplantación de safety, y con
+UC-324 como boundary externo autoritativo para acciones con efectos
+reales.
+
+---
+
+## 7. UC-317 para UC-315 en Trading — Explicación 
+
+> Imagina que UC-315 es un **cerebro AGI especializado en trading** de
+> bolsa. Esta sección explica, en lenguaje simple, cómo UC-317 le ayuda.
+
+### 7.1. La analogía del chef y la cocina
+
+Piensa en UC-315 como un **chef estrella** que sabe qué plato cocinar,
+qué ingredientes combinar y en qué orden. Es el cerebro: decide la
+receta, prueba el sabor, corrige la sazón.
+
+UC-317 es la **cocina industrial**: tiene hornos, neveras, batidoras,
+temporizadores y despensas. El chef no necesita construirse su propia
+cocina en cada restaurante; usa la cocina que ya existe.
+
+```text
+Chef (UC-315):  "Voy a preparar un análisis de riesgo de Apple."
+                 "Necesito calcular el Sharpe ratio."
+                 "Necesito guardar el plan de trading."
+                 "Necesito evaluar 3 modelos de sentimiento de mercado."
+
+Cocina (UC-317): "Tengo una calculadora lista."
+                 "Tengo storage para guardar tu plan."
+                 "Tengo un scheduler para correr los 3 modelos en paralelo."
+                 "Tengo backends mock/openai/ollama para que pruebes modelos."
+```
+
+El chef **decide**; la cocina **ejecuta**. Ninguno reemplaza al otro.
+
+### 7.2. ¿Qué hace UC-315 (el cerebro trader)?
+
+UC-315 es el que **piensa como trader**:
+
+| Función | Qué hace en trading |
+|---|---|
+| **Percepción** | Lee datos de mercado (precios, volumen, noticias, sentimiento). |
+| **Planning** | Decide qué análisis hacer, en qué orden, con qué prioridad. |
+| **Critic** | Evalúa si un plan de trading tiene sentido o es arriesgado. |
+| **Metacognición** | Se pregunta: "¿estoy siendo demasiado optimista con esta posición?" |
+| **Safety Supervisor** | Bloquea operaciones que violan políticas de riesgo. |
+| **Memoria de dominio** | Recuerda estrategias que funcionaron antes en condiciones similares. |
+| **Plasticidad** | Ajusta parámetros según el mercado cambia. |
+
+UC-315 es el **experto en finanzas** que toma las decisiones de trading.
+
+### 7.3. ¿Qué hace UC-317 (la cocina)?
+
+UC-317 **no sabe nada de trading**. Es infraestructura genérica:
+
+| Función | Qué hace |
+|---|---|
+| **LLM Core** | Conecta con modelos de IA (mock, OpenAI, Ollama) para generar texto. |
+| **Tool Manager** | Ejecuta herramientas deterministas (calculadora, búsqueda, fecha). |
+| **Memory Manager** | Guarda notas temporales por sesión. |
+| **Storage Manager** | Persiste datos en disco como archivos JSON. |
+| **Agent Scheduler** | Encola y ejecuta tareas en paralelo. |
+| **Access Manager** | Valida quién puede hacer qué (roles y permisos). |
+
+UC-317 es el **asistente técnico** que ejecuta lo que el cerebro le pide.
+
+### 7.4. Ejemplos concretos en trading
+
+#### Ejemplo 1: UC-315 necesita calcular un ratio financiero
+
+```text
+UC-315 (cerebro trader):
+  "Necesito calcular el Sharpe ratio de Apple.
+   Retorno promedio = 0.12, desviación = 0.05, risk-free = 0.02.
+   Sharpe = (0.12 - 0.02) / 0.05 = 2.0"
+
+UC-315 le pide a UC-317:
+  POST /api/v1/kernel/tools/call
+  {"name": "calculator", "args": {"expression": "(0.12-0.02)/0.05"}}
+
+UC-317 responde:
+  {"success": true, "result": 2.0}
+
+UC-315 interpreta:
+  "Sharpe = 2.0 → buena relación riesgo-retorno. Aprobar posición."
+```
+
+**Por qué ayuda:** UC-315 no implementa su propia calculadora; usa la de
+UC-317 que ya está validada y testeada.
+
+#### Ejemplo 2: UC-315 quiere evaluar 3 modelos de sentimiento
+
+UC-315 quiere saber cuál de 3 modelos de IA es mejor para analizar
+sentimiento de noticias de mercado. En lugar de configurar cada SDK en
+su propio código, le pide a UC-317:
+
+```text
+UC-315:
+  "Voy a probar 3 modelos con la misma noticia:
+   - mock (gratis, determinista)
+   - openai/gpt-4o-mini (cloud, barato)
+   - ollama/llama3.1 (local, privado)"
+
+Para cada modelo M:
+  1. POST /api/v1/kernel/sessions  {"model": M, "name": "sentiment_test"}
+  2. POST /api/v1/kernel/chat
+     {"agent_id": "...", "message": "Analiza el sentimiento de:
+      'Apple beats earnings expectations by 15%'"}
+  3. UC-317 responde con el análisis de cada modelo.
+
+UC-315 compara:
+  - mock: "Mock LLM response." (no útil para producción)
+  - gpt-4o-mini: "Bullish sentiment. Strong earnings beat." (bueno)
+  - llama3.1: "Positive outlook for AAPL." (bueno, más barato)
+
+UC-315 decide: "Para sentimiento uso llama3.1; para análisis profundo
+uso gpt-4o-mini."
+```
+
+**Por qué ayuda:** UC-315 evalúa modelos sin acoplar su código a ningún
+provider. Si mañana sale un modelo mejor, cambia una línea en UC-317 y
+UC-315 sigue funcionando igual.
+
+#### Ejemplo 3: UC-315 quiere guardar un plan de trading
+
+```text
+UC-315:
+  "Acabo de generar un plan de trading para AAPL.
+   Quiero guardarlo por si el proceso crashea."
+
+UC-315 le pide a UC-317:
+  POST /api/v1/kernel/storage
+  {
+    "key": "aapl_plan_20260820",
+    "data": {
+      "ticker": "AAPL",
+      "entry": 195.50,
+      "stop_loss": 190.00,
+      "target": 210.00,
+      "position_size": 0.05,
+      "thesis": "Earnings beat + sentimiento positivo",
+      "sharpe": 2.0
+    }
+  }
+
+UC-317 responde:
+  {"saved": "aapl_plan_20260820"}
+
+Si UC-315 crashea, al reiniciar:
+  GET /api/v1/kernel/storage/aapl_plan_20260820
+  → recupera el plan completo.
+```
+
+**Por qué ayuda:** UC-315 no pierde su trabajo si algo falla; UC-317
+guarda el checkpoint externamente.
+
+#### Ejemplo 4: UC-315 quiere analizar 5 tickers en paralelo
+
+```text
+UC-315:
+  "Necesito analizar sentimiento de noticias para 5 tickers
+   simultáneamente: AAPL, MSFT, GOOGL, AMZN, TSLA."
+
+UC-315 encola 5 tareas en UC-317:
+  POST /api/v1/kernel/schedule
+  {"agent_id": "sentiment_agent", "goal": "analyze AAPL news"}
+
+  POST /api/v1/kernel/schedule
+  {"agent_id": "sentiment_agent", "goal": "analyze MSFT news"}
+
+  ... (5 veces)
+
+UC-315 consulta:
+  GET /api/v1/kernel/scheduler/status
+  → {"pending": 0, "running": 0, "completed": 5, "max_concurrent": 8}
+
+UC-315 recoge los 5 resultados y combina el análisis.
+```
+
+**Por qué ayuda:** UC-315 no programa threads ni concurrencia; UC-317
+gestiona la ejecución paralela.
+
+#### Ejemplo 5: UC-315 quiere un "cuaderno de borradores"
+
+UC-315 tiene memoria de dominio (estrategias ganadoras, lecciones
+aprendidas). Pero para análisis efímeros no quiere contaminar su
+memoria permanente.
+
+```text
+UC-315:
+  "Estoy evaluando una hipótesis: 'Si VIX > 30, reducir posición.'
+   Quiero anotar resultados parciales sin guardarlos en mi memoria
+   permanente hasta confirmar."
+
+UC-315 usa la memoria efímera de UC-317:
+  POST /api/v1/kernel/syscall
+  {
+    "agent_id": "vix_analysis_session",
+    "syscall_type": "memory",
+    "operation": "memory.add",
+    "payload": {
+      "content": "VIX=32, histórico: 70% de las veces cayó en 5 días.",
+      "role": "system",
+      "source": "analysis",
+      "long_term": false
+    }
+  }
+
+Cuando UC-315 confirma la hipótesis, la mueve a SU memoria de dominio.
+UC-317 descarta el borrador.
+```
+
+**Por qué ayuda:** UC-315 mantiene su memoria de dominio limpia; UC-317
+sirve de cuaderno de borradores desechables.
+
+### 7.5. Lo que UC-317 NUNCA hace
+
+| No hace | Por qué |
+|---|---|
+| **No decide comprar o vender** | Eso es decisión del cerebro trader (UC-315). |
+| **No evalúa riesgo financiero** | Eso lo hace `SafetySupervisor315` + UC-324. |
+| **No acceda a cuentas de corretaje** | UC-317 no tiene credenciales financieras. |
+| **No reemplaza la memoria de dominio** | UC-317 es scratchpad, no memoria permanente. |
+| **No aprueba operaciones** | La aprobación la da UC-315 + UC-324 (gates de safety). |
+| **No aprende del mercado** | UC-317 no tiene plasticidad; UC-315 sí. |
+
+### 7.6. Resumen en una frase
+
+> **UC-315 es el trader que decide; UC-317 es la infraestructura que
+> ejecuta. El trader no necesita construir su propia cocina en cada
+> operación; usa la cocina compartida, validada y testeada de UC-317.**
+
+### 7.7. Diagrama simple para trading
+
+```text
+┌──────────────────────────────────────────────────┐
+│  UC-315 — Cerebro Trader AGI                     │
+│                                                  │
+│  "Leí las noticias. AAPL batió earnings.         │
+│   VIX está bajo. Sentimiento positivo.           │
+│   Mi plan: comprar AAPL con stop en 190."        │
+│                                                  │
+│  SafetySupervisor315: "Plan aprobado,            │
+│   riesgo dentro de política."                    │
+└──────────────────┬───────────────────────────────┘
+                   │ "Calcúlame el Sharpe ratio."
+                   │ "Guarda mi plan."
+                   │ "Evalúa 3 modelos de sentimiento."
+                   │ "Analiza 5 tickers en paralelo."
+                   ▼
+┌──────────────────────────────────────────────────┐
+│  UC-317 — Cocina / Infraestructura               │
+│                                                  │
+│  Calculator: (0.12-0.02)/0.05 = 2.0             │
+│  Storage: plan guardado como aapl_plan_...       │
+│  LLM Core: probé mock, gpt-4o-mini, llama3.1     │
+│  Scheduler: 5 análisis corriendo en paralelo     │
+└──────────────────────────────────────────────────┘
+                   │
+                   ▼  (si hay acción externa)
+┌──────────────────────────────────────────────────┐
+│  UC-324 — Boundary de seguridad                  │
+│                                                  │
+│  "Antes de ejecutar la orden de compra,          │
+│   paso por gates A-K de safety."                 │
+└──────────────────────────────────────────────────┘
+```
