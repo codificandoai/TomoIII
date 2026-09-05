@@ -1,0 +1,13 @@
+# UC-320 — Hugging Face Integration con UC-315/UC-317/UC-324
+flask>=2.3.0
+pydantic>=2.0.0
+pyyaml>=6.0
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Hugging Face (opcional). El gateway funciona con backend mock si
+# huggingface_hub no está instalado o no hay HF_TOKEN.
+# huggingface_hub>=0.24.0
+# transformers>=4.40.0
+# datasets>=2.19.0
+# sentence-transformers>=2.7.0
