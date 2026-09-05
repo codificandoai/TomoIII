@@ -1,0 +1,37 @@
+# UC-324 — AGT governance manifest (ejemplo)
+# Vincula políticas Rego a puntos de intervención del orquestador AGI.
+apiVersion: agent-governance-toolkit/v1
+kind: GovernanceManifest
+metadata:
+  name: uc324-agi-containment
+  domain: agi-orchestrator
+spec:
+  policyBundle: policy.rego
+  interventionPoints:
+    - name: pre_action
+      hook: /api/v1/containment/check
+      enforce: true
+    - name: execute
+      hook: /api/v1/containment/orchestrate
+      enforce: true
+    - name: post_action
+      hook: /api/v1/containment/audit
+      enforce: false
+  defaultDecision: deny
+  schemas:
+    skill:
+      required:
+        - domain
+        - name
+        - action_class
+        - risk_level
+      properties:
+        domain:
+          type: string
+          enum: [trading, reservations]
+        action_class:
+          type: string
+          enum: [read, predict, analyze, transact, execute, delete]
+        risk_level:
+          type: string
+          enum: [low, medium, high, critical]
