@@ -9,7 +9,11 @@ from typing import Any, Dict, List, Optional
 
 from benchmark import ModelBenchmark
 from contracts import ContractBuilder, SecureContract
+from hf_catalog import HFCatalogBrowser
+from hf_download import HFDownloadManager
 from hf_gateway import HuggingFaceModelGateway
+from hf_oauth import HFOAuth
+from hf_script_generator import FineTuneConfig, ScriptGenerator
 from hf_services import (
     DatasetManager,
     EvaluateService,
@@ -91,6 +95,40 @@ class UC320Orchestrator:
         self.templates = templates or TemplateRegistry()
         self.benchmark = ModelBenchmark(self.gateway)
         self.hf = hf_services or HFServices(backend="mock")
+        # Cache de HFServices por token de usuario (para billing al usuario)
+        self._user_services: Dict[str, HFServices] = {}
+        # Catálogo, descarga, scripts, OAuth
+        self.catalog_browser = HFCatalogBrowser(backend="mock")
+        self.script_generator = ScriptGenerator()
+        self.oauth = HFOAuth(backend="mock")
+        self._download_managers: Dict[str, HFDownloadManager] = {}
+
+    def get_download_manager(self, hf_token: str = "") -> HFDownloadManager:
+        """Retorna HFDownloadManager con el token del usuario."""
+        if hf_token and hf_token not in self._download_managers:
+            self._download_managers[hf_token] = HFDownloadManager(token=hf_token)
+        return self._download_managers.get(hf_token, HFDownloadManager())
+
+    def get_catalog_browser(self, hf_token: str = "") -> HFCatalogBrowser:
+        """Retorna HFCatalogBrowser con el token del usuario."""
+        if hf_token:
+            return HFCatalogBrowser(backend="mock", token=hf_token)
+        return self.catalog_browser
+
+    def get_user_services(self, hf_token: str) -> HFServices:
+        """Retorna HFServices con el token del usuario.
+
+        Los cargos de GPU van a la cuenta HF del usuario, no a UTRON.AI.
+        El token se pasa a InferenceClient, HfApi, Trainer, etc.
+        """
+        if not hf_token:
+            return self.hf  # fallback al servicio default
+        # Determinar backend desde el entorno
+        import os
+        backend = os.environ.get("UC320_BACKEND", "mock")
+        if hf_token not in self._user_services:
+            self._user_services[hf_token] = HFServices(backend=backend, token=hf_token)
+        return self._user_services[hf_token]
 
     # --- Inferencia de sentimiento ---
     def sentiment(
