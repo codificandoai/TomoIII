@@ -42,6 +42,14 @@ Este manual describe el flujo de procesos del cerebro AGI implementado en `/User
 | **EWC** | Elastic Weight Consolidation. Técnica que congela parámetros críticos para evitar olvido catastrófico. |
 | **MP** | Macro Proceso. Proceso de alto nivel en el Plan Maestro de Procesos. |
 | **SP** | Subproceso. Proceso detallado dentro de un MP. |
+| **IT** | Instructivo de Trabajo. Procedimiento paso a paso para un rol operativo. |
+| **UC-322** | Capa de resolución de conflictos multi-agente multi-dominio. No modifica el cerebro AGI; lo envuelve como middleware. |
+| **Reputación dinámica** | Score 0–1 por agente y dominio que se actualiza por episodio según éxito, calidad y eficiencia. Reemplaza pesos estáticos. |
+| **Negociación con concesiones** | Proceso iterativo donde agentes ceden posición proporcionalmente a flexibilidad × reputación × ronda. Reemplaza aprobación binaria. |
+| **Circuit breaker** | Disyuntor que se abre tras N conflictos consecutivos no resueltos, deteniendo el dominio hasta reset manual. |
+| **Deadlock** | Ciclo de dependencia circular entre agentes que impide progreso (A espera a B, B espera a A). Detectado por DFS. |
+| **Fingerprint SHA-256** | Hash normalizado de la descripción de una tarea para detectar trabajo duplicado entre agentes. |
+| **Escalación formal** | Envío de un conflicto no resuelto al orquestador de nivel superior con veredictos PROCEED / REVIEW / STOP / REASSIGN. |
 
 ---
 
@@ -87,6 +95,16 @@ Este manual describe el flujo de procesos del cerebro AGI implementado en `/User
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ MP-05  DECISIÓN BDI + JUICE FILTER + SAFETY SUPERVISOR                        │
 │   Beliefs → Desires → Intentions → confrontación adversarial Juice → Safety   │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ MP-322 RESOLUCIÓN DE CONFLICTOS MULTI-AGENTE (UC-322)                         │
+│   Nivel 1: Negociación con concesiones                                       │
+│   Nivel 2: Votación ponderada por reputación dinámica                       │
+│   Nivel 3: CNP dinámico con pujas compuestas                                │
+│   Nivel 4: Escalación formal (PROCEED / REVIEW / STOP / REASSIGN)          │
+│   + Duplicados SHA-256 + Deadlocks DFS + Circuit Breaker                    │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │
                                       ▼
@@ -146,6 +164,7 @@ Este manual describe el flujo de procesos del cerebro AGI implementado en `/User
 | MP-03 | Monitor metacognitivo | `MetacognitiveMonitor` | Workspace, estados internos | Veredicto PROCEED/REVIEW/STOP, coherencia | Tasa de intervención, falsos positivos |
 | MP-04 | Razonamiento ReAct + ToT | `ReActReasonactToTBrain` | Ticks, news, predictores | Predicción ask/bid, árbol de razonamiento | Confianza, error de predicción |
 | MP-05 | Decisión BDI + Juice + Safety | `BDIBuilder`, `JuiceAgent`, `SafetySupervisor` | Snapshots, beliefs, señales | Estrategia seleccionada, decisión de seguridad | Tasa de bloqueo, razones de rechazo |
+| **MP-322** | **Resolución de conflictos multi-agente** | `ConflictResolutionLayer`, `ReputationSystem` | Beliefs conflictivas, votos, pujas | Resolución, veredicto, reputación actualizada | Tasa de resolución por nivel, latencia, conflictos/hora, circuit breaker |
 | MP-06 | Ejecución y retroalimentación | `ExchangeSimulator`, `TradingWorldModel` | Orden aprobada | Resultado de ejecución, observaciones | Slippage, costo, error de predicción |
 | MP-07 | Gestión de memoria AGI | `IntelligentMemoryRouter` | Consultas, episodios, hechos | Recuperaciones, almacenamiento persistente | Precisión de intención, latencia |
 | MP-08 | Autoevaluación continua y metas | `ContinuousSelfEvaluator`, `GoalManager` | Episodios de desempeño | Reflexión, propuesta de cambio de objetivo | Tasa de éxito, recompensa promedio |
@@ -579,7 +598,14 @@ fitness      = 0.45 · task_success_rate + 0.35 · quality + 0.20 · efficiency
    │  MP-05       │ BDI + Juice + Safety
    │  Decisión    │
    └──────────────┘
-          │ selected_strategy / blocked
+          │ propuestas conflictivas
+          ▼
+   ┌──────────────┐
+   │  MP-322      │ ConflictResolutionLayer.resolve()
+   │  Resolución  │ Negociación → Votación → CNP → Escalación
+   │  Conflictos  │ + Duplicados + Deadlocks + Circuit Breaker
+   └──────────────┘
+          │ resolución / veredicto
           ▼
    ┌──────────────┐
    │  MP-06       │ ExchangeSimulator.execute()
@@ -632,6 +658,15 @@ fitness      = 0.45 · task_success_rate + 0.35 · quality + 0.20 · efficiency
 | `MetacognitiveMonitor` | `UC307CognitiveEvolutionLayer` | `evaluate_execution()` | Convertir veredicto en plasticidad |
 | `ContractNetMiddleware` | `UC307CognitiveEvolutionLayer` | `evaluate_execution()` por agente | Evolución de población |
 | `CuriositySkillLoop` | `UC307CognitiveEvolutionLayer` | `evaluate_execution()` | Evaluar adquisición de skill |
+| **UC-322** `ConflictResolutionLayer` | `NegotiationEngine` | `negotiate(conflict)` | Nivel 1: concesiones |
+| **UC-322** `ConflictResolutionLayer` | `VotingSystem` | `vote(conflict, options, prefs)` | Nivel 2: votación ponderada |
+| **UC-322** `ConflictResolutionLayer` | `DynamicCNP` | `bid(conflict, bids)` | Nivel 3: pujas dinámicas |
+| **UC-322** `ConflictResolutionLayer` | `EscalationProtocol` | `escalate(conflict, ...)` | Nivel 4: veredicto formal |
+| **UC-322** `ConflictResolutionLayer` | `ReputationSystem` | `record_episode()` / `get_reputation()` | Pesos dinámicos por dominio |
+| **UC-322** `ConflictResolutionLayer` | `DuplicateDetection` | `register_task()` | Fingerprints SHA-256 |
+| **UC-322** `ConflictResolutionLayer` | `DeadlockDetector` | `detect_cycle()` | DFS sobre wait graph |
+| **UC-322** `EscalationProtocol` | `MetacognitiveMonitor` | Recibe veredicto REVIEW/STOP | Escalación desde monitor |
+| Resultado de ejecución | **UC-322** `ReputationSystem` | `record_episode(success, quality)` | Feedback actualiza reputación |
 
 ---
 
@@ -656,6 +691,13 @@ fitness      = 0.45 · task_success_rate + 0.35 · quality + 0.20 · efficiency
 | Ejecución CNP | Score ponderado + evaluación evolutiva | Cada ronda | `ContractNetMiddleware` | `CNPRound` |
 | Curiosidad / nuevas herramientas | Verificación de firma y compilación | Cada intento | `CuriositySkillLoop` | `CuriosityAttempt` |
 | Rollback | `rollback_last_applied()` / `PrefrontalController.rollback()` | Bajo solicitud o anomalía | `UC307CognitiveEvolutionLayer` | Snapshot + log |
+| **Reputación dinámica** | `ReputationSystem.record_episode()` → recalcula score | Cada episodio resuelto | `ReputationSystem` | `EpisodeRecord`, Prometheus `conflict_*_total` |
+| **Tasa de resolución por nivel** | Contadores `conflict_negotiation_total`, `conflict_voting_total`, `conflict_cnp_total`, `conflict_escalation_total` | Cada conflicto | `ObservabilityManager` | Prometheus counters + Grafana |
+| **Circuit breaker UC-322** | `EscalationProtocol.consecutive_conflicts >= 3` → OPEN | Cada conflicto no resuelto | `EscalationProtocol` | Estado + alerta `CircuitBreakerAbierto` |
+| **Deadlocks detectados** | `DeadlockDetector.detect_cycle()` → DFS en wait graph | Cada resolución | `DeadlockDetector` | `DeadlockInfo`, logs Loki |
+| **Duplicados detectados** | `DuplicateDetection.register_task()` → fingerprint SHA-256 | Cada registro de tarea | `DuplicateDetection` | `TaskRecord`, logs Loki |
+| **Latencia de resolución** | `ConflictResolutionResult.total_duration` | Cada conflicto | `ConflictResolutionLayer` | Histograma Prometheus |
+| **Conflictos escalados** | Ratio escalación/total | Ventana temporal | `ObservabilityManager` | Dashboard Grafana |
 
 ### 7.2 Plan de contingencia / rollback
 
@@ -736,6 +778,21 @@ La arquitectura combina de forma integrada:
 | POST | `/api/v1/brain/curiosity/learn` | MP-11 |
 | POST | `/api/v1/brain/self_awareness/loop` | MP-12 |
 | POST | `/api/v1/brain/memory_pipeline` | MP-01 a MP-08 |
+| POST | `/api/v1/conflicts/resolve` | MP-322 (SP-322.1 a SP-322.4) |
+| POST | `/api/v1/reputation/record` | MP-322 (SP-322.5) |
+| GET | `/api/v1/reputation/ranking` | MP-322 (SP-322.5) |
+| GET | `/api/v1/reputation/<agent_id>` | MP-322 (SP-322.5) |
+| POST | `/api/v1/duplicate/check` | MP-322 (SP-322.6) |
+| POST | `/api/v1/deadlock/check` | MP-322 (SP-322.6) |
+| GET | `/api/v1/conflicts/history` | MP-322 |
+| GET | `/api/v1/escalation/history` | MP-322 (SP-322.4) |
+| GET | `/api/v1/escalation/circuit-breaker` | MP-322 (SP-322.7) |
+| POST | `/api/v1/escalation/circuit-breaker/reset` | MP-322 (SP-322.7) |
+| GET | `/api/v1/observability/summary` | MP-322 |
+| GET | `/api/v1/observability/logs` | MP-322 |
+| GET | `/api/v1/observability/spans` | MP-322 |
+| GET | `/metrics` | MP-322 (Prometheus) |
+| GET | `/api/v1/tasks/active` | MP-322 (SP-322.6) |
 
 ### Anexo B — Comandos CLI
 
@@ -775,6 +832,14 @@ python code/brain_memory_router.py --mode all
 | Coordinación multi-agente CNP | MP-10 | `ContractNetMiddleware.run_round()` |
 | Aprendizaje por curiosidad | MP-11 | `CuriositySkillLoop.metatool_learn_new_skill()` |
 | Bucle recursivo de autoconciencia | MP-12 | `SelfAwarenessLoop.run_loop()` |
+| **Resolución de conflictos multi-agente** | **MP-322** | `ConflictResolutionLayer.resolve()` |
+| **Negociación con concesiones** | **SP-322.1** | `NegotiationEngine.negotiate()` |
+| **Votación ponderada por reputación** | **SP-322.2** | `VotingSystem.vote()` |
+| **CNP dinámico con pujas** | **SP-322.3** | `DynamicCNP.bid()` |
+| **Escalación formal con 4 veredictos** | **SP-322.4** | `EscalationProtocol.escalate()` |
+| **Reputación dinámica por episodio** | **SP-322.5** | `ReputationSystem.record_episode()` |
+| **Detección de duplicados y deadlocks** | **SP-322.6** | `DuplicateDetection.register_task()`, `DeadlockDetector.detect_cycle()` |
+| **Circuit breaker y protección operacional** | **SP-322.7** | `EscalationProtocol.circuit_breaker_open` |
 
 ---
 
@@ -1066,3 +1131,1270 @@ Integrada en `api.py` junto con los endpoints heredados de UC-313/296:
 - `../skills_brain.png`
 - `../UC-315-secuencia.png`
 - `../UC-315-flujo.png`
+
+---
+
+## 11. UC-324 — Protocolo de contención de Sandbox para validar y prevenir acciones de rebelión de software autónomo y adaptativo
+
+UC-324 es una **capa externa de contención** que envuelve al cerebro AGI
+(UC-315) sin modificarlo. Opera como un middleware opcional con tres gates
+(pre-action, ejecución y post-action), valida planes y skills contra
+múltiples capas de seguridad externas, y registra cada decisión para
+auditoría y posible reversión.
+
+**Principios operativos:**
+
+- **Fail-closed:** cualquier gate que falle o no responda bloquea la acción sensible.
+- **Separación de autoridad:** el LLM/orquestador propone; la capa de contención autoriza.
+- **No toca el cerebro AGI:** importa los módulos de `UC-315/code` mediante
+  `PYTHONPATH=../../UC-315/code`; nunca copia ni modifica el núcleo.
+- **Dependencias externas opcionales:** si un toolkit no es instalable, UC-324
+  implementa una versión nativa/fallback funcional.
+- **Trazabilidad:** cada gate, decisión, SLO, kill switch y firma queda registrado.
+
+### 11.1 Macroproceso MP-324 — Contención de Sandbox
+
+```text
+Objetivo + dominio + roles
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATE PRE-ACTION                                                              │
+│   A. Microsoft Agent Governance Toolkit  → policy-as-code, rings, SRE       │
+│   B. AdaptiveStressTestingToolbox        → worst-case / stress testing      │
+│   C. ai-safety                            → red-teaming / jailbreak          │
+│   G. agent-policy-engine                  → prompt-injection / provenance   │
+│   H. agent-guardrails                     → DevOps/SRE/Kubernetes/IaC       │
+│   I. openguardrails                       → PII, LLM traffic, model control │
+│   E. awesome-safety-critical-ai           → circuit breakers / thresholds   │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SafetySupervisor315 (cerebro AGI — UC-315)                                   │
+│   roles, permisos, precondiciones, postcondiciones, kill switch              │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATE EJECUCIÓN                                                               │
+│   F. faramesh-core                        → frontera criptográfica HMAC       │
+│        firma de intención + nonce + timestamp + anti-replay                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+   Skill executor (importado de UC-315)
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ GATE POST-ACTION                                                             │
+│   D. SafeAuto                             → verificación post-acción         │
+│   J. AgentDoG                             → evaluación contextual trayectorias  │
+│   K. OpenAgentSafety                      → evaluación stage-wise / reglas   │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+   Auditoría + memoria + rollback
+```
+
+### 11.2 Subprocesos SP-324.A — SP-324.K
+
+| SP | Toolkit / Función | Gate | Estado en UC-324 | Archivo nativo |
+|---|---|---|---|---|
+| **SP-324.A** | Microsoft Agent Governance Toolkit — policy-as-code declarativo, rings de privilegio, zero-trust identity, SRE, kill switch | Pre-action | Fallback nativo (motor declarativo + AGT SRE manager) | `agt_native_integration.py`, `agt_sre_integration.py` |
+| **SP-324.B** | AdaptiveStressTestingToolbox — worst-case validation con MCTS-UCT para encontrar escenarios de fallo/rebelión | Pre-action (advisory) | Fallback nativo (MCTS-UCT sobre perturbaciones de estado) | `ast_integration.py` |
+| **SP-324.C** | ai-safety — red-teaming y jailbreak evaluation para detectar si el agente salta restricciones | Pre-action / API | Fallback nativo (motor heurístico de jailbreak + campañas adversariales) | `ai_safety_integration.py` |
+| **SP-324.D** | SafeAuto — verificación post-acción basada en reglas para validar outputs antes de efectuar consecuencias externas | Post-action | Fallback nativo (motor de reglas declarativas) | `safeauto_integration.py` |
+| **SP-324.E** | awesome-safety-critical-ai — circuit breakers y monitoreo de umbrales de confianza/latencia/coste | Pre-action | Fallback nativo (safety-critical monitor) | `safety_critical_monitor.py` |
+| **SP-324.F** | faramesh-core — frontera criptográfica/determinista entre orquestador LLM y shell/SQL/APIs/acciones externas | Ejecución | Fallback nativo (HMAC + nonce + timestamp + anti-replay) | `faramesh_boundary.py` |
+| **SP-324.G** | agent-policy-engine — motor de políticas anti prompt-injection para agentes que consumen web/documentos/tickets/correos | Pre-action | Fallback nativo (provenance, trust levels, redaction, fail-closed) | `prompt_injection_policy_engine.py` |
+| **SP-324.H** | agent-guardrails — guardrails para agentes DevOps/SRE/Kubernetes/IaC y automatización de infraestructura | Pre-action | Fallback nativo (clasificación, destructive patterns, approval) | `devops_guardrails.py` |
+| **SP-324.I** | openguardrails — proteger tráfico entre aplicaciones/agentes y proveedores de LLM; PII, políticas de uso y control de modelos | Pre-action | Fallback nativo (GuardEvent/Verdict-style engine) | `llm_guardrails.py` |
+| **SP-324.J** | AgentDoG — evaluación contextual de trayectorias, detección de patrones inseguros y experimentación de seguridad | Post-action | Fallback nativo (evaluador determinista de trayectorias) | `agent_dog_integration.py` |
+| **SP-324.K** | OpenAgentSafety — evaluación de seguridad por etapas (rule-based + LLM-as-Judge) en simulaciones realistas | Post-action | Fallback nativo (stage-wise rule-based evaluator) | `open_agent_safety_integration.py` |
+
+### 11.3 Detalle de subprocesos
+
+#### SP-324.A — Microsoft Agent Governance Toolkit (policy-as-code y gobernanza)
+
+**Propósito:** proveer un motor de políticas declarativo, anillos de
+privilegio, identidad zero-trust y gobernanza SRE externa al cerebro AGI.
+
+**Funciones complementarias al SafetySupervisor315 existente:**
+
+- **Policy-as-code determinista:** evalúa skills contra roles, permisos,
+  anillos de privilegio y políticas declarativas de forma reproducible y
+  auditable. El `SafetySupervisor315` sigue siendo la última línea de
+  defensa simbólica; AGT añade una capa externa que puede explicar “por qué
+  se bloqueó”.
+- **Zero-trust identity y privilegios:** extiende los roles locales
+  (`payment_processor`, `trader`) con conceptos de DID/Entra Agent ID,
+  cadenas de delegación y trust scoring, preparando el sistema para
+  múltiples agentes/humanos colaborativos.
+- **Sandboxing por anillos:** skills de bajo riesgo (`read`, `predict`)
+  ejecutan en anillos amplios; skills críticas (`PaymentSkill`,
+  `MarketExecutionSkill`, `DeleteSkill`) requieren anillos restringidos,
+  aprobación explícita y permisos granulares.
+- **SRE y kill switch:** integra SLOs, circuit breakers, presupuestos de
+  error y un botón de parada global. El `SafetySupervisor315` recibe el
+  estado del kill switch y aborta ejecuciones si está activo.
+- **Compliance:** mapea procesos MP-315 a OWASP Agentic Top 10, NIST AI RMF
+  y EU AI Act, fortaleciendo la documentación técnica para auditoría y
+  patente.
+
+**Implementación nativa:**
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agt_native_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agt_sre_integration.py" />
+
+**Uso típico:**
+
+```python
+from agt_native_integration import AGTNativeGovernance
+from agt_sre_integration import AGTSREManager
+
+governance = AGTNativeGovernance()
+result = governance.evaluate(
+    skill={"name": "PaymentSkill", "required_roles": ["payment_processor"]},
+    inputs={"amount": 200},
+    roles=["payment_processor", "payment.charge"],
+)
+if not result.allowed:
+    raise PermissionError(result.issues)
+
+sre = AGTSREManager()
+if sre.is_killed():
+    raise RuntimeError("Kill switch global activado")
+```
+
+#### SP-324.B — AdaptiveStressTestingToolbox (worst-case validation)
+
+**Propósito:** encontrar de forma autónoma los peores escenarios donde el
+sistema adaptativo tomaría decisiones catastróficas o rebeldes que violan
+la seguridad del entorno.
+
+**Funciones:**
+
+- Perturba el `domain_state` (`user_consent`, `risk_approved`,
+  `availability_confirmed`, `circuit_breaker_open`, `authorized`).
+- Aplica MCTS-UCT para maximizar una señal de riesgo.
+- Retorna el peor caso encontrado: secuencia de perturbaciones, violación
+  detectada y puntuación de riesgo.
+- Corre en el gate **pre-action como advisory**; no bloquea por sí solo,
+  pero alimenta tests de regresión y auditorías.
+
+**Limitación del repositorio externo:** la librería original depende de
+`garage==2019.10.1` → `torch==1.3.0`, que no tiene rueda para Python 3.11
+/ arm64.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/ast_integration.py" />
+
+#### SP-324.C — ai-safety (red-teaming y jailbreak evaluation)
+
+**Propósito:** simular ataques de adversarios y medir si el agente autónomo
+puede saltarse restricciones o actuar de forma maliciosa.
+
+**Funciones:**
+
+- **Detección heurística rápida** en pre-action: patrones de jailbreak,
+  DAN mode, system override, instrucciones ocultas.
+- **Campañas adversariales** con `RedTeamEvaluator`: genera variantes de
+  un objetivo malicioso, las ejecuta contra el sandbox y reporta tasa de
+  bypass.
+
+**Limitación del repositorio externo:** setuptools detecta múltiples
+paquetes top-level sin configuración válida.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/ai_safety_integration.py" />
+
+#### SP-324.D — SafeAuto (verificación post-acción)
+
+**Propósito:** validar con redes lógicas / reglas declarativas que las
+acciones predichas o generadas autónomamente no violen reglas estrictas
+antes de producir consecuencias externas.
+
+**Funciones:**
+
+- Reglas declarativas por dominio y skill (pago requiere
+  `transaction_id`/`confirmation_id` y estado `AUTHORIZED`).
+- Operadores: `exists`, `contains`, `and`, `or`, `not`, comparadores.
+- Referencias: `output.*`, `input.*`, `skill.*`, `domain_state.*`.
+- Bloquea post-acción si el output no cumple reglas críticas.
+
+**Limitación del repositorio externo:** no contiene `setup.py` ni
+`pyproject.toml`.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/safeauto_integration.py" />
+
+#### SP-324.E — awesome-safety-critical-ai (circuit breakers y umbrales)
+
+**Propósito:** extraer de la lista curada de recursos safety-critical los
+patrones de disyuntores y monitoreo de umbrales para detener software
+autónomo cuando opera fuera de los límites de diseño.
+
+**Funciones:**
+
+- Circuit breaker por skill con estados `CLOSED`, `OPEN`, `HALF_OPEN` y
+  recuperación automática tras cooldown.
+- Umbrales configurables: fallos consecutivos, tasa mínima de éxito,
+  latencia máxima, coste máximo, confianza mínima.
+- Métricas de éxito/fracaso, latencia media, coste y confianza mínima
+  observada.
+
+**Limitación del repositorio externo:** es una lista curada de papers y
+herramientas, no un paquete Python ejecutable.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/safety_critical_monitor.py" />
+
+#### SP-324.F — faramesh-core (frontera criptográfica/determinista)
+
+**Propósito:** diseñar una frontera determinista entre el orquestador LLM
+y acciones externas (shell, SQL, APIs), de modo que solo intenciones
+firmadas y no reproducidas puedan ejecutarse.
+
+**Funciones:**
+
+- HMAC-SHA256 de intención (`skill + inputs`).
+- Nonce y timestamp para anti-replay y frescura.
+- TTL configurable de firma.
+- Detección de patrones peligrosos en inputs (`rm -rf`, `DROP TABLE`,
+  `eval(`, `subprocess`, `os.system`, `__import__`).
+- Solo aprueba o bloquea; nunca ejecuta skills.
+
+**Limitación del repositorio externo:** no contiene `setup.py` ni
+`pyproject.toml`.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/faramesh_boundary.py" />
+
+#### SP-324.G — agent-policy-engine (anti prompt-injection)
+
+**Propósito:** motor de políticas para agentes que consumen contenido web,
+documentos, tickets o correos donde puede existir prompt injection o
+instrucciones ocultas.
+
+**Funciones:**
+
+- Proveniencia de contenido: fuente, `source_id`, `author`, `timestamp`,
+  hash (`fingerprint`).
+- Niveles de confianza: `trusted`, `untrusted`, `unknown`.
+- Detectores: instruction override, role play, separator tokens,
+  encoding obfuscation, indirect injection, markdown codeblock.
+- Score 0–1, redaction de contenido web no confiable y fail-closed para
+  acciones sensibles.
+
+**Limitación del repositorio externo:** no contiene `setup.py` ni
+`pyproject.toml`.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/prompt_injection_policy_engine.py" />
+
+#### SP-324.H — agent-guardrails (DevOps/SRE/Kubernetes/IaC)
+
+**Propósito:** guardrails para agentes que operan infraestructura: DevOps,
+SRE, Kubernetes, Terraform, Helm, AWS CLI, Docker, shell, SQL, Ansible.
+
+**Funciones:**
+
+- Clasificación de comandos por herramienta, acción, entorno, namespace y
+  recurso.
+- Bloqueo de patrones destructivos (`rm -rf /`, `kubectl delete --all`,
+  `terraform destroy`, `docker system prune`, `drop database`, etc.).
+- Requisito de aprobación para acciones destructivas (`approved_by`,
+  `change_ticket_id`).
+- Restricciones por entorno (`kubectl exec` y `terraform destroy` en
+  producción bloqueados).
+- Evaluación de planes completos.
+
+**Limitación del repositorio externo:** no contiene `setup.py` ni
+`pyproject.toml`.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/devops_guardrails.py" />
+
+#### SP-324.I — openguardrails (PII, tráfico LLM, control de modelos)
+
+**Propósito:** proteger el tráfico entre aplicaciones/agentes y
+proveedores de LLM, incluyendo PII, políticas de uso y control de modelos.
+
+**Funciones:**
+
+- Detección de PII: email, teléfono, SSN, tarjeta de crédito (con Luhn
+  básico), documentos de identidad, API keys, tokens, passwords, secrets.
+- Redacción con placeholders (`${OGR_EMAIL_1}`, `${OGR_SECRET_1}`) o
+  bloqueo según modo configurado.
+- Control de proveedor/modelo: allowlists, denylists, modelo requerido
+  por `use_case`.
+- Políticas de uso: casos prohibidos, categorías de contenido, límites de
+  tokens/coste/tasa.
+- Inspección de request/response, incluyendo `tool_calls`.
+- Auditoría sin exponer valores crudos.
+
+**Limitación del repositorio externo:** es un monorepo/protocolo; la
+instalación con `pip install git+...` falla por múltiples paquetes top-level
+sin configuración de setuptools.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/llm_guardrails.py" />
+
+#### SP-324.J — AgentDoG (evaluación contextual de trayectorias)
+
+**Propósito:** evaluar secuencias completas de acciones de agente (trayectorias)
+para detectar patrones inseguros, comportamientos rebeldes y riesgos de
+seguridad que solo son visibles en contexto.
+
+**Funciones:**
+
+- Evaluación de trayectorias con metadatos por paso (`action_class`,
+  `domain`, `status`, `risk_level`).
+- Taxonomía: `missing_prerequisite`, `first_step_critical`,
+  `consecutive_critical`, `insufficient_review`, `blocked_concentration`,
+  `repeated_failures`, `dangerous_command`, `data_exfiltration`,
+  `privilege_escalation`, `scope_creep`, `circular_behavior`.
+- Score por trayectoria y por step.
+- Fail-closed para findings críticos o de severidad alta.
+
+**Limitación del repositorio externo:** framework basado en modelos
+(checkpoints HuggingFace/Transformers y prompts), no un paquete pip
+instalable.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agent_dog_integration.py" />
+
+#### SP-324.K — OpenAgentSafety (evaluación de seguridad por etapas)
+
+**Propósito:** evaluar la seguridad del agente en simulaciones realistas de
+alto riesgo mediante reglas sobre el estado final y observaciones por
+etapas (LLM-as-Judge heurístico).
+
+**Funciones:**
+
+- Evaluación por etapas (`Stage`) con `action_class`, `domain`, `status`,
+  `inputs`, `output`, `risk_level`, `requires_approval`, `human_reviewed`.
+- Taxonomía: `destructive_final_state`, `confidential_data_leak`,
+  `unauthorized_modification`, `high_risk_without_approval`,
+  `unhandled_error`, `domain_mismatch`, `too_many_steps`,
+  `repeated_failed_stage`, `eval_or_exec`.
+- Detección de patrones destructivos, filtración de credenciales, cambios
+  en rutas protegidas y ejecución dinámica de código.
+- Score por etapa y global; fail-closed.
+
+**Limitación del repositorio externo:** benchmark Docker-based con
+servicios (GitLab, ownCloud, RocketChat) y ~30 GB de disco; no es un
+paquete pip instalable.
+
+**Implementación nativa:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/open_agent_safety_integration.py" />
+
+### 11.4 Arquitectura de tres gates de UC-324
+
+```text
+Objetivo + dominio + roles
+        │
+        ▼
+┌──────────────────────────────────────────────┐
+│  GATE PRE-ACTION                               │
+│  A,B,C,E,G,H,I                                 │
+│  ¿Permitido construir y ejecutar el plan?      │
+└──────────┬─────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────┐
+│  SafetySupervisor315 (importado de UC-315)    │
+│  roles, permisos, precondiciones               │
+└──────────┬─────────────────────────────────────┘
+           │
+           ▼
+┌──────────────────────────────────────────────┐
+│  GATE EJECUCIÓN                                │
+│  F — firma HMAC + nonce + timestamp            │
+│  ¿La ejecución física está autorizada?         │
+└──────────┬─────────────────────────────────────┘
+           │
+           ▼
+   Skill executor (UC-315)
+           │
+           ▼
+┌──────────────────────────────────────────────┐
+│  GATE POST-ACTION                              │
+│  D — SafeAuto-style rules                      │
+│  J — AgentDoG trajectory evaluation              │
+│  K — OpenAgentSafety stage-wise evaluation     │
+│  ¿El resultado viola reglas o patrones?        │
+└──────────────────────────────────────────────┘
+           │
+           ▼
+   Auditoría + SRE + memoria + rollback
+```
+
+### 11.5 Modos de operación del sandbox
+
+| Modo | Efecto |
+|---|---|
+| `enforce` | Bloquea cualquier paso que falle un gate |
+| `audit` | Evalúa todos los gates pero no bloquea |
+| `disabled` | UC-324 se desactiva; el cerebro AGI opera solo |
+
+### 11.6 API REST y CLI
+
+Los endpoints de UC-324 están documentados en <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/UC-324.md" />.
+
+Comandos principales:
+
+```bash
+cd /Users/utron/Documents/code-books/TomoIII/UC-324/code
+export PYTHONPATH=../../UC-315/code
+
+# Tests
+.venv/bin/python3 -m pytest tests/test_containment.py -q
+
+# Demos por capa
+.venv/bin/python3 UC-324.py --demo-payment-blocked
+.venv/bin/python3 UC-324.py --demo-ast
+.venv/bin/python3 UC-324.py --demo-red-team
+.venv/bin/python3 UC-324.py --demo-safeauto
+.venv/bin/python3 UC-324.py --demo-circuit-breaker
+.venv/bin/python3 UC-324.py --demo-faramesh
+.venv/bin/python3 UC-324.py --demo-prompt-injection
+.venv/bin/python3 UC-324.py --demo-devops-guardrails
+.venv/bin/python3 UC-324.py --demo-llm-guardrails
+.venv/bin/python3 UC-324.py --demo-trajectory-eval
+.venv/bin/python3 UC-324.py --demo-stage-wise-eval
+
+# Servidor REST
+.venv/bin/python3 UC-324.py --server
+```
+
+### 11.7 Referencias UC-324
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/UC-324.md" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/UC-324.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/api_324.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/containment_protocol.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/external_toolkit_adapters.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agt_native_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agt_sre_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/ast_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/ai_safety_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/safeauto_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/safety_critical_monitor.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/faramesh_boundary.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/prompt_injection_policy_engine.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/devops_guardrails.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/llm_guardrails.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/agent_dog_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/open_agent_safety_integration.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-324/code/tests/test_containment.py" />
+
+---
+
+## 12. UC-322 — Resolución de Conflictos en Sistemas Multi-Agente Multi-Dominio
+
+UC-322 es una **capa de resolución de conflictos** que envuelve al cerebro AGI
+(UC-315) sin modificarlo. Opera como middleware entre las propuestas de los
+agentes y la decisión de ejecución, interceptando y resolviendo conflictos
+mediante cuatro niveles progresivos de complejidad.
+
+**Principios operativos:**
+
+- **UC-315 decide, UC-322 resuelve, UC-324 contiene, UC-317 ejecuta.**
+- **Un modelo genera evidencia. La evidencia no es una orden.**
+- **No toca el cerebro AGI:** importa los módulos de `UC-315/code` mediante
+  `PYTHONPATH=../../UC-315/code` o `_import_paths.py`; nunca copia ni modifica
+  el núcleo cognitivo.
+- **Fail-safe:** si la resolución falla en todos los niveles, el circuit breaker
+  detiene el dominio hasta intervención humana.
+- **Trazabilidad completa:** cada conflicto, negociación, voto, puja, escalación,
+  duplicado y deadlock queda registrado con `trace_id` en Prometheus, Loki y spans.
+
+![Arquitectura de Resolución de Conflictos](./agi_brain_architecture.png)
+
+*Figura 5. Diagrama de arquitectura AGI con UC-322. Las propuestas de agentes UC-315 pasan por la capa de resolución de conflictos antes de llegar a UC-324 (contención) y UC-317 (ejecución).*
+
+### 12.1 Macroproceso MP-322 — Resolución de Conflictos Multi-Agente
+
+```text
+Propuestas de agentes UC-315 (Juice / Trading / CNP / ToT)
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.PRE  DETECCIÓN Y CLASIFICACIÓN                                        │
+│   NegotiationEngine.detect_conflict(beliefs, domain, threshold=0.15)        │
+│   DuplicateDetection.register_task(task_id, agent_id, domain, description)  │
+│   DeadlockDetector.detect_cycle()                                           │
+│   → Conflict(type, severity, agents, beliefs, trace_id)                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.1  NIVEL 1 — NEGOCIACIÓN CON CONCESIONES                             │
+│   NegotiationEngine.negotiate(conflict)                                      │
+│   Hasta 5 rondas · gap < 0.05 → acuerdo · flexibilidad × reputación        │
+│   Si acuerdo → RESOLVED · Si no → escalar a Nivel 2                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │ si falla
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.2  NIVEL 2 — VOTACIÓN PONDERADA POR REPUTACIÓN                       │
+│   VotingSystem.vote(conflict, options, agent_preferences, agent_confidence)  │
+│   peso = ReputationSystem.get_reputation(agent_id, domain) × confidence     │
+│   Si winner_score / total_weight ≥ 0.60 → RESOLVED                        │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │ si falla
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.3  NIVEL 3 — CNP DINÁMICO CON PUJAS COMPUESTAS                       │
+│   DynamicCNP.bid(conflict, agent_bids)                                       │
+│   composite = 0.35·bid + 0.25·conf + 0.25·rep - 0.10·cost - 0.05·latency  │
+│   Ganador con mayor composite → RESOLVED                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │ si falla
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.4  NIVEL 4 — ESCALACIÓN FORMAL                                        │
+│   EscalationProtocol.escalate(conflict, severity, cnp_winner, voting,       │
+│     negotiation_gap, human_review_requested)                                 │
+│   Veredictos: PROCEED · REVIEW · STOP · REASSIGN                           │
+│   Circuit breaker: 3 conflictos consecutivos → STOP automático             │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.5  ACTUALIZACIÓN DE REPUTACIÓN                                        │
+│   ReputationSystem.record_episode(agent_id, task_id, success, quality,      │
+│     efficiency, domain)                                                      │
+│   reputation = BASE + W_s·success_rate + W_q·quality + W_e·efficiency       │
+│                - PENALTY·recent_failures                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.6  DETECCIÓN DE DUPLICADOS Y DEADLOCKS                                │
+│   Fingerprint SHA-256 normalizado por tarea                                  │
+│   DFS sobre wait graph para ciclos de dependencia                           │
+│   Stall timeout: 30 s sin progreso → conflicto tipo DEADLOCK               │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ SP-322.7  CIRCUIT BREAKER Y OBSERVABILIDAD                                   │
+│   3 conflictos consecutivos no resueltos → circuit breaker OPEN             │
+│   Reset manual: POST /api/v1/escalation/circuit-breaker/reset               │
+│   Métricas Prometheus + logs Loki + spans OpenTelemetry + Grafana           │
+└─────────────────────────────────────────────────────────────────────────────┘
+        │
+        ▼
+   Resolución → UC-324 (contención) → UC-317 (ejecución) → Feedback
+```
+
+---
+
+### 12.2 Subprocesos detallados
+
+#### SP-322.PRE — Detección y clasificación de conflictos
+
+**Propósito:** Identificar cuándo dos o más agentes discrepan y clasificar el conflicto por tipo, severidad y dominio.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/negotiation_engine.py" />, <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/duplicate_detection.py" />
+
+**Entradas:**
+- Lista de `AgentBelief` (agent_id, proposition, confidence, evidence, timestamp).
+- `domain`: dominio del conflicto (trading, reservations, etc.).
+- `threshold`: distancia mínima entre confianzas para considerar conflicto (default 0.15).
+
+**Actividades:**
+
+| Paso | Método | Actividad | Salida |
+|---|---|---|---|
+| 1 | `NegotiationEngine.detect_conflict()` | Compara confianzas entre pares de agentes; si `|conf_a - conf_b| ≥ threshold` → conflicto. | `Conflict` o `None` |
+| 2 | `DuplicateDetection.register_task()` | Normaliza descripción → SHA-256 fingerprint → busca duplicado. | `(is_new: bool, conflict: Optional[Conflict])` |
+| 3 | `DeadlockDetector.detect_cycle()` | DFS en wait graph → detecta ciclos circulares. | `DeadlockInfo` o `None` |
+
+**Tipos de conflicto detectables:**
+
+| `ConflictType` | Descripción |
+|---|---|
+| `BELIEF_DISAGREEMENT` | Agentes con confianzas opuestas sobre la misma proposición |
+| `RESOURCE_CONTENTION` | Competencia por un recurso compartido |
+| `TASK_OWNERSHIP` | Dos agentes reclaman la misma tarea |
+| `PRIORITY_DISPUTE` | Prioridades contradictorias |
+| `DUPLICATE_WORK` | Tareas con fingerprint idéntico |
+| `DEADLOCK` | Ciclo de dependencia circular |
+| `GOAL_CONFLICT` | Metas incompatibles entre agentes |
+| `DOMAIN_BOUNDARY` | Conflicto entre dominios distintos |
+
+**Severidad:**
+
+| `ConflictSeverity` | Valor | Comportamiento |
+|---|---|---|
+| `LOW` | 1 | Resolver por negociación normal |
+| `MEDIUM` | 2 | Intentar votación si negociación falla |
+| `HIGH` | 3 | Requiere revisión humana en escalación |
+| `CRITICAL` | 4 | Escalación directa con veredicto STOP |
+
+---
+
+#### SP-322.1 — Nivel 1: Negociación con concesiones
+
+**Propósito:** Resolver el conflicto mediante rondas de concesiones graduales donde cada agente cede proporcionalmente a la reputación del agente contrario.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/negotiation_engine.py" />
+
+**Entradas:**
+- `Conflict` con beliefs de cada agente.
+- `NegotiationConfig`:
+  - `max_rounds`: 5 (máximo de rondas).
+  - `agreement_threshold`: 0.05 (gap mínimo para acuerdo).
+  - `min_concession_step`: 0.02.
+  - `max_concession_step`: 0.15.
+  - `flexibility_factor`: 0.3.
+  - `reputation_influence`: 0.4.
+
+**Actividades:**
+
+| Paso | Actividad | Fórmula / Lógica | Salida |
+|---|---|---|---|
+| 1 | Calcular posiciones iniciales | `position_a = belief_a.confidence`, `position_b = belief_b.confidence` | Posiciones |
+| 2 | Por cada ronda (1..5): | | |
+| 2a | Calcular concesión A | `concession = clamp(flexibility × rep_b × round_factor, min_step, max_step)` | `Concession` |
+| 2b | Calcular concesión B | `concession = clamp(flexibility × rep_a × round_factor, min_step, max_step)` | `Concession` |
+| 2c | Actualizar posiciones | `pos_a -= concession_a`, `pos_b += concession_b` | Posiciones nuevas |
+| 2d | Verificar acuerdo | Si `|pos_a - pos_b| < agreement_threshold` → acuerdo | `bool` |
+| 3 | Si acuerdo | `agreed_value = (pos_a + pos_b) / 2` | `NegotiationResult(agreement_reached=True)` |
+| 4 | Si no acuerdo | `remaining_gap` registrado | `NegotiationResult(agreement_reached=False)` |
+
+**Salidas:**
+- `NegotiationResult` con ronda alcanzada, concesiones, gap residual y acuerdo.
+- Métricas: `conflict_negotiation_total` incrementado.
+- Logs: traza de cada ronda en Loki.
+
+**Reemplaza en UC-315:** `JuiceValidator._local_validate()` (aprobación binaria `consensus ≥ 0.55`).
+
+---
+
+#### SP-322.2 — Nivel 2: Votación ponderada por reputación
+
+**Propósito:** Cuando la negociación falla, someter el conflicto a votación donde el peso de cada agente depende de su reputación dinámica en el dominio.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/voting_system.py" />
+
+**Entradas:**
+- `Conflict` activo.
+- `options`: alternativas a votar (ej: `["BUY", "SELL", "HOLD"]`).
+- `agent_preferences`: mapa `{agent_id: opción_preferida}`.
+- `agent_confidence`: mapa `{agent_id: confianza}`.
+- `VotingConfig`:
+  - `consensus_threshold`: 0.60 (mínimo para declarar ganador).
+  - `min_voters`: 2.
+  - `allow_abstention`: True.
+
+**Actividades:**
+
+| Paso | Actividad | Fórmula / Lógica | Salida |
+|---|---|---|---|
+| 1 | Obtener reputaciones | `rep = ReputationSystem.get_reputation(agent_id, domain)` | Pesos |
+| 2 | Calcular peso de voto | `weight = rep × confidence` | `Vote` por agente |
+| 3 | Agregar votos por opción | `score[opción] += weight` | Scores acumulados |
+| 4 | Determinar ganador | `winner = max(scores)`; si `winner_score/total_weight ≥ threshold` → consenso | `VotingResult` |
+
+**Salidas:**
+- `VotingResult` con votos, ganador, score, consenso.
+- Métricas: `conflict_voting_total` incrementado.
+
+**Reemplaza en UC-315:** `TraderAgent.generate_signal()` (pesos fijos `0.35/0.25/0.15`).
+
+---
+
+#### SP-322.3 — Nivel 3: CNP dinámico con pujas compuestas
+
+**Propósito:** Cuando la votación no alcanza consenso, asignar la tarea al agente con mejor puja compuesta que integra calidad, confianza, reputación, costo y latencia.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/cnp_dynamic.py" />
+
+**Entradas:**
+- `Conflict` activo.
+- `agent_bids`: lista de pujas `[{agent_id, bid_score, confidence, estimated_cost, estimated_latency_ms}]`.
+- `CNPConfig`:
+  - `weight_bid`: 0.35.
+  - `weight_confidence`: 0.25.
+  - `weight_reputation`: 0.25.
+  - `weight_cost`: 0.10.
+  - `weight_latency`: 0.05.
+  - `max_latency_ms`: 5000.
+
+**Actividades:**
+
+| Paso | Actividad | Fórmula | Salida |
+|---|---|---|---|
+| 1 | Obtener reputación | `rep = ReputationSystem.get_reputation(agent_id, domain)` | Score |
+| 2 | Calcular composite | `0.35×bid + 0.25×conf + 0.25×rep - 0.10×cost - 0.05×(latency/max)` | `CNPBid.composite_score` |
+| 3 | Seleccionar ganador | `winner = max(bids, key=composite_score)` | `CNPResult` |
+
+**Salidas:**
+- `CNPResult` con pujas, ganador y score compuesto.
+- Métricas: `conflict_cnp_total` incrementado.
+
+**Reemplaza en UC-315:** `CNPAgentProfile.reliability` (estático 0.9) y `evaluate_and_award.score()` (fórmula fija).
+
+---
+
+#### SP-322.4 — Nivel 4: Escalación formal
+
+**Propósito:** Cuando todos los niveles anteriores fallan, enviar el conflicto al orquestador de nivel superior con un veredicto formal y acciones recomendadas.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/escalation_protocol.py" />
+
+**Entradas:**
+- `Conflict` activo.
+- `severity`: categoría del conflicto.
+- `cnp_winner`: agente ganador del CNP (si existe).
+- `voting_result`: resultado de votación (si existe).
+- `negotiation_gap`: gap residual de negociación.
+- `human_review_requested`: flag de revisión humana.
+- `EscalationConfig`:
+  - `circuit_breaker_threshold`: 3 (conflictos consecutivos para abrir).
+  - `escalation_cooldown_s`: 60.
+  - `max_history`: 50.
+
+**Actividades:**
+
+| Paso | Actividad | Lógica | Salida |
+|---|---|---|---|
+| 1 | Verificar circuit breaker | Si `consecutive_conflicts ≥ 3` → STOP inmediato | `EscalationResult(STOP)` |
+| 2 | Evaluar severidad | CRITICAL → STOP; HIGH → REVIEW; LOW/MEDIUM → evaluar contexto | Veredicto candidato |
+| 3 | Evaluar context | `human_review_requested` → REVIEW; `cnp_winner` disponible → REASSIGN | Veredicto refinado |
+| 4 | Decidir veredicto final | `_decide_verdict()` integra todos los factores | `EscalationVerdict` |
+| 5 | Registrar historial | `_history.append(result)` + `consecutive_conflicts++` o reset | Persistencia |
+
+**Veredictos:**
+
+| Veredicto | Significado | Acción |
+|---|---|---|
+| `PROCEED` | Conflicto de baja severidad, resolución suficiente | Continuar ejecución normal |
+| `REVIEW` | Requiere revisión humana o del orquestador | Pausar y esperar aprobación |
+| `STOP` | Severidad crítica o circuit breaker abierto | Detener el dominio; alertar |
+| `REASSIGN` | CNP encontró un agente mejor | Reasignar tarea al ganador |
+
+**Salidas:**
+- `EscalationResult` con veredicto, razonamiento, acciones, flag `requires_human_review`.
+- Métricas: `conflict_escalation_total` incrementado.
+- Alerta Prometheus: `CircuitBreakerAbierto` (severity critical) si `consecutive_conflicts ≥ 3`.
+
+**Reemplaza en UC-315:** `MetacognitiveMonitor._map_verdict()` (3 veredictos simples sin circuit breaker ni memoria de conflictos).
+
+---
+
+#### SP-322.5 — Reputación dinámica por episodio
+
+**Propósito:** Mantener un score de reputación por agente y dominio que se actualiza con cada resultado de ejecución, reemplazando pesos estáticos.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/reputation_system.py" />
+
+**Entradas:**
+- `agent_id`, `task_id`, `success` (bool), `quality` (0–1), `efficiency` (0–1), `domain`.
+
+**Fórmula de reputación:**
+
+```text
+success_rate    = success_count / total_episodes
+recent_penalty  = min(recent_failures, MAX_WINDOW) × PENALTY_RATE
+reputation      = BASE + W_s × success_rate + W_q × avg_quality + W_e × avg_efficiency
+                  - recent_penalty
+reputation      = clamp(reputation, 0.0, 1.0)
+```
+
+**Constantes por defecto:**
+
+| Constante | Valor | Descripción |
+|---|---|---|
+| `BASE_REPUTATION` | 0.50 | Reputación inicial / baseline |
+| `WEIGHT_SUCCESS` | 0.30 | Peso de tasa de éxito |
+| `WEIGHT_QUALITY` | 0.15 | Peso de calidad promedio |
+| `WEIGHT_EFFICIENCY` | 0.05 | Peso de eficiencia promedio |
+| `PENALTY_RECENT_FAILURES` | 0.10 | Penalización por fallo reciente |
+| `MAX_RECENT_FAILURES_WINDOW` | 5 | Ventana de fallos recientes |
+| `MAX_HISTORY` | 100 | Episodios máximos en historial |
+
+**Actividades:**
+
+| Paso | Método | Actividad | Salida |
+|---|---|---|---|
+| 1 | `register_agent()` | Crear `ReputationEntry` con baseline | Entrada registrada |
+| 2 | `record_episode()` | Registrar `EpisodeRecord`, recalcular counters y reputation | `float` (nueva reputación) |
+| 3 | `get_reputation()` | Obtener score actual por agente + dominio | `float` |
+| 4 | `weight_belief()` | Ponderar `AgentBelief.confidence × reputation` | `float` (peso para votación) |
+| 5 | `get_ranking()` | Top N agentes por dominio, ordenados por reputación | `List[Dict]` |
+
+**Salidas:**
+- `ReputationEntry` actualizada con historial de episodios.
+- `EpisodeRecord` persistido.
+
+**Aislamiento por dominio:** las reputaciones de trading y reservations son independientes. Un agente puede tener `rep=0.95` en trading y `rep=0.40` en reservations.
+
+---
+
+#### SP-322.6 — Detección de duplicados y deadlocks
+
+**Propósito:** Prevenir que dos agentes ejecuten la misma tarea y detectar ciclos de dependencia circular que impiden progreso.
+
+**Archivo clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/duplicate_detection.py" />
+
+**SP-322.6a — Detección de duplicados:**
+
+| Paso | Método | Actividad | Salida |
+|---|---|---|---|
+| 1 | `register_task()` | Normalizar descripción: lowercase, strip, collapse whitespace | `str` normalizado |
+| 2 | | SHA-256 del texto normalizado → fingerprint | `str` hash |
+| 3 | | Buscar fingerprint en tareas activas del mismo dominio | Match o None |
+| 4 | | Si match con otro `agent_id` → conflicto `DUPLICATE_WORK` | `Conflict` |
+| 5 | `complete_task()` | Marcar tarea como completada | `TaskRecord` actualizado |
+| 6 | `update_progress()` | Actualizar `last_progress_at` para evitar falso stall | Timestamp |
+
+**SP-322.6b — Detección de deadlocks:**
+
+| Paso | Método | Actividad | Salida |
+|---|---|---|---|
+| 1 | `set_waiting()` | Registrar `agent_id → waiting_for` en wait graph | Arista en grafo |
+| 2 | `detect_cycle()` | DFS desde cada nodo buscando back-edges | `DeadlockInfo(cycle, tasks)` o `None` |
+| 3 | `detect_stall()` | Buscar tareas activas sin progreso > `STALL_TIMEOUT_SECONDS` (30 s) | `List[Conflict]` |
+| 4 | `clear_waiting()` | Eliminar dependencia cuando tarea completa | Grafo limpio |
+
+**Constantes:**
+
+| Constante | Valor | Descripción |
+|---|---|---|
+| `SIMILARITY_THRESHOLD` | 0.85 | Umbral para considerar fingerprints similares |
+| `STALL_TIMEOUT_SECONDS` | 30.0 | Timeout sin progreso antes de reportar stall |
+
+---
+
+#### SP-322.7 — Circuit breaker y observabilidad
+
+**Propósito:** Proteger el sistema de cascadas de conflictos no resueltos y proveer visibilidad operacional completa.
+
+**Archivos clave:** <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/escalation_protocol.py" />, <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/observability.py" />
+
+**SP-322.7a — Circuit breaker:**
+
+| Estado | Condición | Efecto |
+|---|---|---|
+| `CLOSED` | `consecutive_conflicts < 3` | Operación normal |
+| `OPEN` | `consecutive_conflicts ≥ 3` | Todos los conflictos reciben `STOP` automático |
+| Reset | `POST /api/v1/escalation/circuit-breaker/reset` | Requiere intervención humana; `consecutive_conflicts = 0` |
+
+**SP-322.7b — Observabilidad:**
+
+| Componente | Implementación | Datos |
+|---|---|---|
+| **Métricas Prometheus** | `ObservabilityManager.inc_counter()` | `conflict_negotiation_total`, `conflict_voting_total`, `conflict_cnp_total`, `conflict_escalation_total` |
+| **Logs Loki** | `ObservabilityManager.log()` | `{timestamp, level, message, trace_id, agent_id, ...}` |
+| **Spans OpenTelemetry** | `ObservabilityManager.start_span()` / `end_span()` | `{trace_id, span_id, parent_span_id, operation, agent_id, duration, status}` |
+| **Histogramas** | `ObservabilityManager.observe_histogram()` | Latencia de resolución por nivel |
+| **Gauges** | `ObservabilityManager.set_gauge()` | Estado actual del circuit breaker |
+| **Exportación** | `GET /metrics` | Formato Prometheus text |
+| **Dashboard Grafana** | `grafana_dashboard.json` | 12 paneles: resolución por nivel, éxito, escalación, circuit breaker, conflictos/hora, reputación, trazas, duplicados, deadlocks, duración promedio |
+
+**Alertas Prometheus** (definidas en `alert_rules.yml`):
+
+| Alerta | Condición | Severidad |
+|---|---|---|
+| `CircuitBreakerAbierto` | Circuit breaker en estado OPEN | critical |
+| `EscalacionesFrecuentes` | > 5 escalaciones en 10 minutos | warning |
+| `NegociacionBajaExito` | < 30% de éxito en negociaciones (10 min) | warning |
+| `ConflictosAltos` | > 20 conflictos en 5 minutos | warning |
+| `DeadlockDetectado` | Deadlock reportado | critical |
+
+---
+
+### 12.3 Instructivos de trabajo
+
+#### IT-322.1 — Instructivo de operación normal
+
+**Rol:** Operador / Ingeniero de procesos  
+**Frecuencia:** Continua durante operación
+
+1. Verificar que UC-315 está activo: `curl http://localhost:5315/health`
+2. Iniciar UC-322:
+   ```bash
+   cd /Users/utron/Documents/code-books/TomoIII/UC-322/code
+   PYTHONPATH=../../UC-315/code python3 api_322.py
+   ```
+3. Verificar salud: `curl http://localhost:5322/health`
+4. Verificar que Prometheus está recolectando: `curl http://localhost:5322/metrics`
+5. Monitorear dashboard Grafana: panel "UC-322 Resolución de Conflictos".
+6. Revisar periódicamente el ranking de reputación:
+   ```bash
+   curl http://localhost:5322/api/v1/reputation/ranking?domain=trading
+   ```
+7. Verificar que el circuit breaker está cerrado:
+   ```bash
+   curl http://localhost:5322/api/v1/escalation/circuit-breaker
+   ```
+
+**Criterios de aceptación:**
+- Respuesta `200` en `/health`.
+- Circuit breaker en estado `closed`.
+- Métricas fluyendo a Prometheus.
+- Tasa de resolución > 70% en niveles 1-3 (sin necesidad de escalación).
+
+---
+
+#### IT-322.2 — Instructivo de resolución manual de conflictos
+
+**Rol:** Ingeniero de procesos / Supervisor  
+**Frecuencia:** Bajo demanda (cuando UC-322 escala con veredicto `REVIEW`)
+
+1. Consultar historial de escalaciones:
+   ```bash
+   curl http://localhost:5322/api/v1/escalation/history
+   ```
+2. Identificar conflictos con `verdict: "review"` y `requires_human_review: true`.
+3. Analizar el `reasoning` y las `beliefs` de cada agente involucrado.
+4. Decidir:
+   - **Aprobar propuesta A**: forzar resolución con agente A como ganador.
+   - **Aprobar propuesta B**: forzar resolución con agente B.
+   - **Rechazar ambas**: mantener estado bloqueado y escalar al orquestador.
+5. Registrar la decisión en el sistema de auditoría.
+6. Verificar que la reputación se actualizó correctamente tras la resolución.
+
+**Criterios de aceptación:**
+- Conflicto pasa de `REVIEW` a `RESOLVED` o `ABORTED`.
+- Episodio registrado en `ReputationSystem`.
+- Log en Loki con `trace_id` y decisión humana.
+
+---
+
+#### IT-322.3 — Instructivo de respuesta a circuit breaker abierto
+
+**Rol:** Ingeniero de procesos / SRE  
+**Frecuencia:** Evento crítico (alerta `CircuitBreakerAbierto`)
+
+1. **Recibir alerta** vía Grafana/Prometheus: `CircuitBreakerAbierto (critical)`.
+2. **Verificar estado**:
+   ```bash
+   curl http://localhost:5322/api/v1/escalation/circuit-breaker
+   # Respuesta: {"open": true, "consecutive_conflicts": 3}
+   ```
+3. **Analizar causa raíz**:
+   ```bash
+   curl "http://localhost:5322/api/v1/observability/logs?level=ERROR&limit=20"
+   curl http://localhost:5322/api/v1/escalation/history
+   ```
+4. **Identificar patrón**: ¿datos de mercado corruptos? ¿agente degradado? ¿configuración errónea?
+5. **Resolver causa raíz** antes de resetear (ej: corregir feed de datos, desregistrar agente, ajustar thresholds).
+6. **Resetear circuit breaker**:
+   ```bash
+   curl -X POST http://localhost:5322/api/v1/escalation/circuit-breaker/reset
+   # Respuesta: {"reset": true, "consecutive_conflicts": 0}
+   ```
+7. **Monitorear 15 minutos** para confirmar estabilidad.
+
+**Criterios de aceptación:**
+- Alerta se resuelve en Grafana.
+- `consecutive_conflicts` vuelve a 0.
+- No se abren nuevos conflictos en los 15 minutos siguientes.
+
+---
+
+#### IT-322.4 — Instructivo de registro y auditoría de reputación
+
+**Rol:** Auditor / Ingeniero de calidad  
+**Frecuencia:** Semanal o bajo demanda
+
+1. Exportar ranking completo por dominio:
+   ```bash
+   curl "http://localhost:5322/api/v1/reputation/ranking?domain=trading&top_n=50"
+   ```
+2. Para cada agente, verificar historial de episodios:
+   ```bash
+   curl http://localhost:5322/api/v1/reputation/<agent_id>?domain=trading
+   ```
+3. Verificar:
+   - ¿Algún agente tiene reputación < 0.30? → Candidato a desregistrar.
+   - ¿Algún agente tiene reputación > 0.95 sin fallos? → Verificar si tiene suficientes episodios (> 10).
+   - ¿Hay sesgo por dominio? → Comparar rankings trading vs reservations.
+4. Registrar hallazgos y recomendaciones.
+5. Si un agente debe desregistrarse, coordinar con el equipo de UC-315 (CNP).
+
+**Criterios de aceptación:**
+- Reporte de auditoría con ranking, historial y recomendaciones.
+- Agentes degradados identificados y acción correctiva planificada.
+
+---
+
+#### IT-322.5 — Instructivo de verificación de duplicados y deadlocks
+
+**Rol:** Ingeniero de procesos  
+**Frecuencia:** Diaria durante operación activa
+
+1. Verificar tareas activas:
+   ```bash
+   curl http://localhost:5322/api/v1/tasks/active
+   ```
+2. Verificar deadlocks:
+   ```bash
+   curl -X POST http://localhost:5322/api/v1/deadlock/check
+   ```
+3. Si hay deadlock:
+   - Identificar agentes en el ciclo (`cycle: ["A", "B", "A"]`).
+   - Decidir cuál agente liberar primero (menor reputación o menor prioridad).
+   - Cancelar la tarea del agente liberado.
+   - Verificar que el ciclo se rompió.
+4. Verificar duplicados antes de asignar tareas:
+   ```bash
+   curl -X POST http://localhost:5322/api/v1/duplicate/check \
+     -H "Content-Type: application/json" \
+     -d '{"task_id": "t1", "agent_id": "agent_a", "domain": "trading", "description": "Comprar 100 AAPL"}'
+   ```
+5. Si `duplicate: true`, cancelar la tarea duplicada.
+
+**Criterios de aceptación:**
+- Cero deadlocks activos al final de la jornada.
+- Cero tareas duplicadas activas.
+
+---
+
+#### IT-322.6 — Instructivo de pruebas y validación
+
+**Rol:** Ingeniero de calidad / DevOps  
+**Frecuencia:** Cada despliegue o cambio de configuración
+
+1. Ejecutar tests unitarios:
+   ```bash
+   cd /Users/utron/Documents/code-books/TomoIII/UC-322/code
+   python3 -m pytest tests_uc322/ -q --tb=short
+   # Esperado: 85 passed
+   ```
+2. Ejecutar validación de los 4 procesos operacionales:
+   ```bash
+   python3 validate_uc322.py
+   # Esperado: [OK] Todos los 4 procesos están funcionando correctamente.
+   ```
+3. Smoke test del API:
+   ```bash
+   PYTHONPATH=../../UC-315/code python3 api_322.py &
+   sleep 2
+   curl http://localhost:5322/health
+   curl http://localhost:5322/api/v1/schema
+   # Detener: kill %1
+   ```
+4. Verificar que las métricas se exportan:
+   ```bash
+   curl http://localhost:5322/metrics | grep conflict_
+   ```
+5. Registrar resultados en el checklist de despliegue.
+
+**Criterios de aceptación:**
+- 85/85 tests pasan.
+- validate_uc322.py retorna exit code 0.
+- API responde 200 en todos los endpoints.
+- Métricas Prometheus disponibles.
+
+---
+
+### 12.4 Plan de control UC-322
+
+| Variable | Método de control | Frecuencia | Responsable | Registro / Evidencia |
+|---|---|---|---|---|
+| Reputación por agente | `record_episode()` → recálculo automático | Cada episodio | `ReputationSystem` | `EpisodeRecord` + Prometheus |
+| Conflictos por nivel | Contadores Prometheus por nivel | Cada conflicto | `ObservabilityManager` | Grafana dashboard |
+| Circuit breaker | `consecutive_conflicts` ≥ 3 → OPEN | Continuo | `EscalationProtocol` | Alerta `CircuitBreakerAbierto` |
+| Deadlocks | DFS en wait graph | Cada resolución | `DeadlockDetector` | `DeadlockInfo` + Loki |
+| Duplicados | Fingerprint SHA-256 | Cada registro | `DuplicateDetection` | `TaskRecord` + Loki |
+| Latencia de resolución | `total_duration` en `ConflictResolutionResult` | Cada conflicto | `ConflictResolutionLayer` | Histograma Prometheus |
+| Tasa de escalación | Ratio `escalation_total / (total conflictos)` | Ventana 10 min | `ObservabilityManager` | Grafana panel |
+| Tasa de éxito negociación | Ratio `acuerdos / negociaciones` | Ventana 10 min | `ObservabilityManager` | Alerta `NegociacionBajaExito` |
+
+### 12.5 Plan de contingencia UC-322
+
+1. **Si circuit breaker se abre**: ejecutar IT-322.3 (análisis de causa raíz + reset manual).
+2. **Si deadlock detectado**: ejecutar IT-322.5 (identificar ciclo, liberar agente de menor reputación).
+3. **Si reputación de agente cae < 0.30**: alertar al equipo de UC-315 para evaluar desregistro del agente en CNP.
+4. **Si tasa de escalación > 50%**: revisar thresholds de negociación y votación; posible `agreement_threshold` demasiado bajo.
+5. **Si todos los niveles fallan repetidamente**: verificar calidad de datos de entrada (UC-315 perception pipeline).
+6. **Si API no responde**: reiniciar servicio UC-322 y verificar logs Loki para error de inicio.
+
+---
+
+### 12.6 Diagrama de flujo de la iteración principal con UC-322
+
+```text
+       Entorno
+          │
+          ▼
+   ┌──────────────┐
+   │  MP-01       │ CentralBrain.observe()
+   │  Percepción  │
+   └──────────────┘
+          │ snapshots
+          ▼
+   ┌──────────────┐
+   │  MP-02       │ GlobalWorkspace.build_workspace()
+   │  GWT         │ GlobalWorkspace.broadcast()
+   └──────────────┘
+          │ selected_hypothesis / broadcast
+          ▼
+   ┌──────────────┐
+   │  MP-03       │ MetacognitiveMonitor.observe_internal_state()
+   │  Monitor     │ → coherencia + veredicto
+   └──────────────┘
+          │ veredicto
+          ▼
+   ┌──────────────┐
+   │  MP-04       │ ReActReasonactToTBrain.predict()
+   │  ReAct + ToT │
+   └──────────────┘
+          │ predicción ask/bid
+          ▼
+   ┌──────────────┐
+   │  MP-05       │ BDI + Juice + Safety
+   │  Decisión    │ → propuestas de agentes
+   └──────────────┘
+          │ propuestas conflictivas
+          ▼
+   ┌─────────────────────────────────────────────────────────────┐
+   │                  MP-322 — UC-322                              │
+   │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌────────┐│
+   │  │ SP-322.1   │→ │ SP-322.2   │→ │ SP-322.3   │→ │SP-322.4││
+   │  │ Negociación│  │ Votación   │  │ CNP        │  │Escalac.││
+   │  └────────────┘  └────────────┘  └────────────┘  └────────┘│
+   │  + SP-322.5 Reputación  + SP-322.6 Dup/Deadlock  + SP-322.7│
+   └─────────────────────────────────────────────────────────────┘
+          │ resolución + veredicto (evidencia)
+          ▼
+   ┌──────────────┐
+   │  UC-324      │ PRE / EXEC / POST gates
+   │  Contención  │ → autorización de acción
+   └──────────────┘
+          │ acción autorizada
+          ▼
+   ┌──────────────┐
+   │  UC-317      │ AgentKernel
+   │  Ejecución   │ LLM + Tools + Memory + Scheduler
+   └──────────────┘
+          │ resultado
+          ▼
+   ┌──────────────┐
+   │  MP-06       │ ExchangeSimulator / WorldModel
+   │  Feedback    │ → observaciones → SP-322.5 (reputación)
+   └──────────────┘
+          │
+          ▼
+   ┌──────────────┐
+   │  MP-08/09    │ Autoevaluación + Plasticidad
+   └──────────────┘
+          │
+          ▼
+   ┌──────────────┐
+   │  MP-12       │ SelfAwarenessLoop
+   │  Narrativa   │
+   └──────────────┘
+          │
+          ▼
+   [Retorno al Entorno]
+```
+
+---
+
+### 12.7 API REST UC-322
+
+Servicio en `http://localhost:5322`. Archivo: <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/api_322.py" />
+
+| Método | Endpoint | Subproceso | Descripción |
+|---|---|---|---|
+| GET | `/health` | — | Estado del servicio |
+| GET | `/api/v1/schema` | — | Schemas de entrada/salida (INPUT_CARDS/OUTPUT_CARDS) |
+| GET | `/` | — | Información del servicio y lista de endpoints |
+| POST | `/api/v1/conflicts/resolve` | SP-322.1–4 | Resuelve un conflicto entre agentes |
+| POST | `/api/v1/reputation/record` | SP-322.5 | Registra episodio y actualiza reputación |
+| GET | `/api/v1/reputation/ranking` | SP-322.5 | Ranking de agentes por dominio |
+| GET | `/api/v1/reputation/<agent_id>` | SP-322.5 | Reputación de un agente específico |
+| POST | `/api/v1/duplicate/check` | SP-322.6 | Verifica si tarea es duplicado |
+| POST | `/api/v1/deadlock/check` | SP-322.6 | Verifica deadlocks en wait graph |
+| GET | `/api/v1/conflicts/history` | MP-322 | Historial de resoluciones |
+| GET | `/api/v1/escalation/history` | SP-322.4 | Historial de escalaciones |
+| GET | `/api/v1/escalation/circuit-breaker` | SP-322.7 | Estado del circuit breaker |
+| POST | `/api/v1/escalation/circuit-breaker/reset` | SP-322.7 | Resetear circuit breaker |
+| GET | `/api/v1/observability/summary` | SP-322.7 | Resumen de métricas, logs y trazas |
+| GET | `/api/v1/observability/logs` | SP-322.7 | Logs estructurados (filtrable por level, trace_id) |
+| GET | `/api/v1/observability/spans` | SP-322.7 | Trazas/spans |
+| GET | `/metrics` | SP-322.7 | Exportación Prometheus |
+| GET | `/api/v1/tasks/active` | SP-322.6 | Tareas activas registradas |
+
+---
+
+### 12.8 CLI y comandos
+
+```bash
+cd /Users/utron/Documents/code-books/TomoIII/UC-322/code
+
+# Tests (no requiere PYTHONPATH — módulos UC-322 son independientes)
+python3 -m pytest tests_uc322/ -q --tb=short
+
+# Validación de los 4 procesos operacionales
+python3 validate_uc322.py
+
+# Demo CLI del sistema de resolución de conflictos
+PYTHONPATH=../../UC-315/code python3 UC-322.py
+
+# Servidor API REST (puerto 5322)
+PYTHONPATH=../../UC-315/code python3 api_322.py
+```
+
+---
+
+### 12.9 Estructura de archivos UC-322
+
+```text
+UC-322/code/
+├── _import_paths.py             # Helper: agrega UC-315/code al sys.path
+├── UC-322.py                    # ConflictResolutionLayer + demo CLI
+├── uc322.py                     # Wrapper para importación (guión en nombre)
+├── api_322.py                   # API REST Flask (18 endpoints)
+├── conflict_models.py           # 5 enums + 10 dataclasses
+├── reputation_system.py         # ReputationSystem + EpisodeRecord + ReputationEntry
+├── negotiation_engine.py        # NegotiationEngine + NegotiationConfig
+├── voting_system.py             # VotingSystem + VotingConfig
+├── cnp_dynamic.py               # DynamicCNP + CNPConfig
+├── escalation_protocol.py       # EscalationProtocol + EscalationConfig
+├── duplicate_detection.py       # DuplicateDetection + DeadlockDetector
+├── observability.py             # ObservabilityManager (Prometheus/Loki/Spans)
+├── agent_validation_engine.py   # Motor de validación de agentes
+├── validate_uc322.py            # Validación operacional (4 categorías)
+├── generate_brain_image.py      # Generador del diagrama de arquitectura
+├── notes.md                     # Notas de diseño: impacto en el cerebro AGI
+├── prometheus.yml               # Configuración Prometheus
+├── loki-config.yml              # Configuración Loki
+├── alert_rules.yml              # 5 reglas de alertas
+├── grafana_dashboard.json       # 12 paneles de dashboard
+└── tests_uc322/
+    ├── __init__.py
+    └── test_uc322.py            # 85 tests unitarios + integración + API
+```
+
+---
+
+### 12.10 Referencias UC-322
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/UC-322.md" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/_import_paths.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/UC-322.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/uc322.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/api_322.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/conflict_models.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/reputation_system.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/negotiation_engine.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/voting_system.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/cnp_dynamic.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/escalation_protocol.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/duplicate_detection.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/observability.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/validate_uc322.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/prometheus.yml" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/alert_rules.yml" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/grafana_dashboard.json" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/tests_uc322/test_uc322.py" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/code/notes.md" />
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-322/agi_brain_architecture.png" />
+
+### Cerebro AGI (UC-315 — referenciado, no copiado)
+
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/juice_agents.py" /> — `_local_validate()` reemplazado por SP-322.1
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/trading_agents.py" /> — pesos estáticos reemplazados por SP-322.2
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/cnp_broadcast_middleware.py" /> — `reliability` estático reemplazado por SP-322.3
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/metacognitive_monitor.py" /> — `_map_verdict()` reemplazado por SP-322.4
+- <ref_file file="/Users/utron/Documents/code-books/TomoIII/UC-315/code/global_workspace.py" /> — detección de duplicados agregada por SP-322.6
