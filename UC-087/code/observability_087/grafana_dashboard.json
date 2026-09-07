@@ -1,0 +1,207 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "uc087_mlsecops-security",
+    "title": "UC-087 uc087_mlsecops \u2014 MLSecOps Security",
+    "tags": [
+      "uc-087",
+      "mlsecops",
+      "adversarial",
+      "agi"
+    ],
+    "timezone": "UTC",
+    "schemaVersion": 36,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Batches procesados vs rechazados",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(mlsecops_batches_processed_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "processed"
+          },
+          {
+            "expr": "sum(rate(mlsecops_batches_rejected_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "rejected"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Ataques detectados por categor\u00eda",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(mlsecops_threat_data_poisoning_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "data_poisoning"
+          },
+          {
+            "expr": "sum(rate(mlsecops_threat_backdoor_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "backdoor"
+          },
+          {
+            "expr": "sum(rate(mlsecops_threat_adversarial_example_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "adversarial"
+          },
+          {
+            "expr": "sum(rate(mlsecops_threat_model_manipulation_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "model_manipulation"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Robustness gap (\u00faltimo valor)",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "mlsecops_last_robustness_gap{pipeline=\"uc087_mlsecops\"}",
+            "legendFormat": "robustness_gap"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {
+                  "value": 0.0,
+                  "color": "green"
+                },
+                {
+                  "value": 0.15,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Alertas por severidad",
+        "type": "piechart",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "sum by (severity) (mlsecops_alerts_total{pipeline=\"uc087_mlsecops\"})",
+            "legendFormat": "{{severity}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Versiones de modelo (promoted / rejected / canary)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "mlsecops_model_versions_promoted{pipeline=\"uc087_mlsecops\"}",
+            "legendFormat": "promoted"
+          },
+          {
+            "expr": "mlsecops_model_versions_rejected{pipeline=\"uc087_mlsecops\"}",
+            "legendFormat": "rejected"
+          },
+          {
+            "expr": "mlsecops_model_versions_canary{pipeline=\"uc087_mlsecops\"}",
+            "legendFormat": "canary"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Entradas adversariales detectadas (feature squeezing)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(mlsecops_squeezed_differences_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "squeezing_mismatches"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Rollbacks ejecutados",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "sum(rate(mlsecops_rollbacks_total{pipeline=\"uc087_mlsecops\"}[5m]))",
+            "legendFormat": "rollbacks"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Latencia del guardian (ms)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "mlsecops_guardian_duration_ms{pipeline=\"uc087_mlsecops\"}",
+            "legendFormat": "duration"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "pipeline",
+          "type": "constant",
+          "current": {
+            "value": "uc087_mlsecops",
+            "text": "uc087_mlsecops"
+          }
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

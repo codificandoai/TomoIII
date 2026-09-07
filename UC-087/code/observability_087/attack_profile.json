@@ -1,0 +1,32 @@
+{
+  "pipeline": "uc087_mlsecops",
+  "threat_categories": [
+    "data_poisoning",
+    "backdoor",
+    "adversarial_example",
+    "model_manipulation",
+    "artifact_tampering"
+  ],
+  "metrics": [
+    "mlsecops_batches_processed_total",
+    "mlsecops_batches_rejected_total",
+    "mlsecops_batches_approved_total",
+    "mlsecops_models_rejected_total",
+    "mlsecops_models_approved_total",
+    "mlsecops_rollbacks_total",
+    "mlsecops_last_robustness_gap",
+    "mlsecops_threat_data_poisoning_total",
+    "mlsecops_threat_backdoor_total",
+    "mlsecops_threat_adversarial_example_total",
+    "mlsecops_threat_model_manipulation_total",
+    "mlsecops_threat_artifact_tampering_total",
+    "mlsecops_squeezed_differences_total",
+    "mlsecops_guardian_duration_ms"
+  ],
+  "logs": {
+    "service_name": "uc087_mlsecops",
+    "level_key": "level",
+    "message_key": "message",
+    "trace_id_key": "trace_id"
+  }
+}

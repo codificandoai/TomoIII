@@ -1,0 +1,80 @@
+groups:
+  - name: uc087_mlsecops_alerts
+    interval: 30s
+    rules:
+      - alert: MLSecOpsDataPoisoningDetected
+        expr: increase(mlsecops_threat_data_poisoning_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Data poisoning detectado en { $labels.pipeline }"
+          description: "Se detectó un intento de envenenamiento de datos de entrenamiento."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/data_poisoning"
+
+      - alert: MLSecOpsBackdoorDetected
+        expr: increase(mlsecops_threat_backdoor_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Backdoor detectado en { $labels.pipeline }"
+          description: "Se detectó una caída de performance en un slice, posible backdoor."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/backdoor"
+
+      - alert: MLSecOpsAdversarialAttack
+        expr: increase(mlsecops_threat_adversarial_example_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P2
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Ataque adversarial detectado en { $labels.pipeline }"
+          description: "Feature squeezing o robustness gap indica entrada adversarial."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/adversarial_example"
+
+      - alert: MLSecOpsModelRejected
+        expr: increase(mlsecops_models_rejected_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P2
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Modelo rechazado por seguridad en { $labels.pipeline }"
+          description: "Un modelo candidato o externo no pasó los gates de seguridad."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/model_rejected"
+
+      - alert: MLSecOpsRollbackExecuted
+        expr: increase(mlsecops_rollbacks_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Rollback ejecutado en { $labels.pipeline }"
+          description: "Se revirtió a una versión de modelo segura tras anomalía."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/rollback"
+
+      - alert: MLSecOpsProvenanceFailed
+        expr: increase(mlsecops_batches_rejected_total{pipeline="uc087_mlsecops"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Provenance falló en { $labels.pipeline }"
+          description: "Hash, firma o fuente de datos de entrenamiento no válida."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/provenance_failed"
+
+      - alert: MLSecOpsRobustnessGapHigh
+        expr: mlsecops_last_robustness_gap{pipeline="uc087_mlsecops"} > 0.15
+        for: 0m
+        labels:
+          severity: P2
+          pipeline: uc087_mlsecops
+        annotations:
+          summary: "Brecha de robustez alta en { $labels.pipeline }"
+          description: "Clean accuracy vs adversarial accuracy excede el umbral configurado."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/adversarial_example"

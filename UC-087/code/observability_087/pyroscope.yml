@@ -1,0 +1,15 @@
+server:
+  http_listen_port: 4040
+
+scrape_configs:
+  - job_name: 'uc087_mlsecops'
+    static_configs:
+      - targets: ['localhost:5050']
+    profiling_config:
+      pprof_config:
+        memory:
+          enabled: true
+        cpu:
+          enabled: true
+        goroutine:
+          enabled: true

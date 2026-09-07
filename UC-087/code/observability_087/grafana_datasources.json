@@ -1,0 +1,28 @@
+{
+  "datasources": [
+    {
+      "name": "Prometheus-MLSecOps",
+      "type": "prometheus",
+      "access": "proxy",
+      "url": "http://prometheus:9090"
+    },
+    {
+      "name": "Loki-MLSecOps",
+      "type": "loki",
+      "access": "proxy",
+      "url": "http://loki:3100"
+    },
+    {
+      "name": "Jaeger-MLSecOps",
+      "type": "jaeger",
+      "access": "proxy",
+      "url": "http://jaeger:16686"
+    },
+    {
+      "name": "Pyroscope-MLSecOps",
+      "type": "pyroscope",
+      "access": "proxy",
+      "url": "http://pyroscope:4040"
+    }
+  ]
+}

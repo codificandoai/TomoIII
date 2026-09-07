@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Ataques adversariales detectados",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"Amenaza detectada\" or \"adversarial\""
+  },
+  {
+    "name": "Backdoors / triggers",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"backdoor\" or \"trigger\""
+  },
+  {
+    "name": "Data poisoning / provenance",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"provenance\" or \"poisoning\""
+  },
+  {
+    "name": "Modelos rechazados",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"rechazado\" or \"rejected\""
+  },
+  {
+    "name": "Rollbacks",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"Rollback ejecutado\""
+  },
+  {
+    "name": "Decisiones del guardian",
+    "query": "{pipeline=\"uc087_mlsecops\",component=\"uc087_mlsecops\"} |= \"decision_id\""
+  }
+]
