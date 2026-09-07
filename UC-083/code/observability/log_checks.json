@@ -1,0 +1,30 @@
+[
+  {
+    "name": "OOM_Killed",
+    "pattern": "Killed process|Out of memory|OOM",
+    "severity": "P1",
+    "source": [
+      "stdout",
+      "stderr"
+    ],
+    "pipeline": "trackprice_batch_inference"
+  },
+  {
+    "name": "Worker_Terminated",
+    "pattern": "worker terminated|worker died|exit code",
+    "severity": "P1",
+    "source": [
+      "orchestrator"
+    ],
+    "pipeline": "trackprice_batch_inference"
+  },
+  {
+    "name": "Validation_Failed",
+    "pattern": "VOLUMEN EXCESO|schema drift|validation failed",
+    "severity": "P1",
+    "source": [
+      "orchestrator"
+    ],
+    "pipeline": "trackprice_batch_inference"
+  }
+]

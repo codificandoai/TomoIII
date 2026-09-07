@@ -1,0 +1,27 @@
+[
+  {
+    "name": "OOM Killed",
+    "query": "{job=\"trackprice_batch_inference\"} |= \"Killed process\" or \"Out of memory\" or \"OOM\"",
+    "description": "Workers terminados por OOM"
+  },
+  {
+    "name": "Worker Terminated",
+    "query": "{job=\"trackprice_batch_inference\",source=\"orchestrator\"} |= \"worker terminated\" or \"worker died\" or \"exit code\"",
+    "description": "Workers detenidos por el orquestador"
+  },
+  {
+    "name": "Validation Failed",
+    "query": "{job=\"trackprice_batch_inference\",source=\"orchestrator\"} |= \"VOLUMEN EXCESO\" or \"schema drift\" or \"validation failed\"",
+    "description": "Fallos de validaci\u00f3n de datos"
+  },
+  {
+    "name": "Pipeline Start/End",
+    "query": "{job=\"trackprice_batch_inference\",source=\"orchestrator\"} |= \"Pipeline started\" or \"Pipeline completed\" or \"Pipeline failed\"",
+    "description": "Inicio y fin de jobs"
+  },
+  {
+    "name": "Errors by Trace ID",
+    "query": "{job=\"trackprice_batch_inference\"} |= \"ERROR\" | json trace_id=\"trace_id\"",
+    "description": "Errores agrupables por trace_id"
+  }
+]

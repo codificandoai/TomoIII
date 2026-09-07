@@ -1,0 +1,332 @@
+{
+  "trackprice_nightly_inference_chunk_0000.csv": {
+    "checkpoint_id": "ae9d359d-e18",
+    "partition_id": "trackprice_nightly_inference_chunk_0000.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819463.447853,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0000.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0001.csv": {
+    "checkpoint_id": "1647cf47-851",
+    "partition_id": "trackprice_nightly_inference_chunk_0001.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819463.448832,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0001.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0002.csv": {
+    "checkpoint_id": "83ee2d72-d1f",
+    "partition_id": "trackprice_nightly_inference_chunk_0002.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819463.952245,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0002.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0003.csv": {
+    "checkpoint_id": "9a1e6c33-781",
+    "partition_id": "trackprice_nightly_inference_chunk_0003.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819463.952181,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0003.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0005.csv": {
+    "checkpoint_id": "369e4b87-cc2",
+    "partition_id": "trackprice_nightly_inference_chunk_0005.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819464.459143,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0005.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0004.csv": {
+    "checkpoint_id": "44bd53ac-eb9",
+    "partition_id": "trackprice_nightly_inference_chunk_0004.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819464.459009,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0004.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0006.csv": {
+    "checkpoint_id": "92a83472-253",
+    "partition_id": "trackprice_nightly_inference_chunk_0006.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819464.967017,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0006.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0007.csv": {
+    "checkpoint_id": "7c4715f5-b09",
+    "partition_id": "trackprice_nightly_inference_chunk_0007.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819464.967094,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0007.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0008.csv": {
+    "checkpoint_id": "81d7e27a-e68",
+    "partition_id": "trackprice_nightly_inference_chunk_0008.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819465.469943,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0008.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0009.csv": {
+    "checkpoint_id": "9d072b5c-a2c",
+    "partition_id": "trackprice_nightly_inference_chunk_0009.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819465.4698482,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0009.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0010.csv": {
+    "checkpoint_id": "3d4c8895-abe",
+    "partition_id": "trackprice_nightly_inference_chunk_0010.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819465.973456,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0010.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0011.csv": {
+    "checkpoint_id": "f65cfce6-b53",
+    "partition_id": "trackprice_nightly_inference_chunk_0011.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819465.973741,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0011.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0012.csv": {
+    "checkpoint_id": "37cd7f15-51a",
+    "partition_id": "trackprice_nightly_inference_chunk_0012.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819466.477943,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0012.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0013.csv": {
+    "checkpoint_id": "916ae29d-d76",
+    "partition_id": "trackprice_nightly_inference_chunk_0013.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819466.481791,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0013.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0014.csv": {
+    "checkpoint_id": "4c620f69-1f4",
+    "partition_id": "trackprice_nightly_inference_chunk_0014.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819466.985654,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0014.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0015.csv": {
+    "checkpoint_id": "dff406ac-03c",
+    "partition_id": "trackprice_nightly_inference_chunk_0015.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819466.986249,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0015.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0016.csv": {
+    "checkpoint_id": "0ac279a3-9ec",
+    "partition_id": "trackprice_nightly_inference_chunk_0016.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819467.488843,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0016.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0017.csv": {
+    "checkpoint_id": "ad13cb8a-6d3",
+    "partition_id": "trackprice_nightly_inference_chunk_0017.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819467.491199,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0017.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0018.csv": {
+    "checkpoint_id": "0c61b66c-48b",
+    "partition_id": "trackprice_nightly_inference_chunk_0018.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819467.9939892,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0018.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0019.csv": {
+    "checkpoint_id": "0f8aa9ca-d1f",
+    "partition_id": "trackprice_nightly_inference_chunk_0019.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819467.9941592,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0019.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0020.csv": {
+    "checkpoint_id": "16985b44-a1c",
+    "partition_id": "trackprice_nightly_inference_chunk_0020.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819468.5019982,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0020.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0021.csv": {
+    "checkpoint_id": "55508e5e-5e2",
+    "partition_id": "trackprice_nightly_inference_chunk_0021.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819468.501842,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0021.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0022.csv": {
+    "checkpoint_id": "f59b4a74-1ca",
+    "partition_id": "trackprice_nightly_inference_chunk_0022.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819469.0068219,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0022.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0023.csv": {
+    "checkpoint_id": "6be03a9a-016",
+    "partition_id": "trackprice_nightly_inference_chunk_0023.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819469.006902,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0023.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0024.csv": {
+    "checkpoint_id": "dfdb7dfc-c6e",
+    "partition_id": "trackprice_nightly_inference_chunk_0024.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819469.5094981,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0024.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0025.csv": {
+    "checkpoint_id": "12c61a26-76a",
+    "partition_id": "trackprice_nightly_inference_chunk_0025.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819469.513269,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0025.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0027.csv": {
+    "checkpoint_id": "a578d7db-524",
+    "partition_id": "trackprice_nightly_inference_chunk_0027.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819470.015102,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0027.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0026.csv": {
+    "checkpoint_id": "f5215be2-84c",
+    "partition_id": "trackprice_nightly_inference_chunk_0026.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819470.016296,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0026.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0029.csv": {
+    "checkpoint_id": "1114f1ab-7c0",
+    "partition_id": "trackprice_nightly_inference_chunk_0029.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819470.5202408,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0029.csv",
+      "status": "ok"
+    }
+  },
+  "trackprice_nightly_inference_chunk_0028.csv": {
+    "checkpoint_id": "95a28744-25e",
+    "partition_id": "trackprice_nightly_inference_chunk_0028.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819470.520628,
+    "metadata": {
+      "chunk": "trackprice_nightly_inference_chunk_0028.csv",
+      "status": "ok"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "stats_sinks": [
+    {
+      "name": "envoy.stat_sinks.statsd",
+      "typed_config": {
+        "@type": "type.googleapis.com/envoy.config.metrics.v3.StatsdSink",
+        "address": {
+          "socket_address": {
+            "address": "statsd-exporter",
+            "port_value": 9125
+          }
+        }
+      }
+    }
+  ],
+  "stats_config": {
+    "stats_tags": [
+      {
+        "tag_name": "pipeline",
+        "fixed_value": "trackprice_batch_inference"
+      }
+    ]
+  }
+}

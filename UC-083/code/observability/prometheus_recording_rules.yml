@@ -1,0 +1,24 @@
+groups:
+  - name: trackprice_batch_inference_recording
+    interval: 1m
+    rules:
+      - record: batch_job:success_rate_5m
+        expr: |
+          sum(rate(batch_job_status{job="trackprice_batch_inference",status="success"}[5m]))
+          /
+          sum(rate(batch_job_status{job="trackprice_batch_inference"}[5m]))
+
+      - record: batch_worker:oom_rate_5m
+        expr: sum(rate(oom_killed_total{job="trackprice_batch_inference"}[5m]))
+
+      - record: batch_worker:restart_rate_5m
+        expr: sum(rate(worker_restarts_total{job="trackprice_batch_inference"}[5m]))
+
+      - record: batch_input:volume_zscore_1d
+        expr: |
+          (
+            batch_input_rows{job="trackprice_batch_inference"}
+            - avg_over_time(batch_input_rows{job="trackprice_batch_inference"}[1d])
+          )
+          /
+          stddev_over_time(batch_input_rows{job="trackprice_batch_inference"}[1d])

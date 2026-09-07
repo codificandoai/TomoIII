@@ -1,0 +1,190 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "uc-083-trackprice_batch_inference",
+    "title": "UC-083 trackprice_batch_inference \u2014 Resiliencia Batch",
+    "tags": [
+      "uc-083",
+      "batch",
+      "mlops",
+      "trackprice"
+    ],
+    "timezone": "UTC",
+    "schemaVersion": 36,
+    "refresh": "30s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Uso de memoria (%)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "memory_usage_percent{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "memory"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "value": 90.0,
+                  "color": "red"
+                }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Uso de CPU (%)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 0
+        },
+        "targets": [
+          {
+            "expr": "cpu_usage_percent{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "cpu"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Duraci\u00f3n del job (min)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "batch_job_duration_minutes{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "duration"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Volumen de entrada (filas)",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 8
+        },
+        "targets": [
+          {
+            "expr": "batch_input_rows{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "input rows"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Checkpoints completados / fallidos",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "sum(checkpoints_completed{job=\"trackprice_batch_inference\"})",
+            "legendFormat": "completed"
+          },
+          {
+            "expr": "sum(checkpoints_failed{job=\"trackprice_batch_inference\"})",
+            "legendFormat": "failed"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Tasa de \u00e9xito del job (5m)",
+        "type": "stat",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 16
+        },
+        "targets": [
+          {
+            "expr": "batch_job:success_rate_5m{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "success rate"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Reinicios y OOM de workers",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "batch_worker:oom_rate_5m{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "OOM rate"
+          },
+          {
+            "expr": "batch_worker:restart_rate_5m{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "restart rate"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Z-score volumen de entrada",
+        "type": "timeseries",
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 24
+        },
+        "targets": [
+          {
+            "expr": "batch_input:volume_zscore_1d{job=\"trackprice_batch_inference\"}",
+            "legendFormat": "z-score"
+          }
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "pipeline",
+          "type": "constant",
+          "current": {
+            "value": "trackprice_batch_inference",
+            "text": "trackprice_batch_inference"
+          }
+        }
+      ]
+    }
+  },
+  "overwrite": true
+}

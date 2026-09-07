@@ -1,0 +1,65 @@
+groups:
+  - name: trackprice_batch_inference_alerts
+    interval: 30s
+    rules:
+      - alert: BatchInferenceMemoryPressure
+        expr: memory_usage_percent{job="trackprice_batch_inference"} >= 90.0
+        for: 2m
+        labels:
+          severity: P1
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Presión de memoria en trackprice_batch_inference"
+          description: "El uso de memoria ha estado >= 90.0% por 2 minutos."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/out_of_memory"
+
+      - alert: BatchInferenceCPUPressure
+        expr: cpu_usage_percent{job="trackprice_batch_inference"} >= 90.0
+        for: 5m
+        labels:
+          severity: P2
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Presión de CPU en trackprice_batch_inference"
+          description: "El uso de CPU ha estado >= 90.0% por 5 minutos."
+
+      - alert: BatchInferenceDurationExceeded
+        expr: batch_job_duration_minutes{job="trackprice_batch_inference"} > 120.0
+        for: 0m
+        labels:
+          severity: P2
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Duración de job excedida en trackprice_batch_inference"
+          description: "El job lleva más de 120.0 minutos."
+
+      - alert: BatchInferenceInputVolumeAnomaly
+        expr: abs((batch_input_rows - avg_over_time(batch_input_rows[1d])) / stddev_over_time(batch_input_rows[1d])) > 3.0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Anomalía de volumen de entrada en trackprice_batch_inference"
+          description: "El volumen de entrada se desvía más de 3.0 desviaciones estándar del promedio diario."
+
+      - alert: BatchInferenceValidationFailed
+        expr: increase(batch_validation_failures{job="trackprice_batch_inference"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: P1
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Validación de datos falló en trackprice_batch_inference"
+          description: "Se detectó al menos un fallo de validación en los últimos 5 minutos."
+
+      - alert: BatchInferenceCheckpointsFailed
+        expr: rate(checkpoints_failed{job="trackprice_batch_inference"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: P1
+          pipeline: trackprice_batch_inference
+        annotations:
+          summary: "Checkpoints fallando en trackprice_batch_inference"
+          description: "Se detectaron checkpoints fallidos; requiere revisión del reprocesamiento."
+          runbook_url: "https://wiki.trackprice.ai/runbooks/infrastructure"

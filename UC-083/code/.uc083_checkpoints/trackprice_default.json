@@ -1,0 +1,13 @@
+{
+  "trackprice_default_chunk_0000.csv": {
+    "checkpoint_id": "9d1495f9-374",
+    "partition_id": "trackprice_default_chunk_0000.csv",
+    "status": "completed",
+    "records_processed": 500,
+    "timestamp": 1788819461.096755,
+    "metadata": {
+      "chunk": "trackprice_default_chunk_0000.csv",
+      "status": "ok"
+    }
+  }
+}

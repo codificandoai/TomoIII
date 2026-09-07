@@ -1,0 +1,13 @@
+{
+  "test_reprocess_chunk_0000.csv": {
+    "checkpoint_id": "b6d9c511-154",
+    "partition_id": "test_reprocess_chunk_0000.csv",
+    "status": "completed",
+    "records_processed": 200,
+    "timestamp": 1788819441.244071,
+    "metadata": {
+      "chunk": "test_reprocess_chunk_0000.csv",
+      "status": "ok"
+    }
+  }
+}

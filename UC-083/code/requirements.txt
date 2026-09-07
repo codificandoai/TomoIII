@@ -1,0 +1,5 @@
+# UC-083 — Dependencias
+flask>=2.3.0
+pytest>=7.0.0
+# Opcionales (para integración con observabilidad avanzada)
+# prometheus_client>=0.17.0
