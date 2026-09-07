@@ -1,0 +1,169 @@
+{
+  "dashboard": {
+    "title": "UC-322 Conflict Resolution — Multi-Agent Monitoring",
+    "tags": ["uc-322", "multiagent", "conflict-resolution", "utron"],
+    "timezone": "browser",
+    "schemaVersion": 39,
+    "version": 1,
+    "refresh": "5s",
+    "time": {
+      "from": "now-15m",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Conflictos por Nivel de Resolución",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {"expr": "sum(rate(conflict_negotiation_total[5m]))", "legendFormat": "Nivel 1: Negociación"},
+          {"expr": "sum(rate(conflict_voting_total[5m]))", "legendFormat": "Nivel 2: Votación"},
+          {"expr": "sum(rate(conflict_cnp_total[5m]))", "legendFormat": "Nivel 3: CNP"},
+          {"expr": "sum(rate(conflict_escalation_total[5m]))", "legendFormat": "Nivel 4: Escalación"}
+        ],
+        "fieldConfig": {
+          "defaults": {"unit": "ops", "thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "yellow", "value": 5},
+            {"color": "red", "value": 10}
+          ]}}
+        }
+      },
+      {
+        "id": 2,
+        "title": "Tasa de Éxito por Nivel",
+        "type": "gauge",
+        "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {"expr": "sum(rate(conflict_negotiation_total{result=\"agreement\"}[5m])) / clamp_min(sum(rate(conflict_negotiation_total[5m])), 1)", "legendFormat": "Negociación"},
+          {"expr": "sum(rate(conflict_voting_total{result=\"consensus\"}[5m])) / clamp_min(sum(rate(conflict_voting_total[5m])), 1)", "legendFormat": "Votación"},
+          {"expr": "sum(rate(conflict_cnp_total{result=\"winner\"}[5m])) / clamp_min(sum(rate(conflict_cnp_total[5m])), 1)", "legendFormat": "CNP"}
+        ],
+        "fieldConfig": {
+          "defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [
+            {"color": "red", "value": null},
+            {"color": "yellow", "value": 0.5},
+            {"color": "green", "value": 0.7}
+          ]}}
+        }
+      },
+      {
+        "id": 3,
+        "title": "Veredictos de Escalación",
+        "type": "piechart",
+        "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+        "targets": [
+          {"expr": "sum(conflict_escalation_total{verdict=\"proceed\"})", "legendFormat": "PROCEED"},
+          {"expr": "sum(conflict_escalation_total{verdict=\"review\"})", "legendFormat": "REVIEW"},
+          {"expr": "sum(conflict_escalation_total{verdict=\"stop\"})", "legendFormat": "STOP"},
+          {"expr": "sum(conflict_escalation_total{verdict=\"reassign\"})", "legendFormat": "REASSIGN"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Circuit Breaker Status",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+        "targets": [
+          {"expr": "sum(conflict_escalation_total{verdict=\"stop\"})", "legendFormat": "STOP emitidos"}
+        ],
+        "fieldConfig": {
+          "defaults": {"thresholds": {"mode": "absolute", "steps": [
+            {"color": "green", "value": null},
+            {"color": "red", "value": 1}
+          ]}}
+        }
+      },
+      {
+        "id": 5,
+        "title": "Conflictos por Tiempo (5m rate)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {"expr": "sum(rate(conflict_negotiation_total[5m]))", "legendFormat": "Nivel 1: Negociación"},
+          {"expr": "sum(rate(conflict_voting_total[5m]))", "legendFormat": "Nivel 2: Votación"},
+          {"expr": "sum(rate(conflict_cnp_total[5m]))", "legendFormat": "Nivel 3: CNP"},
+          {"expr": "sum(rate(conflict_escalation_total[5m]))", "legendFormat": "Nivel 4: Escalación"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "ops"}}
+      },
+      {
+        "id": 6,
+        "title": "Logs de Negociación (Loki)",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {"expr": "{job=\"uc322\"} |= \"conflict\" | json | level != \"DEBUG\"", "datasource": {"type": "loki", "uid": "loki"}}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Ranking de Reputación por Agente",
+        "type": "bargauge",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+        "targets": [
+          {"expr": "agent_reputation", "legendFormat": "{{agent_id}}"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}}
+      },
+      {
+        "id": 8,
+        "title": "Trazas de Resolución (Tempo)",
+        "type": "table",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+        "targets": [
+          {"expr": "sum by (trace_id) (rate(conflict_negotiation_total[5m]))", "legendFormat": "{{trace_id}}"}
+        ],
+        "transformations": [
+          {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true}}}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Deadlocks y Trabajo Duplicado",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 22},
+        "targets": [
+          {"expr": "sum(conflict_escalation_total{verdict=\"stop\"})", "legendFormat": "Deadlocks"},
+          {"expr": "sum(rate(conflict_negotiation_total[10m]))", "legendFormat": "Duplicados/min"}
+        ],
+        "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [
+          {"color": "green", "value": null},
+          {"color": "red", "value": 1}
+        ]}}}
+      },
+      {
+        "id": 10,
+        "title": "Duración Promedio de Resolución",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 22},
+        "targets": [
+          {"expr": "rate(conflict_resolution_duration_seconds_sum[5m]) / clamp_min(rate(conflict_resolution_duration_seconds_count[5m]), 1)", "legendFormat": "Duración promedio (s)"}
+        ],
+        "fieldConfig": {"defaults": {"unit": "s"}}
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "domain",
+          "type": "query",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "query": "label_values(conflict_negotiation_total, domain)",
+          "refresh": 1
+        }
+      ]
+    },
+    "alerts": [
+      {
+        "name": "Circuit Breaker Activo",
+        "message": "El circuit breaker de UC-322 está abierto. Se requiere intervención humana.",
+        "frequency": "10s",
+        "conditions": [
+          {"type": "query", "query": {"params": ["A", "5m", "now"]}, "evaluator": {"params": [0], "type": "gt"}}
+        ]
+      }
+    ]
+  }
+}
