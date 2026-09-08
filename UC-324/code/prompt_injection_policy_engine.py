@@ -115,6 +115,7 @@ class PolicyVerdict:
     evidence: List[Dict[str, Any]] = field(default_factory=list)
     provenance: List[Dict[str, Any]] = field(default_factory=list)
     redacted_content: List[str] = field(default_factory=list)
+    llm_judge_evidence: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -126,6 +127,7 @@ class PolicyVerdict:
             "evidence": self.evidence,
             "provenance": self.provenance,
             "redacted_content": self.redacted_content,
+            "llm_judge_evidence": self.llm_judge_evidence,
         }
 
 
@@ -268,11 +270,26 @@ class PromptInjectionPolicyEngine:
         rules: Optional[List[PolicyRule]] = None,
         trust_by_source_type: Optional[Dict[SourceType, TrustLevel]] = None,
         sensitive_action_classes: Optional[set] = None,
+        llm_judge_client: Optional[Any] = None,
+        llm_judge_weight: float = 0.3,
     ) -> None:
         self.detectors = detectors if detectors is not None else build_default_detectors()
         self.rules = rules if rules is not None else list(DEFAULT_POLICY_RULES)
         self.trust_by_source_type = trust_by_source_type if trust_by_source_type is not None else dict(TRUST_BY_SOURCE_TYPE)
         self.sensitive_action_classes = sensitive_action_classes or {"execute", "transact", "delete"}
+        self.llm_judge_client = llm_judge_client
+        self.llm_judge_weight = max(0.0, min(1.0, llm_judge_weight))
+
+    def _llm_judge_score(self, item: ContentItem, context: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Consulta al juez externo si está disponible."""
+        if self.llm_judge_client is None:
+            return None
+        judge_result = self.llm_judge_client.judge(
+            content=item.content,
+            source_type=item.source_type.value,
+            context={**(context or {}), "fingerprint": item.fingerprint()},
+        )
+        return judge_result.to_dict()
 
     def _decode_b64_candidates(self, text: str) -> List[str]:
         """Intenta decodificar bloques base64 para inspeccionar contenido oculto."""
@@ -316,6 +333,7 @@ class PromptInjectionPolicyEngine:
         decoded_hits: List[str] = []
 
         max_score = 0.0
+        judge_evidence: List[Dict[str, Any]] = []
         for item in items:
             if item.trust_level == TrustLevel.UNKNOWN:
                 item.trust_level = self.trust_by_source_type.get(item.source_type, TrustLevel.UNKNOWN)
@@ -325,11 +343,20 @@ class PromptInjectionPolicyEngine:
             if decoded:
                 decoded_hits.extend(decoded)
             item_score = max((m.severity for m in matches), default=0.0)
+
+            # Aportar evidencia del juez externo si existe
+            judge_result = self._llm_judge_score(item, context={"action_sensitivity": action_sensitivity.value})
+            if judge_result is not None:
+                judge_evidence.append(judge_result)
+                judge_score = judge_result.get("risk_score", 0.0)
+                combined = (1 - self.llm_judge_weight) * item_score + self.llm_judge_weight * judge_score
+                item_score = combined
+
             if item_score > max_score:
                 max_score = item_score
-            if item.trust_level == TrustLevel.UNTRUSTED and matches:
+            if item.trust_level == TrustLevel.UNTRUSTED and (matches or judge_result):
                 redacted.append(
-                    f"[REDACTED: {item.source_type.value} {item.source_id or 'unknown'} due to policy matches]"
+                    f"[REDACTED: {item.source_type.value} {item.source_id or 'unknown'} due to policy or judge findings]"
                 )
 
         verdict = PolicyVerdict(
@@ -339,6 +366,7 @@ class PromptInjectionPolicyEngine:
             evidence=[m.to_dict() for m in all_matches],
             provenance=provenance,
             redacted_content=redacted,
+            llm_judge_evidence=judge_evidence,
         )
 
         # Aplicar reglas de política según sensibilidad y score

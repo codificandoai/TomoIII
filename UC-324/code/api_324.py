@@ -28,7 +28,13 @@ from open_agent_safety_integration import (
     StageWiseSafetyEvaluator,
     evaluate_stages,
 )
-from prompt_injection_policy_engine import SourceType, scan_content_items
+from prompt_injection_policy_engine import (
+    SourceType,
+    scan_content_items,
+    PromptInjectionPolicyEngine,
+    ContentItem,
+)
+from uc315_judge_client import UC315JudgeClient
 from safeauto_integration import PostActionRuleEngine
 from safety_critical_monitor import CircuitBreakerConfig, SafetyCriticalMonitor
 from domain_skills import build_default_registry
@@ -697,6 +703,45 @@ def scan_content() -> Dict[str, Any]:
 
     verdict = scan_content_items(items, action_sensitivity=action_sensitivity, action_class=action_class)
     return jsonify(verdict)
+
+
+@app.route("/api/v1/containment/llm-judge", methods=["POST"])
+def llm_judge() -> Dict[str, Any]:
+    """Consulta un LLM-as-a-judge externo para análisis de manipulación.
+
+    El juez devuelve evidencia (risk_score, señales, explicación).
+    UC-324/UC-300 conservan el veredicto final.
+    """
+    payload = request.get_json(force=True) or {}
+    content = payload.get("content", "")
+    source_type = payload.get("source_type", "unknown")
+    action_sensitivity = payload.get("action_sensitivity", "medium")
+    action_class = payload.get("action_class", "read")
+    use_injection_engine = payload.get("use_injection_engine", False)
+
+    if not content:
+        return jsonify({"error": "content is required"}), 400
+
+    client = UC315JudgeClient(
+        endpoint=payload.get("endpoint") or os.environ.get("UC315_JUDGE_ENDPOINT"),
+        timeout_seconds=float(payload.get("timeout_seconds", 5.0)),
+    )
+
+    if use_injection_engine:
+        engine = PromptInjectionPolicyEngine(llm_judge_client=client)
+        item = ContentItem(
+            content=content,
+            source_type=SourceType(source_type),
+        )
+        verdict = engine.evaluate(
+            [item],
+            action_sensitivity=action_sensitivity,
+            action_class=action_class,
+        )
+        return jsonify(verdict.to_dict())
+
+    judge_result = client.judge(content=content, source_type=source_type)
+    return jsonify(judge_result.to_dict())
 
 
 @app.route("/api/v1/containment/devops-guardrails", methods=["POST"])
