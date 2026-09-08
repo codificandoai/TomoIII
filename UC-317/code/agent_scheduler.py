@@ -12,6 +12,7 @@ class AgentStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -32,8 +33,11 @@ class AgentScheduler:
         self._queue: List[ScheduledAgent] = []
         self._running: Dict[str, ScheduledAgent] = {}
         self._completed: List[ScheduledAgent] = []
+        self._accepting_tasks: bool = True
 
     def schedule(self, agent_id: str, goal: str, task_id: Optional[str] = None) -> ScheduledAgent:
+        if not self._accepting_tasks:
+            raise RuntimeError("scheduler is not accepting new tasks (shutdown in progress)")
         task = ScheduledAgent(
             agent_id=agent_id,
             task_id=task_id or f"task_{uuid.uuid4().hex[:8]}",
@@ -82,3 +86,60 @@ class AgentScheduler:
             }
             for t in all_tasks
         ]
+
+    # -------------------------------------------------------------------
+    # UC-324 Safe Shutdown Adapter
+    # -------------------------------------------------------------------
+
+    def stop_accepting_tasks(self, shutdown_id: str = "") -> Dict[str, Any]:
+        """UC-324 safe shutdown: stop accepting new tasks immediately."""
+        self._accepting_tasks = False
+        return {
+            "adapter": "uc317_scheduler",
+            "stopped": True,
+            "shutdown_id": shutdown_id,
+            "pending": len(self._queue),
+            "running": len(self._running),
+        }
+
+    def drain_and_cancel(self, shutdown_id: str = "", timeout_seconds: float = 30.0) -> Dict[str, Any]:
+        """UC-324 safe shutdown: drain/cancel pending and running tasks.
+
+        Deterministic simulation: cancels pending immediately, marks running
+        as cancelled. No threads required.
+        """
+        cancelled = 0
+        drained = 0
+
+        # Cancel pending tasks
+        for task in self._queue:
+            task.status = AgentStatus.CANCELLED
+            task.result = {"cancelled_by": "safe_shutdown", "shutdown_id": shutdown_id}
+            self._completed.append(task)
+            cancelled += 1
+        self._queue.clear()
+
+        # Cancel running tasks
+        for task_id, task in list(self._running.items()):
+            task.status = AgentStatus.CANCELLED
+            task.result = {"cancelled_by": "safe_shutdown", "shutdown_id": shutdown_id}
+            self._completed.append(task)
+            cancelled += 1
+        drained = len(self._running)
+        self._running.clear()
+
+        return {
+            "adapter": "uc317_scheduler",
+            "drained": drained,
+            "cancelled": cancelled,
+            "shutdown_id": shutdown_id,
+        }
+
+    def resume_accepting_tasks(self) -> Dict[str, Any]:
+        """UC-324 reactivation: resume accepting tasks."""
+        self._accepting_tasks = True
+        return {"adapter": "uc317_scheduler", "accepting": True}
+
+    @property
+    def is_accepting_tasks(self) -> bool:
+        return self._accepting_tasks

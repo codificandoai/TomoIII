@@ -643,6 +643,69 @@ class SecureToolGateway:
             error=error,
         )
 
+
+    # -----------------------------------------------------------------------
+    # UC-324 Safe Shutdown Adapter
+    # -----------------------------------------------------------------------
+
+    def quiesce_for_shutdown(self, shutdown_id: str) -> Dict[str, Any]:
+        """UC-324 safe shutdown adapter: reject new authorizations/executions."""
+        self._kill_switch = True
+        self._shutdown_reason = f"safe_shutdown:{shutdown_id}"
+        self._audit("system", "quiesce_for_shutdown", {
+            "shutdown_id": shutdown_id,
+            "action": "quiesce",
+        })
+        return {
+            "adapter": "uc300_tool_gateway",
+            "quiesced": True,
+            "shutdown_id": shutdown_id,
+            "kill_switch": self._kill_switch,
+        }
+
+    def revoke_pending_for_shutdown(self, shutdown_id: str) -> Dict[str, Any]:
+        """UC-324 safe shutdown adapter: revoke/clear pending one-use
+        capability tokens and credential leases safely."""
+        revoked_tokens = self.capability_tokens.revoke_all()
+        revoked_creds = self.credential_broker.revoke_all()
+        self._audit("system", "revoke_pending_for_shutdown", {
+            "shutdown_id": shutdown_id,
+            "revoked_tokens": revoked_tokens,
+            "revoked_credentials": revoked_creds,
+        })
+        return {
+            "adapter": "uc300_tool_gateway",
+            "revoked_tokens": revoked_tokens,
+            "revoked_credentials": revoked_creds,
+            "shutdown_id": shutdown_id,
+        }
+
+    def resume_after_approved_reactivation(self, shutdown_id: str) -> Dict[str, Any]:
+        """UC-324: resume accepting authorizations after approved reactivation.
+        Only the coordinator may call this after human approval."""
+        self._kill_switch = False
+        self._shutdown_reason = ""
+        self.capability_tokens.resume_issuing()
+        self.credential_broker.resume_issuing()
+        self._audit("system", "resume_after_approved_reactivation", {
+            "shutdown_id": shutdown_id,
+            "action": "resume",
+        })
+        return {
+            "adapter": "uc300_tool_gateway",
+            "resumed": True,
+            "shutdown_id": shutdown_id,
+        }
+
+    def shutdown_status(self) -> Dict[str, Any]:
+        """UC-324 safe shutdown adapter: status during shutdown."""
+        return {
+            "adapter": "uc300_tool_gateway",
+            "kill_switch": self._kill_switch,
+            "shutdown_reason": getattr(self, "_shutdown_reason", ""),
+            "pending_nonces": len(self._consumed_nonces),
+        }
+
     def _audit(self, actor: str, event: str, details: Dict[str, Any]) -> None:
         trace_id = details.get("trace_id", "")
         self.audit_trail.record(actor=actor, event=event, details=details, trace_id=trace_id)

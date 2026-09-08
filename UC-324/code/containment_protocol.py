@@ -88,6 +88,8 @@ class ContainmentSandbox:
         mode: ContainmentMode = ContainmentMode.ENFORCE,
         enable_kill_switch: bool = True,
         crypto_secret: Optional[str] = None,
+        coordinator: Optional[Any] = None,
+        safe_shutdown_adapters: Optional[Dict[str, Any]] = None,
     ) -> None:
         self.orchestrator = orchestrator or GeneralOrchestrator(
             safety=SafetySupervisor315(PolicyRegistry())
@@ -103,27 +105,58 @@ class ContainmentSandbox:
             if _SCM_AVAILABLE
             else None
         )
+        # UC-324 Safe Shutdown: internal raw latch and optional coordinator
+        self._raw_kill_switch = False
+        self._coordinator = coordinator
+        self._safe_shutdown_adapters = safe_shutdown_adapters or {}
+        self._shutdown_coordinator = coordinator
 
     # ------------------------------------------------------------------
     # Kill switch global
     # ------------------------------------------------------------------
-    def kill(self) -> None:
+    def _raw_kill(self) -> None:
+        """Internal raw latch; does NOT coordinate shutdown."""
         if self._enable_kill_switch:
-            self._killed = True
+            self._raw_kill_switch = True
             if self._sre is not None:
                 self._sre.kill("manual")
 
-    def unkill(self) -> None:
-        self._killed = False
+    def _raw_unkill(self) -> None:
+        """Internal raw unlatch; only coordinator may call after approved reactivation."""
+        self._raw_kill_switch = False
         if self._sre is not None:
             self._sre.unkill()
 
+    def kill(self) -> None:
+        """Public kill: set raw latch and optionally coordinate safe shutdown."""
+        self._raw_kill()
+
+    def unkill(self) -> None:
+        """Public unkill: ONLY clears raw latch when safe-shutdown is not terminal.
+
+        When the SafeShutdownCoordinator is in SAFE_STOPPED/CONTAINED, this
+        method does NOT bypass human reactivation. Only a successful
+        request_reactivation calls _raw_unkill internally.
+        """
+        # Do not bypass coordinator's human-approval gate
+        if self._shutdown_coordinator_terminal():
+            return
+        self._raw_unkill()
+
     def is_killed(self) -> bool:
-        if getattr(self, "_killed", False):
+        if self._raw_kill_switch:
             return True
         if self._sre is not None:
             return self._sre.is_killed()
         return False
+
+    def _shutdown_coordinator_terminal(self) -> bool:
+        """True if the safe shutdown coordinator is in a terminal state."""
+        coord = getattr(self, "_shutdown_coordinator", None)
+        if coord is None:
+            return False
+        from safe_shutdown_models import ShutdownState
+        return coord.state in (ShutdownState.SAFE_STOPPED, ShutdownState.CONTAINED)
 
     # ------------------------------------------------------------------
     # Circuit breaker / safety-critical monitor
@@ -436,3 +469,114 @@ class ContainmentSandbox:
 
     def get_audit_log(self) -> List[Dict[str, Any]]:
         return [d.to_dict() for d in self._audit_log]
+
+    # ------------------------------------------------------------------
+    # Safe Shutdown Coordinator (UC-324 extension)
+    # ------------------------------------------------------------------
+    def safe_shutdown(
+        self,
+        reason: str = "manual",
+        shutdown_id: Optional[str] = None,
+        trace_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Initiate a safe shutdown via the SafeShutdownCoordinator.
+
+        Coordinates with UC-300/UC-317/UC-309/UC-296/UC-326/UC-290.
+        Activates the raw kill latch and builds the coordinator with injected
+        adapters on first call. Does NOT recursively call kill() after the
+        coordinator is initialized.
+        """
+        from safe_shutdown_coordinator import SafeShutdownCoordinator, build_concrete_adapters
+        from safe_shutdown_models import ShutdownConfig
+
+        # Set raw latch immediately for compatibility (is_killed() true)
+        self._raw_kill()
+
+        if self._shutdown_coordinator is None:
+            adapters = self._safe_shutdown_adapters
+            # If adapters were not injected but we can build from the
+            # orchestrator/toolkit, prefer concrete over no-op.
+            if not adapters:
+                adapters = build_concrete_adapters()
+            self._shutdown_coordinator = SafeShutdownCoordinator(
+                config=ShutdownConfig(),
+                tool_gateway=adapters.get("tool_gateway"),
+                scheduler=adapters.get("scheduler"),
+                observability=adapters.get("observability"),
+                memory_snapshot=adapters.get("memory_snapshot"),
+                reactivation_approval=adapters.get("reactivation_approval"),
+            )
+
+        status = self._shutdown_coordinator.initiate_shutdown(
+            reason=reason,
+            shutdown_id=shutdown_id,
+            trace_id=trace_id,
+        )
+        return status.to_dict()
+
+    def get_shutdown_status(self) -> Optional[Dict[str, Any]]:
+        """Return the current shutdown status, or None if no coordinator."""
+        if self._shutdown_coordinator is not None:
+            return self._shutdown_coordinator.get_status().to_dict()
+        return None
+
+    def get_shutdown_postmortem(self) -> Optional[Dict[str, Any]]:
+        """Return the last shutdown postmortem, or None."""
+        if self._shutdown_coordinator is not None:
+            pm = self._shutdown_coordinator.get_postmortem()
+            return pm.to_dict() if pm else None
+        return None
+
+    def get_shutdown_evidence(self) -> List[Dict[str, Any]]:
+        """Return the full evidence chain."""
+        if self._shutdown_coordinator is not None:
+            return self._shutdown_coordinator.get_evidence()
+        return []
+
+    def request_reactivation(
+        self,
+        shutdown_id: str,
+        recovery_state_hash: str,
+        reviewer_id: str,
+        justification: str = "",
+        ttl_seconds: float = 3600.0,
+    ) -> Dict[str, Any]:
+        """Request reactivation after safe shutdown.
+
+        unkill() is NOT called here — it only happens if the coordinator
+        approves. Once SAFE_STOPPED/CONTAINED, unkill() alone will not
+        bypass the human-approval gate.
+        """
+        from safe_shutdown_coordinator import SafeShutdownCoordinator
+        from safe_shutdown_models import ReactivationRequest
+
+        if not hasattr(self, "_shutdown_coordinator"):
+            return {"approved": False, "reason": "no shutdown coordinator active"}
+
+        req = ReactivationRequest(
+            shutdown_id=shutdown_id,
+            recovery_state_hash=recovery_state_hash,
+            reviewer_id=reviewer_id,
+            justification=justification,
+            ttl_seconds=ttl_seconds,
+        )
+        result = self._shutdown_coordinator.request_reactivation(req)
+        if result.approved:
+            # Only successful human-approved reactivation may unlatch the raw kill switch.
+            self._raw_unkill()
+            # Resume subsystem adapters
+            try:
+                if self._shutdown_coordinator._tool_gateway:
+                    self._shutdown_coordinator._tool_gateway.resume_after_approved_reactivation(
+                        self._shutdown_coordinator.shutdown_id
+                    )
+            except Exception:
+                pass
+            try:
+                if self._shutdown_coordinator._scheduler:
+                    self._shutdown_coordinator._scheduler.resume_after_approved_reactivation(
+                        self._shutdown_coordinator.shutdown_id
+                    )
+            except Exception:
+                pass
+        return result.to_dict()

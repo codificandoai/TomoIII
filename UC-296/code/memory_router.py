@@ -128,6 +128,33 @@ class IntelligentMemoryRouter:
     def store_episode(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> str:
         return self.vector.add(text, metadata=metadata)
 
+    # -------------------------------------------------------------------
+    # UC-324 Safe Shutdown: redacted memory snapshot
+    # -------------------------------------------------------------------
+
+    def redacted_snapshot(self, shutdown_id: str = "") -> Dict[str, Any]:
+        """Return a redacted memory snapshot for UC-324 safe shutdown.
+
+        Returns hash/manifest and counts/safe metadata, NOT raw memory
+        contents, private memory, or chain-of-thought.
+        """
+        import hashlib as _hl
+
+        notepad_count = len(self.notepad._notes) if hasattr(self.notepad, "_notes") else 0
+        vector_count = len(self.vector._memory) if hasattr(self.vector, "_memory") else 0
+
+        manifest_data = f"notepad:{notepad_count}|vector:{vector_count}|sid:{shutdown_id}"
+        manifest_hash = _hl.sha256(manifest_data.encode()).hexdigest()
+
+        return {
+            "adapter": "uc296_memory",
+            "shutdown_id": shutdown_id,
+            "manifest_hash": manifest_hash,
+            "notepad_entry_count": notepad_count,
+            "vector_entry_count": vector_count,
+            "raw_data_included": False,
+        }
+
     @staticmethod
     def _infer_entity_type(query: str) -> Optional[str]:
         q = query.lower()

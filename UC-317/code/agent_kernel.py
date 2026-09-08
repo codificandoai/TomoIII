@@ -123,6 +123,27 @@ class AgentKernel:
 
         return SyscallResponse(False, error=f"Unknown operation: {op}")
 
+
+    # -------------------------------------------------------------------
+    # UC-324 Safe Shutdown wrappers (delegate to scheduler)
+    # -------------------------------------------------------------------
+
+    def stop_accepting_tasks(self, shutdown_id: str = "") -> Dict[str, Any]:
+        """UC-324: stop accepting new agent tasks."""
+        return self.scheduler.stop_accepting_tasks(shutdown_id)
+
+    def drain_and_cancel(self, shutdown_id: str = "", timeout_seconds: float = 30.0) -> Dict[str, Any]:
+        """UC-324: drain and cancel pending/running tasks."""
+        return self.scheduler.drain_and_cancel(shutdown_id, timeout_seconds)
+
+    def resume_accepting_tasks(self) -> Dict[str, Any]:
+        """UC-324: resume accepting tasks after approved reactivation."""
+        return self.scheduler.resume_accepting_tasks()
+
+    def is_accepting_tasks(self) -> bool:
+        """UC-324: whether the scheduler is accepting new tasks."""
+        return self.scheduler.is_accepting_tasks
+
     def chat(self, agent_id: str, message: str, use_tools: bool = True) -> Dict[str, Any]:
         """Conveniencia: conversación con el agente usando el kernel."""
         session = self._sessions.get(agent_id)

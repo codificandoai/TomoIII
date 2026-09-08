@@ -331,6 +331,37 @@ class MaqriEngine:
         """Retorna resumen de observabilidad."""
         return self.observability.get_summary()
 
+    # -------------------------------------------------------------------
+    # UC-324 Safe Shutdown: redacted memory snapshot
+    # -------------------------------------------------------------------
+
+    def redacted_snapshot(self, shutdown_id: str = "") -> Dict[str, Any]:
+        """Return a redacted memory snapshot for UC-324 safe shutdown.
+
+        Returns hash/manifest and counts/safe metadata, NOT raw memory
+        contents, private memory, or chain-of-thought.
+        """
+        import hashlib as _hl
+
+        # Collect safe metadata counts
+        episodic_count = len(self.episodic._episodes) if hasattr(self.episodic, "_episodes") else 0
+        semantic_count = len(self.semantic._entries) if hasattr(self.semantic, "_entries") else 0
+        history_count = len(self._history)
+
+        # Compute manifest hash over counts (not raw data)
+        manifest_data = f"episodic:{episodic_count}|semantic:{semantic_count}|history:{history_count}|sid:{shutdown_id}"
+        manifest_hash = _hl.sha256(manifest_data.encode()).hexdigest()
+
+        return {
+            "adapter": "uc326_maqri",
+            "shutdown_id": shutdown_id,
+            "manifest_hash": manifest_hash,
+            "episodic_entry_count": episodic_count,
+            "semantic_entry_count": semantic_count,
+            "search_history_count": history_count,
+            "raw_data_included": False,
+        }
+
     def reset(self) -> None:
         """Resetea todo el estado."""
         self.episodic.reset()

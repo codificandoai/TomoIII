@@ -100,6 +100,23 @@ class CredentialBroker:
             del self._leases[k]
         return len(expired)
 
+    def revoke_all(self) -> int:
+        """Revoke all active credential leases."""
+        count = 0
+        for lease in self._leases.values():
+            if not lease.revoked:
+                lease.revoked = True
+                count += 1
+        return count
+
+    def resume_issuing(self) -> int:
+        """After approved reactivation, clear only expired revoked leases."""
+        now = time.time()
+        expired = [k for k, v in self._leases.items() if v.revoked and v.expires_at < now]
+        for k in expired:
+            del self._leases[k]
+        return len(expired)
+
     def get_summary(self) -> Dict[str, Any]:
         return {
             "active_leases": len(self._leases),

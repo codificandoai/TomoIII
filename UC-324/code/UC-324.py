@@ -552,6 +552,76 @@ def demo_stage_wise_eval() -> None:
     assert not result["allowed"]
 
 
+def demo_safe_shutdown() -> None:
+    print("\n== Demo: Safe Shutdown Coordinator ==")
+    from safe_shutdown_coordinator import SafeShutdownCoordinator
+    from safe_shutdown_models import ShutdownConfig, ReactivationRequest
+
+    coordinator = SafeShutdownCoordinator(config=ShutdownConfig())
+
+    # Register a simulated rollback
+    coordinator.rollback_registry.register(
+        "simulated_transaction_1",
+        lambda: {"rolled_back": True, "transaction_id": "TX-SIM-001"},
+    )
+
+    # Register a health check
+    coordinator.health_checker.register(lambda: {"healthy": True, "check": "basic"})
+
+    # Initiate shutdown
+    status = coordinator.initiate_shutdown(reason="manual", shutdown_id="demo-sd-001")
+    print(f"  Shutdown state: {status.state.value}")
+    print(f"  Evidence chain valid: {status.evidence_chain_valid}")
+
+    if status.postmortem:
+        print(f"  Postmortem reason: {status.postmortem.reason}")
+        print(f"  Rollbacks executed: {status.postmortem.rollbacks_executed}")
+
+    # Idempotent re-trigger
+    status2 = coordinator.initiate_shutdown(reason="manual", shutdown_id="demo-sd-001")
+    print(f"  Idempotent re-trigger state: {status2.state.value}")
+
+    # Reactivation
+    recovery_hash = coordinator.compute_recovery_state_hash()
+    req = ReactivationRequest(
+        shutdown_id="demo-sd-001",
+        recovery_state_hash=recovery_hash,
+        reviewer_id="human-reviewer-1",
+        justification="Incident resolved",
+    )
+    result = coordinator.request_reactivation(req)
+    print(f"  Reactivation approved: {result.approved}")
+    print(f"  New state: {result.new_state}")
+
+    # Evidence
+    print(f"  Evidence entries: {len(coordinator.get_evidence())}")
+    print(f"  Evidence chain valid: {coordinator.evidence.verify()}")
+    print(json.dumps(coordinator.get_status().to_dict(), indent=2, default=str))
+
+
+def demo_safe_shutdown_contained() -> None:
+    print("\n== Demo: Safe Shutdown with adapter failure → CONTAINED ==")
+    from safe_shutdown_coordinator import SafeShutdownCoordinator
+    from safe_shutdown_models import ShutdownConfig
+
+    class FailingGateway:
+        def quiesce(self, shutdown_id):
+            raise RuntimeError("simulated gateway failure")
+        def revoke_pending(self, shutdown_id):
+            return {}
+        def status(self):
+            return {}
+
+    coordinator = SafeShutdownCoordinator(
+        config=ShutdownConfig(),
+        tool_gateway=FailingGateway(),
+    )
+    status = coordinator.initiate_shutdown(reason="test_failure", shutdown_id="fail-001")
+    print(f"  State: {status.state.value}")
+    print(f"  Failure metadata: {status.failure_metadata}")
+    assert status.state.value == "CONTAINED"
+
+
 def run_server() -> None:
     from api_324 import app
     port = int(os.environ.get("PORT", 5299))
@@ -577,6 +647,8 @@ def main() -> None:
     parser.add_argument("--demo-llm-guardrails", action="store_true")
     parser.add_argument("--demo-trajectory-eval", action="store_true")
     parser.add_argument("--demo-stage-wise-eval", action="store_true")
+    parser.add_argument("--demo-safe-shutdown", action="store_true")
+    parser.add_argument("--demo-safe-shutdown-contained", action="store_true")
     parser.add_argument("--server", action="store_true")
     args = parser.parse_args()
 
@@ -612,6 +684,10 @@ def main() -> None:
         demo_trajectory_eval()
     elif args.demo_stage_wise_eval:
         demo_stage_wise_eval()
+    elif args.demo_safe_shutdown:
+        demo_safe_shutdown()
+    elif args.demo_safe_shutdown_contained:
+        demo_safe_shutdown_contained()
     elif args.server:
         run_server()
     else:

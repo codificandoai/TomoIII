@@ -209,6 +209,36 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
             {"name": "config", "type": "object", "required": False, "default": {}, "description": "Configuración opcional del StageWiseSafetyEvaluator"},
         ],
     },
+    "POST /api/v1/containment/safe-shutdown": {
+        "endpoint": "POST /api/v1/containment/safe-shutdown",
+        "description": "Inicia un safe shutdown determinista del sandbox con coordinación de subsistemas.",
+        "parameters": [
+            {"name": "reason", "type": "string", "required": False, "default": "manual", "example": "manual"},
+            {"name": "shutdown_id", "type": "string", "required": False, "default": None, "description": "ID de shutdown para idempotencia"},
+            {"name": "trace_id", "type": "string", "required": False, "default": None},
+        ],
+    },
+    "GET /api/v1/containment/shutdown-status": {
+        "endpoint": "GET /api/v1/containment/shutdown-status",
+        "description": "Estado actual del safe shutdown coordinator.",
+        "parameters": [],
+    },
+    "GET /api/v1/containment/shutdown-postmortem": {
+        "endpoint": "GET /api/v1/containment/shutdown-postmortem",
+        "description": "Postmortem redactado del último shutdown.",
+        "parameters": [],
+    },
+    "POST /api/v1/containment/reactivation-request": {
+        "endpoint": "POST /api/v1/containment/reactivation-request",
+        "description": "Solicita reactivación tras SAFE_STOPPED/CONTAINED. Requiere aprobación humana.",
+        "parameters": [
+            {"name": "shutdown_id", "type": "string", "required": True},
+            {"name": "recovery_state_hash", "type": "string", "required": True},
+            {"name": "reviewer_id", "type": "string", "required": True},
+            {"name": "justification", "type": "string", "required": False, "default": ""},
+            {"name": "ttl_seconds", "type": "float", "required": False, "default": 3600.0},
+        ],
+    },
 }
 
 OUTPUT_CARDS: Dict[str, Dict[str, Any]] = {
@@ -389,6 +419,46 @@ OUTPUT_CARDS: Dict[str, Dict[str, Any]] = {
             {"name": "findings", "type": "list[object]"},
             {"name": "per_stage_scores", "type": "object"},
             {"name": "details", "type": "object"},
+        ],
+    },
+    "POST /api/v1/containment/safe-shutdown": {
+        "endpoint": "POST /api/v1/containment/safe-shutdown",
+        "description": "Estado del safe shutdown: shutdown_id, state, postmortem, evidence.",
+        "fields": [
+            {"name": "shutdown_id", "type": "string"},
+            {"name": "state", "type": "string", "enum": ["RUNNING", "QUIESCING", "DRAINING", "ROLLING_BACK", "CAPTURING", "SAFE_STOPPED", "CONTAINED"]},
+            {"name": "reason", "type": "string"},
+            {"name": "postmortem", "type": "object | null"},
+            {"name": "evidence_chain_valid", "type": "boolean"},
+            {"name": "evidence_chain_hash", "type": "string"},
+        ],
+    },
+    "GET /api/v1/containment/shutdown-status": {
+        "endpoint": "GET /api/v1/containment/shutdown-status",
+        "description": "Estado actual del safe shutdown coordinator.",
+        "fields": [
+            {"name": "shutdown_id", "type": "string"},
+            {"name": "state", "type": "string"},
+            {"name": "postmortem", "type": "object | null"},
+        ],
+    },
+    "GET /api/v1/containment/shutdown-postmortem": {
+        "endpoint": "GET /api/v1/containment/shutdown-postmortem",
+        "description": "Postmortem redactado del último shutdown.",
+        "fields": [
+            {"name": "shutdown_id", "type": "string"},
+            {"name": "final_state", "type": "string"},
+            {"name": "reason", "type": "string"},
+            {"name": "evidence_chain_valid", "type": "boolean"},
+        ],
+    },
+    "POST /api/v1/containment/reactivation-request": {
+        "endpoint": "POST /api/v1/containment/reactivation-request",
+        "description": "Resultado de solicitud de reactivación.",
+        "fields": [
+            {"name": "approved", "type": "boolean"},
+            {"name": "reason", "type": "string"},
+            {"name": "new_state", "type": "string"},
         ],
     },
 }
@@ -740,6 +810,52 @@ def kill_switch() -> Dict[str, Any]:
     elif action == "reset":
         _sandbox.unkill()
     return jsonify({"killed": _sandbox.is_killed(), "action": action})
+
+
+@app.route("/api/v1/containment/safe-shutdown", methods=["POST"])
+def safe_shutdown() -> Dict[str, Any]:
+    """Inicia un safe shutdown determinista."""
+    payload = request.get_json(force=True) or {}
+    reason = payload.get("reason", "manual")
+    shutdown_id = payload.get("shutdown_id")
+    trace_id = payload.get("trace_id")
+    result = _sandbox.safe_shutdown(reason=reason, shutdown_id=shutdown_id, trace_id=trace_id)
+    return jsonify(result)
+
+
+@app.route("/api/v1/containment/shutdown-status", methods=["GET"])
+def shutdown_status() -> Dict[str, Any]:
+    """Estado actual del safe shutdown coordinator."""
+    status = _sandbox.get_shutdown_status()
+    return jsonify(status or {"state": "no_coordinator"})
+
+
+@app.route("/api/v1/containment/shutdown-postmortem", methods=["GET"])
+def shutdown_postmortem() -> Dict[str, Any]:
+    """Postmortem redactado del último shutdown."""
+    pm = _sandbox.get_shutdown_postmortem()
+    return jsonify(pm or {"postmortem": None})
+
+
+@app.route("/api/v1/containment/shutdown-evidence", methods=["GET"])
+def shutdown_evidence() -> Dict[str, Any]:
+    """Cadena de evidencia del shutdown."""
+    evidence = _sandbox.get_shutdown_evidence()
+    return jsonify({"evidence": evidence})
+
+
+@app.route("/api/v1/containment/reactivation-request", methods=["POST"])
+def reactivation_request() -> Dict[str, Any]:
+    """Solicita reactivación tras safe shutdown."""
+    payload = request.get_json(force=True) or {}
+    result = _sandbox.request_reactivation(
+        shutdown_id=payload.get("shutdown_id", ""),
+        recovery_state_hash=payload.get("recovery_state_hash", ""),
+        reviewer_id=payload.get("reviewer_id", ""),
+        justification=payload.get("justification", ""),
+        ttl_seconds=payload.get("ttl_seconds", 3600.0),
+    )
+    return jsonify(result)
 
 
 @app.route("/api/v1/containment/audit", methods=["GET"])

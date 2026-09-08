@@ -28,6 +28,8 @@ class CapabilityTokenManager:
     def __init__(self, secret: Optional[str] = None):
         # Generar secreto internamente si no se provee; nunca expuesto en logs.
         self._secret = (secret or secrets.token_hex(32)).encode("utf-8")
+        self._revocation_time: Optional[float] = None
+        self._issued_count: int = 0
 
     def issue(
         self,
@@ -59,6 +61,7 @@ class CapabilityTokenManager:
             hashlib.sha256,
         ).hexdigest()
         payload["signature"] = signature
+        self._issued_count += 1
         token_bytes = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         return base64.urlsafe_b64encode(token_bytes).rstrip(b"=").decode("ascii")
 
@@ -92,6 +95,11 @@ class CapabilityTokenManager:
         expected_action: str,
         consumed_nonces: set,
     ) -> CapabilityTokenPayload:
+        # Global shutdown revocation: reject any token issued before revocation time
+        if self._revocation_time is not None:
+            payload = self.parse(token)
+            if payload.issued_at < self._revocation_time:
+                raise ValueError("capability token revoked by shutdown")
         """Valida firma, TTL, uso único y vínculo exacto a hashes."""
         payload = self.parse(token)
 
@@ -142,6 +150,16 @@ class CapabilityTokenManager:
 
     def mark_consumed(self, nonce: str, consumed_nonces: set) -> None:
         consumed_nonces.add(nonce)
+
+    def revoke_all(self) -> int:
+        """Revoke all pending/issued capability tokens by setting a revocation time."""
+        self._revocation_time = time.time()
+        return self._issued_count
+
+    def resume_issuing(self) -> None:
+        """Resume accepting capability tokens after approved reactivation."""
+        self._revocation_time = None
+        self._issued_count = 0
 
     def rotate_secret(self) -> str:
         """Rota el secreto interno y devuelve el hash público del nuevo secreto."""

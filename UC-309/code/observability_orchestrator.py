@@ -130,6 +130,62 @@ class ObservabilityOrchestrator:
     def retention(self, max_records: Optional[int] = None, retention_seconds: Optional[int] = None, role: Optional[str] = None):
         self.store.set_retention(max_records, retention_seconds, role=role)
 
+
+    # -------------------------------------------------------------------
+    # UC-324 Safe Shutdown: postmortem ingestion
+    # -------------------------------------------------------------------
+
+    def ingest_postmortem(self, postmortem: Dict[str, Any]) -> Dict[str, Any]:
+        """Ingest a redacted postmortem from UC-324 SafeShutdownCoordinator.
+
+        Uses existing privacy sanitation (PrivacyGuard.sanitize) and immutable
+        hash-chain store. Stores only the shutdown correlation and evidence
+        hash; never raw secrets, chain-of-thought, or private memory contents.
+        """
+        import hashlib as _hl
+        import json as _json
+        import time as _time
+
+        # First sanitize the postmortem dict before building the canonical event
+        safe = self.privacy.sanitize({
+            "trace_id": postmortem.get("trace_id", ""),
+            "span_id": postmortem.get("shutdown_id", ""),
+            "event_type": "uc324_containment",
+            "agent_id": "uc324_safe_shutdown",
+            "action_proposed": "shutdown_postmortem",
+            "observation_summary": (
+                f"Shutdown {postmortem.get('shutdown_id', '?')}: "
+                f"state={postmortem.get('final_state', '?')}, "
+                f"drained={postmortem.get('tasks_drained', 0)}, "
+                f"cancelled={postmortem.get('tasks_cancelled', 0)}"
+            ),
+            "uc324": {
+                "shutdown_id": postmortem.get("shutdown_id", ""),
+                "final_state": postmortem.get("final_state", ""),
+                "evidence_chain_hash": postmortem.get("evidence_chain_hash", ""),
+                "evidence_chain_valid": postmortem.get("evidence_chain_valid", False),
+            },
+            "evidence_refs": [postmortem.get("evidence_chain_hash", "")],
+            "timestamp_ns": int(postmortem.get("timestamp", _time.time()) * 1e9),
+        })
+
+        # Compute a stable digest of the sanitized postmortem for the hash chain
+        pm_digest = _hl.sha256(
+            _json.dumps(postmortem, sort_keys=True, default=str).encode()
+        ).hexdigest()[:32]
+        safe["observed_action_hash"] = pm_digest
+
+        event = CanonicalEvent.from_dict(safe)
+        self.store.store(event)
+        self._refresh_derived()
+
+        return {
+            "adapter": "uc309_observability",
+            "ingested": True,
+            "event_hash": event.event_hash,
+            "trace_id": event.trace_id,
+        }
+
     def reset(self, role: Optional[str] = None):
         self.store.reset(role=role)
         self.metrics.reset()
