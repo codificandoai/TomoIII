@@ -57,6 +57,7 @@ class HITLGuardian:
         self.dossiers: Dict[str, DecisionDossier] = {}
         self.results: List[Dict[str, Any]] = []
         self._used_reactivation_ids: set = set()
+        self._used_experiment_promotion_ids: set = set()
 
     # -----------------------------------------------------------------------
     # Pipeline principal
@@ -275,17 +276,19 @@ class HITLGuardian:
             return {"approved": False, "reason": "ttl_seconds must be > 0"}
         if not reviewer_id or not reviewer_id.strip():
             return {"approved": False, "reason": "reviewer_id required; cannot auto-approve"}
-        if not experiment_id or not report_hash:
-            return {"approved": False, "reason": "experiment_id and report_hash required"}
+        if not experiment_id or not report_hash or not request_id:
+            return {"approved": False, "reason": "experiment_id and report_hash required; request_id required"}
+        if not champion_version or not challenger_version:
+            return {"approved": False, "reason": "champion_version and challenger_version required"}
 
         now = time.time()
         if timestamp > now + 60.0:
             return {"approved": False, "reason": "timestamp unreasonably far in the future"}
         if (now - timestamp) > ttl_seconds:
             return {"approved": False, "reason": "approval request expired (TTL)"}
-        if request_id in self._used_reactivation_ids:
+        if request_id in self._used_experiment_promotion_ids:
             return {"approved": False, "reason": "request_id already used (anti-replay)"}
-        self._used_reactivation_ids.add(request_id)
+        self._used_experiment_promotion_ids.add(request_id)
 
         self.observability.log(
             "INFO",
@@ -319,6 +322,8 @@ class HITLGuardian:
             self.escalation_engine = EscalationEngine(self.config)
         self.dossiers.clear()
         self.results.clear()
+        self._used_reactivation_ids.clear()
+        self._used_experiment_promotion_ids.clear()
         self.escalation_engine.reset()
         self.audit_trail.reset()
         self.observability.reset()

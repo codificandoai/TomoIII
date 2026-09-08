@@ -9,7 +9,8 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "UC-317", "code")))
 
 from drift_orchestrator import DriftOrchestrator
 from environment_simulator import SimulatedExternalEnvironment

@@ -684,49 +684,8 @@ class SecureToolGateway:
             "shutdown_id": shutdown_id,
         }
 
-    # -----------------------------------------------------------------------
-    # UC-308 Champion/Challenger experiment adapter
-    # -----------------------------------------------------------------------
-
-    def authorize_experiment_trade(self, request: Dict[str, Any]) -> Dict[str, Any]:
-        """Deterministic deny-real-execution adapter for UC-308.
-
-        - Challengers (and any non-promoted state) are restricted to paper-only.
-        - Real orders are allowed only for the champion in the ``promoted`` state
-          and when the exact model/version/experiment binding matches.
-        """
-        experiment_id = request.get("experiment_id", "")
-        model_id = request.get("model_id", "")
-        version = request.get("model_version", "")
-        role = request.get("model_role", "")
-        state = request.get("experiment_state", "")
-        real_order = bool(request.get("real_order", False))
-        expected_model_id = request.get("expected_model_id", "")
-        expected_version = request.get("expected_version", "")
-
-        if not experiment_id or not model_id or not version:
-            return {
-                "allowed": False,
-                "mode": "denied",
-                "reason": "missing experiment_id, model_id or model_version binding",
-            }
-
-        if real_order:
-            if role != "champion" or state != "promoted":
-                return {
-                    "allowed": False,
-                    "mode": "denied",
-                    "reason": f"real order denied: role={role}, state={state}; only promoted champion may trade",
-                }
-            if expected_model_id and expected_model_id != model_id:
-                return {"allowed": False, "mode": "denied", "reason": "model_id binding mismatch"}
-            if expected_version and expected_version != version:
-                return {"allowed": False, "mode": "denied", "reason": "version binding mismatch"}
-
-        return {"allowed": True, "mode": "paper_only", "reason": "paper execution authorized"}
-
     def shutdown_status(self) -> Dict[str, Any]:
-        """UC-324 safe shutdown adapter: status during shutdown. (MARKER)"""
+        """UC-324 safe shutdown adapter: status during shutdown."""
         return {
             "adapter": "uc300_tool_gateway",
             "kill_switch": self._kill_switch,
