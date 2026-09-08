@@ -27,6 +27,7 @@ class ShutdownState(str, Enum):
     """Estados del ciclo de vida de shutdown seguro."""
     RUNNING = "RUNNING"
     QUIESCING = "QUIESCING"
+    SAFE_HOLD = "SAFE_HOLD"
     DRAINING = "DRAINING"
     ROLLING_BACK = "ROLLING_BACK"
     CAPTURING = "CAPTURING"
@@ -35,11 +36,12 @@ class ShutdownState(str, Enum):
 
 
 VALID_TRANSITIONS: Dict[ShutdownState, List[ShutdownState]] = {
-    ShutdownState.RUNNING: [ShutdownState.QUIESCING],
-    ShutdownState.QUIESCING: [ShutdownState.DRAINING, ShutdownState.CONTAINED],
-    ShutdownState.DRAINING: [ShutdownState.ROLLING_BACK, ShutdownState.CONTAINED],
-    ShutdownState.ROLLING_BACK: [ShutdownState.CAPTURING, ShutdownState.CONTAINED],
-    ShutdownState.CAPTURING: [ShutdownState.SAFE_STOPPED, ShutdownState.CONTAINED],
+    ShutdownState.RUNNING: [ShutdownState.QUIESCING, ShutdownState.SAFE_HOLD],
+    ShutdownState.QUIESCING: [ShutdownState.SAFE_HOLD, ShutdownState.DRAINING, ShutdownState.CONTAINED],
+    ShutdownState.SAFE_HOLD: [ShutdownState.DRAINING, ShutdownState.SAFE_STOPPED, ShutdownState.CONTAINED],
+    ShutdownState.DRAINING: [ShutdownState.ROLLING_BACK, ShutdownState.SAFE_HOLD, ShutdownState.CONTAINED],
+    ShutdownState.ROLLING_BACK: [ShutdownState.CAPTURING, ShutdownState.SAFE_HOLD, ShutdownState.CONTAINED],
+    ShutdownState.CAPTURING: [ShutdownState.SAFE_STOPPED, ShutdownState.SAFE_HOLD, ShutdownState.CONTAINED],
     ShutdownState.SAFE_STOPPED: [],
     ShutdownState.CONTAINED: [],
 }

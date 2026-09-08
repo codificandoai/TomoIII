@@ -525,6 +525,25 @@ class SafeShutdownCoordinator:
             details=sanitized,
         )
 
+    def enter_safe_hold(self, reason: str, trace_id: Optional[str] = None) -> ShutdownStatus:
+        """Transición a SAFE_HOLD: pausa controlada sin perder estado."""
+        if self._state not in (ShutdownState.RUNNING, ShutdownState.QUIESCING):
+            return self._build_status()
+        if not self._shutdown_id:
+            self._shutdown_id = uuid.uuid4().hex[:12]
+        self._trace_id = trace_id or uuid.uuid4().hex[:16]
+        self._reason = reason
+        self._transition(ShutdownState.SAFE_HOLD, {"reason": reason})
+        return self._build_status()
+
+    def resume_from_safe_hold(self, trace_id: Optional[str] = None) -> ShutdownStatus:
+        """Reanuda desde SAFE_HOLD a RUNNING tras resolución del incidente."""
+        if self._state != ShutdownState.SAFE_HOLD:
+            return self._build_status()
+        self._trace_id = trace_id or uuid.uuid4().hex[:16]
+        self._transition(ShutdownState.RUNNING, {"reason": "resume_from_safe_hold"})
+        return self._build_status()
+
     # ------------------------------------------------------------------
     # Orquestación principal
     # ------------------------------------------------------------------

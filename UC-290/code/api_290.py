@@ -308,6 +308,32 @@ def metrics():
     return _guardian.get_metrics(), 200, {"Content-Type": "text/plain; charset=utf-8"}
 
 
+@app.route("/api/v1/safe-hold", methods=["GET"])
+def safe_hold_reviews():
+    """Expedientes en SAFE_HOLD."""
+    return jsonify({
+        "items": _guardian.get_safe_hold_reviews(),
+        "count": len(_guardian.get_safe_hold_reviews()),
+    })
+
+
+@app.route("/api/v1/safe-hold/<dossier_id>/release", methods=["POST"])
+def release_safe_hold(dossier_id):
+    """Libera un expediente SAFE_HOLD a revisión humana."""
+    data = request.get_json(silent=True) or {}
+    result = _guardian.release_safe_hold(
+        dossier_id=dossier_id,
+        reviewer_id=data.get("reviewer_id", ""),
+        action=HumanAction(data.get("action", "approve")),
+        modified_suggestion=data.get("modified_suggestion", ""),
+        override_reason=data.get("override_reason", ""),
+        review_notes=data.get("review_notes", ""),
+    )
+    if result is None:
+        return jsonify({"error": "dossier not in safe_hold"}), 404
+    return jsonify(result)
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="UC-290 HITL Guardian API")

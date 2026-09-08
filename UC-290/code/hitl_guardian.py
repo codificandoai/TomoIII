@@ -105,6 +105,11 @@ class HITLGuardian:
 
         # Verificar bloqueos duros
         blocked = self._check_hard_blocks(decision_input, risk_assessment)
+
+        # SAFE_HOLD: incertidumbre, conflicto, sin procedencia o ruptura de política
+        # sin ser un bloqueo duro. Mantiene el expediente en retención segura.
+        safe_hold = self._check_safe_hold_conditions(decision_input, risk_assessment)
+
         if blocked:
             dossier.status = DossierStatus.PENDING_REVIEW
             dossier.decision = HITLDecision.BLOCKED
@@ -115,6 +120,16 @@ class HITLGuardian:
             self.audit_trail.record_blocked(dossier, blocked)
             self.observability.increment("hitl_blocked_total")
             self.observability.log("WARN", f"Decisión bloqueada: {blocked}", trace_id)
+        elif safe_hold:
+            dossier.status = DossierStatus.SAFE_HOLD
+            dossier.decision = HITLDecision.SAFE_HOLD
+            result.decision = HITLDecision.SAFE_HOLD
+            result.escalated = True
+            result.escalation_reasons = [safe_hold]
+            result.issues = [safe_hold]
+            self.audit_trail.record_safe_hold(dossier, safe_hold)
+            self.observability.increment("hitl_safe_hold_total")
+            self.observability.log("WARN", f"Decisión en SAFE_HOLD: {safe_hold}", trace_id)
         elif risk_assessment.requires_escalation:
             # Escalar a humano
             notification = self.escalation_engine.escalate(dossier)
@@ -155,6 +170,19 @@ class HITLGuardian:
             return "UC-162 rechazó gobernanza LLMOps: bloqueo automático."
         if risk.risk_level.value == "critical" and self.config.require_human_for_critical:
             return "Riesgo crítico: requiere intervención humana obligatoria."
+        return None
+
+    def _check_safe_hold_conditions(self, decision_input: DecisionInput, risk: RiskAssessment) -> Optional[str]:
+        """Condiciones de incertidumbre que requieren retención segura (SAFE_HOLD)."""
+        # SAFE_HOLD es un estado intermedio cuando no hay bloqueo duro ni escalamiento formal.
+        if risk.requires_escalation:
+            return None
+        if decision_input.uc322_conflict_detected:
+            return "conflicto detectado por UC-322: SAFE_HOLD hasta resolución"
+        if decision_input.context.get("provenance_missing"):
+            return "datos sin procedencia: SAFE_HOLD"
+        if decision_input.uc325_reflection_score < 0.0:
+            return "reflexión UC-325 indica inconsistencia: SAFE_HOLD"
         return None
 
     # -----------------------------------------------------------------------
@@ -207,6 +235,38 @@ class HITLGuardian:
         """Retorna expedientes pendientes de revisión humana."""
         self.escalation_engine.check_timeouts()
         return self.escalation_engine.get_pending()
+
+    def get_safe_hold_reviews(self) -> List[Dict[str, Any]]:
+        """Retorna expedientes en SAFE_HOLD."""
+        return [
+            d.to_dict()
+            for d in self.dossiers.values()
+            if d.status == DossierStatus.SAFE_HOLD
+        ]
+
+    def release_safe_hold(
+        self,
+        dossier_id: str,
+        reviewer_id: str,
+        action: HumanAction,
+        modified_suggestion: str = "",
+        override_reason: str = "",
+        review_notes: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        """Libera un expediente SAFE_HOLD a aprobado/rechazado/modificado."""
+        dossier = self.dossiers.get(dossier_id)
+        if dossier is None or dossier.status != DossierStatus.SAFE_HOLD:
+            return None
+
+        dossier.status = DossierStatus.PENDING_REVIEW
+        return self.submit_human_review(
+            dossier_id=dossier_id,
+            reviewer_id=reviewer_id,
+            action=action,
+            modified_suggestion=modified_suggestion,
+            override_reason=override_reason,
+            review_notes=review_notes,
+        )
 
     def present_dossier(self, dossier_id: str) -> Optional[Dict[str, Any]]:
         """Presenta un expediente para revisión humana."""

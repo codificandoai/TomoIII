@@ -50,6 +50,11 @@ from policy_engine import PolicyEngine
 from pre_intent_gate import PreIntentGate
 from quota_manager import QuotaManager
 from sandbox_executor import SandboxExecutor
+from separation_of_powers import (
+    ActionPowerClassifier,
+    Power,
+    SeparationOfPowersRegistry,
+)
 from pydantic import ValidationError
 from schema_registry import (
     HIGH_PAYMENT_THRESHOLD,
@@ -86,6 +91,7 @@ class SecureToolGateway:
         # Estado interno
         self._consumed_nonces: set = set()
         self._kill_switch = False
+        self._power_registry = SeparationOfPowersRegistry()
 
     # -----------------------------------------------------------------------
     # Authorize phase
@@ -105,6 +111,15 @@ class SecureToolGateway:
             self._audit("system", "authorize_blocked", {"trace_id": trace_id, "reason": reason})
             self.observability.increment("uc300_authorize_killed_total")
             return self._denied(AuthorizationVerdict.KILLED, reason, request)
+
+        # 0. Separation of powers: no single agent can propose, authorize,
+        #    execute and rewrite its own controls.
+        conflict = self._check_power_separation(request.agent_id, request.action)
+        if conflict:
+            reason = f"separation of powers violated: {conflict}"
+            self._audit(request.agent_id, "powers_denied", {"trace_id": trace_id, "reason": reason})
+            self.observability.increment("uc300_powers_denied_total")
+            return self._denied(AuthorizationVerdict.DENIED_POLICY, reason, request)
 
         # 1. Canonicalize + Schema validation
         try:
@@ -227,6 +242,14 @@ class SecureToolGateway:
         if self._kill_switch:
             reason = "kill switch enabled: gateway offline"
             self._audit("system", "execute_blocked", {"trace_id": trace_id, "reason": reason})
+            return self._execution_failure(request, reason, ExecutionStatus.BLOCKED)
+
+        # 0. Separation of powers re-validation in execution phase.
+        conflict = self._check_power_separation(request.agent_id, request.action)
+        if conflict:
+            reason = f"separation of powers violated: {conflict}"
+            self._audit(request.agent_id, "powers_denied", {"trace_id": trace_id, "reason": reason})
+            self.observability.increment("uc300_powers_denied_total")
             return self._execution_failure(request, reason, ExecutionStatus.BLOCKED)
 
         # Re-validate schema (TOCTOU primer paso)
@@ -581,6 +604,16 @@ class SecureToolGateway:
 
     def _is_destructive(self, action: str) -> bool:
         return action in ("delete_product", "send_payment")
+
+    def _classify_action_power(self, action: str) -> Power:
+        """Asigna un poder a la acción solicitada mediante clasificador robusto."""
+        return ActionPowerClassifier.classify(action)
+
+    def _check_power_separation(self, agent_id: str, action: str) -> Optional[str]:
+        """Registra y valida separación de poderes para un agente."""
+        power = self._classify_action_power(action)
+        self._power_registry.register(agent_id, [power])
+        return self._power_registry.check_conflict(agent_id, power.value)
 
     def _denied(
         self,

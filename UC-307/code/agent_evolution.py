@@ -10,6 +10,7 @@ import copy
 import random
 from typing import Dict, List, Optional
 
+from auto_evolution_tracer import AutoEvolutionTracer, EvolutionAction
 from config import EVOLUTION
 from models import AgentDNA, DecisionAction
 
@@ -19,7 +20,7 @@ class DNAOperators:
 
     def __init__(self, config=EVOLUTION):
         self.cfg = config
-
+        self.tracer = AutoEvolutionTracer()
     def default_dna(self, agent_id: Optional[str] = None) -> AgentDNA:
         """Genera un ADN con los hiperparámetros por defecto."""
         params = dict(self.cfg.default_hyperparams)
@@ -29,7 +30,7 @@ class DNAOperators:
             hyperparams=params,
         )
 
-    def mutate(self, dna: AgentDNA) -> AgentDNA:
+    def mutate(self, dna: AgentDNA, reason: str = "") -> AgentDNA:
         """Crea una nueva versión del ADN perturbando hiperparámetros."""
         new_params = copy.deepcopy(dna.hyperparams)
         for key, value in new_params.items():
@@ -38,14 +39,22 @@ class DNAOperators:
                 delta = random.uniform(-1, 1) * self.cfg.mutation_strength * (hi - lo)
                 new_value = max(lo, min(hi, value + delta))
                 new_params[key] = round(new_value, 6)
-        return AgentDNA(
+        child = AgentDNA(
             agent_id=dna.agent_id,
             version=dna.version + 1,
             hyperparams=new_params,
             parent_ids=dna.parent_ids + [dna.agent_id],
         )
+        self.tracer.record(
+            agent_id=dna.agent_id,
+            action=EvolutionAction.MUTATE,
+            parent_dna=dna.hyperparams,
+            child_dna=child.hyperparams,
+            reason=reason or "random mutation",
+        )
+        return child
 
-    def crossover(self, parent_a: AgentDNA, parent_b: AgentDNA) -> AgentDNA:
+    def crossover(self, parent_a: AgentDNA, parent_b: AgentDNA, reason: str = "") -> AgentDNA:
         """Produce un hijo mezclando los hiperparámetros de dos progenitores."""
         child_params: Dict[str, float] = {}
         blend = self.cfg.crossover_blend
@@ -66,12 +75,20 @@ class DNAOperators:
                 lo, hi = self.cfg.param_bounds[key]
                 child_params[key] = max(lo, min(hi, child_params[key]))
 
-        return AgentDNA(
+        child = AgentDNA(
             agent_id=f"child_{random.randint(1000, 9999)}",
             version=1,
             hyperparams=child_params,
             parent_ids=[parent_a.agent_id, parent_b.agent_id],
         )
+        self.tracer.record(
+            agent_id=child.agent_id,
+            action=EvolutionAction.CROSSOVER,
+            parent_dna={"parent_a": parent_a.hyperparams, "parent_b": parent_b.hyperparams},
+            child_dna=child.hyperparams,
+            reason=reason or "crossover",
+        )
+        return child
 
     def adjust_params(self, dna: AgentDNA, reason: str = "") -> AgentDNA:
         """Ajusta hiperparámetros de forma heurística según el tipo de problema.
@@ -100,12 +117,20 @@ class DNAOperators:
                 if key in new_params and key in self.cfg.param_bounds:
                     lo, hi = self.cfg.param_bounds[key]
                     new_params[key] = max(lo, new_params[key] * 0.95)
-        return AgentDNA(
+        child = AgentDNA(
             agent_id=dna.agent_id,
             version=dna.version + 1,
             hyperparams=new_params,
             parent_ids=dna.parent_ids + [dna.agent_id],
         )
+        self.tracer.record(
+            agent_id=dna.agent_id,
+            action=EvolutionAction.ADJUST,
+            parent_dna=dna.hyperparams,
+            child_dna=child.hyperparams,
+            reason=reason or "heuristic adjust",
+        )
+        return child
 
     def apply_action(
         self,
@@ -116,14 +141,31 @@ class DNAOperators:
     ) -> Optional[AgentDNA]:
         """Aplica una acción evolutiva y devuelve el ADN resultante o None si se elimina."""
         if action == DecisionAction.MUTATE:
-            return self.mutate(dna)
+            return self.mutate(dna, reason)
         if action == DecisionAction.ADJUST_PARAMS:
             return self.adjust_params(dna, reason)
         if action == DecisionAction.GROW_CROSSOVER and mate_dna is not None:
-            return self.crossover(dna, mate_dna)
+            return self.crossover(dna, mate_dna, reason)
         if action == DecisionAction.GROW_RANDOM:
-            return self.default_dna()
-        # PERSIST, RETRAIN, ELIMINATE no alteran el ADN
+            child = self.default_dna()
+            self.tracer.record(
+                agent_id=dna.agent_id,
+                action=EvolutionAction.MODIFY_PARAMS,
+                parent_dna=dna.hyperparams,
+                child_dna=child.hyperparams,
+                reason=reason or "grow random",
+            )
+            return child
+        if action == DecisionAction.ELIMINATE:
+            self.tracer.record(
+                agent_id=dna.agent_id,
+                action=EvolutionAction.ELIMINATE,
+                parent_dna=dna.hyperparams,
+                child_dna={},
+                reason=reason or "eliminated by fitness",
+            )
+            return None
+        # PERSIST y RETRAIN no alteran el ADN
         return dna
 
 

@@ -427,6 +427,73 @@ def metrics():
     return layer.engine.observability.export_prometheus(), 200, {"Content-Type": "text/plain"}
 
 
+@app.route("/api/v1/maqri/governed/submit", methods=["POST"])
+def maqri_governed_submit():
+    """Somete una hipótesis de memoria local."""
+    data = request.get_json(force=True)
+    agent_id = data.get("agent_id", "")
+    content = data.get("content", "")
+    content_type = data.get("content_type", "fact")
+    source_id = data.get("source_id", "")
+    evidence_hash = data.get("evidence_hash", "")
+    confidence = float(data.get("confidence", 0.5))
+    ttl_seconds = data.get("ttl_seconds")
+
+    if not agent_id or not content or not source_id or not evidence_hash:
+        return jsonify({"error": "agent_id, content, source_id and evidence_hash are required"}), 400
+
+    memory_id = layer.engine.submit_governed_memory(
+        agent_id=agent_id,
+        content=content,
+        content_type=content_type,
+        source_id=source_id,
+        evidence_hash=evidence_hash,
+        confidence=confidence,
+        ttl_seconds=float(ttl_seconds) if ttl_seconds is not None else None,
+    )
+    return jsonify({"memory_id": memory_id, "status": "hypothesis"})
+
+
+@app.route("/api/v1/maqri/governed/validate", methods=["POST"])
+def maqri_governed_validate():
+    """Promueve una hipótesis a memoria compartida con aprobación."""
+    data = request.get_json(force=True)
+    memory_id = data.get("memory_id", "")
+    approved_by = data.get("approved_by", "")
+    trace_id = data.get("trace_id", "")
+
+    if not memory_id or not approved_by:
+        return jsonify({"error": "memory_id and approved_by are required"}), 400
+
+    try:
+        item = layer.engine.validate_governed_memory(
+            memory_id=memory_id,
+            approved_by=approved_by,
+            trace_id=trace_id,
+        )
+        return jsonify(item)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/v1/maqri/governed", methods=["GET"])
+def maqri_governed_get():
+    """Recupera memoria gobernada visible para un agente."""
+    agent_id = request.args.get("agent_id", "")
+    scope = request.args.get("scope", "domain")
+    query = request.args.get("query", "")
+
+    if not agent_id:
+        return jsonify({"error": "agent_id is required"}), 400
+
+    items = layer.engine.get_governed_memory(
+        agent_id=agent_id,
+        scope=scope,
+        query=query,
+    )
+    return jsonify({"items": items})
+
+
 # ─── SERVER ──────────────────────────────────────────────────────────────────
 
 def run_server(port: int = 5326) -> None:

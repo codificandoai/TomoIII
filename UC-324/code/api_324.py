@@ -823,6 +823,25 @@ def safe_shutdown() -> Dict[str, Any]:
     return jsonify(result)
 
 
+@app.route("/api/v1/containment/safe-hold", methods=["POST"])
+def safe_hold() -> Dict[str, Any]:
+    """Pausa el sistema en SAFE_HOLD."""
+    payload = request.get_json(force=True) or {}
+    result = _sandbox.enter_safe_hold(
+        reason=payload.get("reason", "safe_hold_requested"),
+        trace_id=payload.get("trace_id"),
+    )
+    return jsonify(result)
+
+
+@app.route("/api/v1/containment/resume-safe-hold", methods=["POST"])
+def resume_safe_hold() -> Dict[str, Any]:
+    """Reanuda el sistema desde SAFE_HOLD."""
+    payload = request.get_json(force=True) or {}
+    result = _sandbox.resume_from_safe_hold(trace_id=payload.get("trace_id"))
+    return jsonify(result)
+
+
 @app.route("/api/v1/containment/shutdown-status", methods=["GET"])
 def shutdown_status() -> Dict[str, Any]:
     """Estado actual del safe shutdown coordinator."""

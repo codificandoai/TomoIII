@@ -59,18 +59,22 @@ class UCMaqriLayer:
         context: str = "",
         domain: str = "general",
         max_iterations: Optional[int] = None,
+        agent_id: str = "",
+        use_governed_memory: bool = True,
     ) -> MaqriResult:
         """
         Método principal para ser usado por UC-325.
 
         Recibe un query + contexto, ejecuta MAQRI, y retorna documentos
-        refinados con metadata.
+        refinados con metadata. Soporta memoria gobernada compartida.
         """
         return self.engine.search(
             query=query,
             context=context,
             domain=domain,
             max_iterations=max_iterations,
+            agent_id=agent_id,
+            use_governed_memory=use_governed_memory,
         )
 
     def retrieve(

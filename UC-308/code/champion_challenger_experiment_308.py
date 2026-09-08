@@ -35,6 +35,7 @@ from cc_models_308 import (
     StageMetrics,
 )
 from cc_predictors_308 import PredictorAdapter
+from experiment_hypothesis import ExperimentHypothesis, HypothesisRegistry, HypothesisStatus
 from observability_308 import ObservabilityManager
 
 
@@ -181,6 +182,56 @@ class ChampionChallengerExperiment:
         self._shutdown_postmortem: Optional[Dict[str, Any]] = None
         self._seen_event_ids: set = set()
         self._hitl_used_request_ids: set = set()
+        self.hypothesis_registry = HypothesisRegistry()
+        self._active_hypothesis: Optional[ExperimentHypothesis] = None
+
+    # ------------------------------------------------------------------
+    # Hypothesis lifecycle (MLOps/LLMOps formal artifact)
+    # ------------------------------------------------------------------
+    def create_hypothesis(
+        self,
+        metric: str,
+        target_improvement: float,
+        challenger_change: str,
+        rationale: str,
+        success_criteria: Optional[Dict[str, Any]] = None,
+        rollback_criteria: Optional[Dict[str, Any]] = None,
+    ) -> ExperimentHypothesis:
+        hyp = self.hypothesis_registry.create(
+            self.experiment_id,
+            metric,
+            target_improvement,
+            challenger_change,
+            rationale,
+            success_criteria,
+            rollback_criteria,
+        )
+        self._active_hypothesis = hyp
+        self.audit.append("hypothesis_created", hyp.to_dict())
+        return hyp
+
+    def approve_hypothesis(self, hypothesis_id: str, approved_by: str, trace_id: str) -> ExperimentHypothesis:
+        hyp = self.hypothesis_registry.approve(
+            self.experiment_id, hypothesis_id, approved_by, trace_id
+        )
+        self._active_hypothesis = hyp
+        self.audit.append("hypothesis_approved", hyp.to_dict())
+        return hyp
+
+    def _ensure_hypothesis(self) -> Optional[ExperimentHypothesis]:
+        """Garantiza que existe una hipótesis activa; si no, crea una default."""
+        if self._active_hypothesis is not None:
+            return self._active_hypothesis
+        hyp = self.create_hypothesis(
+            metric="improvement",
+            target_improvement=0.0,
+            challenger_change="challenger vs champion",
+            rationale="default hypothesis created automatically for backwards compatibility",
+            success_criteria={},
+            rollback_criteria={},
+        )
+        hyp.approve("system", "default")
+        return hyp
 
     # ------------------------------------------------------------------
     # Registration
@@ -260,6 +311,8 @@ class ChampionChallengerExperiment:
             return {"success": False, "reason": "both predictors must be registered"}
         if stage not in {s.value for s in ExperimentState}:
             return {"success": False, "reason": f"invalid stage {stage}"}
+        # El ciclo MLOps/LLMOps comienza con una hipótesis aprobada y versionada.
+        self._ensure_hypothesis()
         self.state = stage
         self.observability.gauge(
             "uc308_cc_experiment_state",

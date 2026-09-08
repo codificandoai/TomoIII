@@ -104,6 +104,12 @@ class AuditTrail:
             {"reason": reason}
         )
 
+    def record_safe_hold(self, dossier: DecisionDossier, reason: str) -> AuditEntry:
+        return self.record(
+            dossier, "safe_hold", "system",
+            {"reason": reason}
+        )
+
     def get_entries(self, dossier_id: str = None, trace_id: str = None) -> List[Dict[str, Any]]:
         """Filtra entradas por dossier o trace."""
         result = []

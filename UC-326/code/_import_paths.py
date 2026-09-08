@@ -14,8 +14,9 @@ import os
 
 _uc315_path = os.path.join(os.path.dirname(__file__), "..", "..", "UC-315", "code")
 _uc325_path = os.path.join(os.path.dirname(__file__), "..", "..", "UC-325", "code")
+_uc296_path = os.path.join(os.path.dirname(__file__), "..", "..", "UC-296", "code")
 
-for _path in [_uc315_path, _uc325_path]:
+for _path in [_uc315_path, _uc325_path, _uc296_path]:
     _abs = os.path.abspath(_path)
     if _abs not in sys.path and os.path.isdir(_abs):
         sys.path.insert(0, _abs)

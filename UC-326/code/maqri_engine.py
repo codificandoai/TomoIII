@@ -10,6 +10,7 @@ Orquesta el ciclo de búsqueda inteligente con memoria:
 6. Devuelve chunks refinados a UC-325.
 """
 
+import _import_paths  # noqa: F401
 from typing import List, Dict, Optional, Any, Callable
 import time
 
@@ -17,6 +18,9 @@ from maqri_models import (
     MaqriResult, MaqriConfig, MaqriIteration, SearchEpisode,
     RetrievedDocument, WorkingMemory, MemoryQuery, RetrievalVerdict,
     QueryVariant,
+)
+from governed_memory import (
+    GovernedMemoryStore, MemoryProvenance, MemoryScope, MemoryVerdict,
 )
 from episodic_memory import EpisodicMemory
 from semantic_memory import SemanticMemory
@@ -69,12 +73,73 @@ class MaqriEngine:
         # Historial de búsquedas
         self._history: List[MaqriResult] = []
 
+        # Governed memory shared store
+        self.governed_memory = GovernedMemoryStore()
+
+    def submit_governed_memory(
+        self,
+        agent_id: str,
+        content: str,
+        content_type: str,
+        source_id: str,
+        evidence_hash: str,
+        confidence: float,
+        ttl_seconds: Optional[float] = None,
+    ) -> str:
+        """Somete una hipótesis de memoria local a revisión."""
+        provenance = MemoryProvenance(
+            source_id=source_id,
+            source_type="maqri_retrieval",
+            evidence_hash=evidence_hash,
+            agent_id=agent_id,
+        )
+        item = self.governed_memory.submit(
+            agent_id=agent_id,
+            content=content,
+            content_type=content_type,
+            provenance=provenance,
+            confidence=confidence,
+            ttl_seconds=ttl_seconds,
+        )
+        return item.memory_id
+
+    def validate_governed_memory(
+        self,
+        memory_id: str,
+        approved_by: str,
+        trace_id: str,
+        automatic_checks: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Promueve una hipótesis a memoria compartida tras aprobación externa."""
+        item = self.governed_memory.validate_for_promotion(
+            memory_id, approved_by, trace_id, automatic_checks
+        )
+        return item.to_dict()
+
+    def get_governed_memory(
+        self,
+        agent_id: str,
+        scope: str = "domain",
+        query: str = "",
+    ) -> List[Dict[str, Any]]:
+        """Recupera memoria gobernada visible para el agente."""
+        items = self.governed_memory.get_visible(
+            agent_id=agent_id,
+            scope=MemoryScope(scope),
+        )
+        if query:
+            q = query.lower()
+            items = [it for it in items if q in it.content.lower()]
+        return [it.to_dict() for it in items]
+
     def search(
         self,
         query: str,
         context: str = "",
         domain: str = "general",
         max_iterations: Optional[int] = None,
+        agent_id: str = "",
+        use_governed_memory: bool = True,
     ) -> MaqriResult:
         """
         Ejecuta una búsqueda MAQRI iterativa.
@@ -145,6 +210,24 @@ class MaqriEngine:
                     iteration=iteration,
                 )
                 docs.extend(docs_from_variants)
+
+                # Memoria gobernada compartida
+                if use_governed_memory and agent_id:
+                    governed = self.governed_memory.get_visible(
+                        agent_id=agent_id,
+                        scope=MemoryScope.DOMAIN,
+                    )
+                    for item in governed:
+                        docs.append(RetrievedDocument(
+                            content=item.content,
+                            source=item.provenance.source_id if item.provenance else "governed",
+                            score=item.confidence,
+                            metadata={
+                                "governed_memory_id": item.memory_id,
+                                "verdict": item.verdict.value,
+                                "scope": item.scope.value,
+                            },
+                        ))
 
                 # Dedup interno
                 seen = {}

@@ -514,6 +514,35 @@ class ContainmentSandbox:
         )
         return status.to_dict()
 
+    def enter_safe_hold(self, reason: str = "safe_hold_requested", trace_id: Optional[str] = None) -> Dict[str, Any]:
+        """Pausa el sistema en SAFE_HOLD sin perder estado."""
+        from safe_shutdown_coordinator import SafeShutdownCoordinator, build_concrete_adapters
+        from safe_shutdown_models import ShutdownConfig
+
+        if self._shutdown_coordinator is None:
+            adapters = self._safe_shutdown_adapters or build_concrete_adapters()
+            self._shutdown_coordinator = SafeShutdownCoordinator(
+                config=ShutdownConfig(),
+                tool_gateway=adapters.get("tool_gateway"),
+                scheduler=adapters.get("scheduler"),
+                observability=adapters.get("observability"),
+                memory_snapshot=adapters.get("memory_snapshot"),
+                reactivation_approval=adapters.get("reactivation_approval"),
+            )
+
+        status = self._shutdown_coordinator.enter_safe_hold(
+            reason=reason,
+            trace_id=trace_id,
+        )
+        return status.to_dict()
+
+    def resume_from_safe_hold(self, trace_id: Optional[str] = None) -> Dict[str, Any]:
+        """Reanuda el sistema desde SAFE_HOLD."""
+        if self._shutdown_coordinator is None:
+            return {"state": "no_coordinator"}
+        status = self._shutdown_coordinator.resume_from_safe_hold(trace_id=trace_id)
+        return status.to_dict()
+
     def get_shutdown_status(self) -> Optional[Dict[str, Any]]:
         """Return the current shutdown status, or None if no coordinator."""
         if self._shutdown_coordinator is not None:
