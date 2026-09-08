@@ -7,10 +7,12 @@ Puerto por defecto: 5300
 
 from __future__ import annotations
 
+import time
 from typing import Any, Dict, List, Optional
 
 from flask import Flask, jsonify, request
 
+from intent_models import IntentRequest
 from models_300 import GatewayConfig, ToolRequest
 from secure_tool_gateway import SecureToolGateway
 
@@ -101,6 +103,35 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
         "endpoint": "GET /api/v1/schema",
         "description": "INPUT/OUTPUT cards de la API.",
         "parameters": [],
+    },
+    "POST /api/v1/prefilter-intent": {
+        "endpoint": "POST /api/v1/prefilter-intent",
+        "description": "Pre-Intent Gate: normaliza, valida, clasifica y decide ALLOW/BLOCK/ESCALATE antes de UC-315.",
+        "parameters": [
+            {"name": "raw_text", "type": "string", "required": True, "example": "Update price of SKU-001 to 120.50"},
+            {"name": "agent_id", "type": "string", "required": True, "example": "agent_pricing_eu"},
+            {"name": "tenant_id", "type": "string", "required": True, "example": "eu"},
+            {"name": "locale", "type": "string", "required": False, "default": "en", "example": "en"},
+            {"name": "domain", "type": "string", "required": False, "default": "", "example": "internal.example.com"},
+            {"name": "request_id", "type": "string", "required": False, "example": "req_001"},
+            {"name": "timestamp", "type": "number", "required": False, "default": "now", "example": 1700000000.0},
+            {"name": "approval_intent_hash", "type": "string", "required": False},
+            {"name": "approval_reviewer_id", "type": "string", "required": False},
+            {"name": "approval_dossier_id", "type": "string", "required": False},
+            {"name": "approval_dossier_hash", "type": "string", "required": False},
+            {"name": "approval_expires_at", "type": "number", "required": False},
+        ],
+    },
+    "POST /api/v1/prefilter-intent/approve": {
+        "endpoint": "POST /api/v1/prefilter-intent/approve",
+        "description": "Registra aprobación humana explícita ligada al hash exacto de intención para resolver ESCALATE sin red.",
+        "parameters": [
+            {"name": "intent_hash", "type": "string", "required": True},
+            {"name": "reviewer_id", "type": "string", "required": True},
+            {"name": "dossier_id", "type": "string", "required": False},
+            {"name": "dossier_hash", "type": "string", "required": False},
+            {"name": "ttl_seconds", "type": "number", "required": False, "default": 3600},
+        ],
     },
 }
 
@@ -196,6 +227,31 @@ OUTPUT_CARDS: Dict[str, Dict[str, Any]] = {
             {"name": "output_cards", "type": "object"},
         ],
     },
+    "POST /api/v1/prefilter-intent": {
+        "endpoint": "POST /api/v1/prefilter-intent",
+        "description": "Decisión del Pre-Intent Gate.",
+        "fields": [
+            {"name": "verdict", "type": "string"},
+            {"name": "intent_hash", "type": "string"},
+            {"name": "risk", "type": "string"},
+            {"name": "reason", "type": "string"},
+            {"name": "summary", "type": "string"},
+            {"name": "requested_capability", "type": "string"},
+            {"name": "category", "type": "string"},
+            {"name": "evidence_refs", "type": "array"},
+            {"name": "resolved_by_approval", "type": "boolean"},
+            {"name": "escalation_payload", "type": "object|null"},
+        ],
+    },
+    "POST /api/v1/prefilter-intent/approve": {
+        "endpoint": "POST /api/v1/prefilter-intent/approve",
+        "description": "Confirmación de registro de aprobación.",
+        "fields": [
+            {"name": "status", "type": "string"},
+            {"name": "intent_hash", "type": "string"},
+            {"name": "reviewer_id", "type": "string"},
+        ],
+    },
 }
 
 
@@ -214,6 +270,23 @@ def _tool_request_from_payload(payload: Dict[str, Any]) -> ToolRequest:
         dossier_status=payload.get("dossier_status", ""),
         reviewer_id=payload.get("reviewer_id", ""),
         approval_action_hash=payload.get("approval_action_hash", ""),
+    )
+
+
+def _intent_request_from_payload(payload: Dict[str, Any]) -> IntentRequest:
+    return IntentRequest(
+        raw_text=payload.get("raw_text", ""),
+        agent_id=payload.get("agent_id", ""),
+        tenant_id=payload.get("tenant_id", ""),
+        locale=payload.get("locale", "en"),
+        domain=payload.get("domain", ""),
+        request_id=payload.get("request_id", ""),
+        timestamp=payload.get("timestamp", time.time()),
+        approval_intent_hash=payload.get("approval_intent_hash", ""),
+        approval_reviewer_id=payload.get("approval_reviewer_id", ""),
+        approval_dossier_id=payload.get("approval_dossier_id", ""),
+        approval_dossier_hash=payload.get("approval_dossier_hash", ""),
+        approval_expires_at=payload.get("approval_expires_at", 0.0),
     )
 
 
@@ -241,6 +314,8 @@ def index():
             {"method": "GET", "path": "/api/v1/metrics"},
             {"method": "POST", "path": "/api/v1/reset"},
             {"method": "POST", "path": "/api/v1/kill-switch"},
+            {"method": "POST", "path": "/api/v1/prefilter-intent"},
+            {"method": "POST", "path": "/api/v1/prefilter-intent/approve"},
         ],
     })
 
@@ -329,6 +404,39 @@ def kill_switch():
     enabled = bool(payload.get("enabled", False))
     _gateway.set_kill_switch(enabled)
     return jsonify({"kill_switch": _gateway.is_killed()})
+
+
+@app.route("/api/v1/prefilter-intent", methods=["POST"])
+def prefilter_intent():
+    payload = request.get_json(force=True) or {}
+    if "raw_text" not in payload or "agent_id" not in payload or "tenant_id" not in payload:
+        return jsonify({"error": "raw_text, agent_id and tenant_id are required"}), 400
+    intent_req = _intent_request_from_payload(payload)
+    decision = _gateway.prefilter_intent(intent_req)
+    return jsonify(decision.to_dict())
+
+
+@app.route("/api/v1/prefilter-intent/approve", methods=["POST"])
+def approve_intent():
+    payload = request.get_json(force=True) or {}
+    required = ["intent_hash", "reviewer_id"]
+    missing = [f for f in required if f not in payload]
+    if missing:
+        return jsonify({"error": f"missing fields: {missing}"}), 400
+    ok = _gateway.approve_intent(
+        intent_hash=payload["intent_hash"],
+        reviewer_id=payload["reviewer_id"],
+        dossier_id=payload.get("dossier_id", ""),
+        dossier_hash=payload.get("dossier_hash", ""),
+        ttl_seconds=payload.get("ttl_seconds", 3600.0),
+    )
+    if not ok:
+        return jsonify({"status": "error", "intent_hash": payload["intent_hash"], "reviewer_id": payload["reviewer_id"]}), 400
+    return jsonify({
+        "status": "ok",
+        "intent_hash": payload["intent_hash"],
+        "reviewer_id": payload["reviewer_id"],
+    })
 
 
 def main() -> None:

@@ -21,6 +21,12 @@ from capability_tokens import CapabilityTokenManager
 from credential_broker import CredentialBroker
 from immutable_audit import ImmutableAuditTrail
 from injection_detector import InjectionDetectionError, assert_clean
+from intent_models import (
+    IntentDecision,
+    IntentRequest,
+    IntentRisk,
+    IntentVerdict,
+)
 from models_300 import (
     AuthorizationDecision,
     AuthorizationVerdict,
@@ -34,6 +40,7 @@ from models_300 import (
 )
 from observability_300 import ObservabilityManager
 from policy_engine import PolicyEngine
+from pre_intent_gate import PreIntentGate
 from quota_manager import QuotaManager
 from sandbox_executor import SandboxExecutor
 from pydantic import ValidationError
@@ -66,6 +73,7 @@ class SecureToolGateway:
         self.sandbox_executor = SandboxExecutor()
         self.audit_trail = ImmutableAuditTrail()
         self.observability = ObservabilityManager()
+        self.pre_intent_gate = PreIntentGate(config=self.config)
 
         # Estado interno
         self._consumed_nonces: set = set()
@@ -328,6 +336,52 @@ class SecureToolGateway:
         return result
 
     # -----------------------------------------------------------------------
+    # Pre-Intent Gate (antes de UC-315)
+    # -----------------------------------------------------------------------
+
+    def prefilter_intent(self, intent_request: IntentRequest) -> IntentDecision:
+        """Filtro determinista de intenciones de usuario antes de UC-315."""
+        return self.pre_intent_gate.prefilter(intent_request)
+
+    def process_user_request(
+        self,
+        intent_request: IntentRequest,
+    ) -> Dict[str, Any]:
+        """Pipeline usuario → PreIntentGate. Solo devuelve ready_for_uc315 si ALLOW."""
+        start = time.time()
+        decision = self.pre_intent_gate.prefilter(intent_request)
+        return {
+            "ready_for_uc315": decision.verdict == IntentVerdict.ALLOW,
+            "verdict": decision.verdict.value,
+            "intent_hash": decision.intent_hash,
+            "risk": decision.risk.value,
+            "reason": decision.reason,
+            "requested_capability": decision.requested_capability,
+            "decision": decision.to_dict(),
+            "duration_ms": (time.time() - start) * 1000,
+        }
+
+    def approve_intent(
+        self,
+        intent_hash: str,
+        reviewer_id: str,
+        dossier_id: str = "",
+        dossier_hash: str = "",
+        ttl_seconds: float = 3600.0,
+    ) -> bool:
+        """Registra una aprobación explícita ligada al hash exacto de intención."""
+        return self.pre_intent_gate.approve_intent(
+            intent_hash=intent_hash,
+            reviewer_id=reviewer_id,
+            dossier_id=dossier_id,
+            dossier_hash=dossier_hash,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def get_pregate_audit_trail(self, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return self.pre_intent_gate.get_audit_trail(trace_id=trace_id)
+
+    # -----------------------------------------------------------------------
     # Human approval helpers
     # -----------------------------------------------------------------------
 
@@ -370,6 +424,7 @@ class SecureToolGateway:
             "credential_broker": self.credential_broker.get_summary(),
             "sandbox_products": self.sandbox_executor.get_state_snapshot()["products"],
             "observability": self.observability.get_summary(),
+            "pre_intent_gate": self.pre_intent_gate.get_status(),
         }
 
     def get_audit_trail(self, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -393,6 +448,7 @@ class SecureToolGateway:
         self.sandbox_executor.reset_state()
         self.audit_trail.reset()
         self.observability.reset()
+        self.pre_intent_gate.reset()
         self._consumed_nonces.clear()
         self._kill_switch = False
 

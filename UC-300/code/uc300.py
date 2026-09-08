@@ -11,6 +11,12 @@ from capability_tokens import CapabilityTokenManager
 from credential_broker import CredentialBroker, CredentialLease
 from immutable_audit import ImmutableAuditTrail
 from injection_detector import InjectionDetectionError
+from intent_models import (
+    IntentDecision,
+    IntentRequest,
+    IntentRisk,
+    IntentVerdict,
+)
 from models_300 import (
     AuditEntry,
     AuthorizationDecision,
@@ -27,6 +33,7 @@ from models_300 import (
 )
 from observability_300 import ObservabilityManager
 from policy_engine import PolicyEngine, PolicyRule
+from pre_intent_gate import PreIntentGate
 from quota_manager import QuotaManager
 from sandbox_executor import SandboxExecutor, SimulatedState
 from schema_registry import (
@@ -41,6 +48,12 @@ from secure_tool_gateway import SecureToolGateway
 __all__ = [
     # Core gateway
     "SecureToolGateway",
+    # Pre-Intent Gate
+    "PreIntentGate",
+    "IntentRequest",
+    "IntentDecision",
+    "IntentVerdict",
+    "IntentRisk",
     # Models
     "GatewayConfig",
     "ToolRequest",
