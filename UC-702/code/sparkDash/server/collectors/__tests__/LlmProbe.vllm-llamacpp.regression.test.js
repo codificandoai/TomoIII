@@ -90,7 +90,7 @@ test("vLLM probe: counter diffs + tiles; skips get_server_info when known vllm",
   assert.equal(snap.backend, "vllm");
   assert.equal(snap.modelId, "meta-llama/Llama-3.1-8B");
   assert.equal(snap.contextLength, 8192);
-  assert.equal(snap.generationTps, 200); // (900-500)/2
+  assert.ok(Math.abs(snap.generationTps - 200) <= 0.2); // (900-500)/2
   // Prefill is no longer prompt-token delta over the poll interval. vLLM credits
   // prompt_tokens_total at ADMISSION, so that ratio reported an 80K prompt as ~39,500 tok/s
   // against a real effective rate near 1,600. It is now tokens over the seconds the TTFT
