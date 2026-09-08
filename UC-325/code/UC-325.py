@@ -49,6 +49,10 @@ from hallucination_detector import HallucinationDetector
 from query_refiner import QueryRefiner
 from retrieval_evaluator import RetrievalEvaluator
 from convergence_monitor import ConvergenceMonitor
+from meta_reasoning_orchestrator import (
+    MetaReasoningOrchestrator,
+    ReasoningHeuristic,
+)
 from observability_325 import ObservabilityManager
 
 
@@ -239,11 +243,15 @@ class ReasoningLoopEngine:
         self.retrieval_evaluator = RetrievalEvaluator(
             min_relevance=self.config.min_chunk_score,
         )
+        self.observability = ObservabilityManager()
+
         self.convergence_monitor = ConvergenceMonitor(
             min_convergence_delta=self.config.min_convergence_delta,
             stall_threshold=self.config.stall_threshold,
         )
-        self.observability = ObservabilityManager()
+        self.meta_orchestrator = MetaReasoningOrchestrator(
+            observability=self.observability,
+        )
 
         # Historial
         self._history: List[ReasoningResult] = []
@@ -253,6 +261,7 @@ class ReasoningLoopEngine:
         query: str,
         domain: str = "general",
         max_rounds: Optional[int] = None,
+        context: Optional[Dict[str, Any]] = None,
     ) -> ReasoningResult:
         """
         Ejecuta el bucle de razonamiento completo.
@@ -261,27 +270,57 @@ class ReasoningLoopEngine:
         - query: consulta en lenguaje natural.
         - domain: dominio del razonamiento.
         - max_rounds: override del máximo de iteraciones.
+        - context: metacontext para el MetaReasoningOrchestrator.
 
         Salida:
         - ReasoningResult con respuesta, confianza, veredicto, trazas.
         """
+        # Metarrazonamiento: planificar heurística y recursos
+        meta_context = context or {}
+        meta_context["requested_max_rounds"] = max_rounds
+        meta_plan = self.meta_orchestrator.plan(
+            query=query,
+            domain=domain,
+            context=meta_context,
+            trace_id=None,
+        )
+
+        # Aplicar plan al motor
+        adjusted = meta_plan.adjusted_params
+        self.convergence_monitor = ConvergenceMonitor(
+            min_convergence_delta=adjusted["min_convergence_delta"],
+            stall_threshold=adjusted["stall_threshold"],
+        )
+        self.hallucination_detector = HallucinationDetector(
+            threshold=adjusted["hallucination_threshold"],
+        )
+
         # Inicializar estado
         state = ReasoningState(
             query=query,
             domain=domain,
-            max_rounds=max_rounds or self.config.max_rounds,
+            max_rounds=adjusted["max_rounds"],
         )
 
         # Span principal
         root_span = self.observability.start_span(
             operation="reasoning_loop",
             trace_id=state.trace_id,
-            attributes={"query": query, "domain": domain},
+            attributes={
+                "query": query,
+                "domain": domain,
+                "heuristic": meta_plan.heuristic.value,
+                "meta_trace_id": meta_plan.trace_id,
+            },
         )
 
         self.observability.log(
-            "INFO", f"Starting reasoning loop for: {query[:100]}",
+            "INFO",
+            f"Starting reasoning loop for: {query[:100]} "
+            f"with heuristic={meta_plan.heuristic.value}, "
+            f"adjusted={adjusted}",
             trace_id=state.trace_id,
+            meta_trace_id=meta_plan.trace_id,
         )
 
         try:
@@ -368,6 +407,18 @@ class ReasoningLoopEngine:
                     state, quality, hallucination
                 )
 
+                # Metarrazonamiento: monitorear paso y decidir si cambiar heurística
+                meta_step = self.meta_orchestrator.monitor_step(
+                    round_number=state.round_number,
+                    convergence_delta=convergence_delta,
+                    stall_count=self.convergence_monitor.stall_count,
+                    confidence=current_confidence,
+                    quality_overall=quality.overall,
+                )
+                if meta_step["action"] == "switch_heuristic":
+                    adjusted = self.meta_orchestrator._current_plan.adjusted_params
+                    state.max_rounds = max(state.max_rounds, adjusted["max_rounds"])
+
                 self.observability.log(
                     "INFO",
                     f"Round {state.round_number}: confidence={current_confidence:.3f}, "
@@ -413,6 +464,14 @@ class ReasoningLoopEngine:
             self.observability.end_span(root_span.span_id, status="ERROR")
             state.verdict = ReasoningVerdict.INSUFFICIENT_DATA
             state.completed_at = time.time()
+
+        # Registrar metarrazonamiento
+        self.meta_orchestrator.record_outcome(
+            trace_id=state.trace_id,
+            success=state.verdict == ReasoningVerdict.CONVERGED,
+            final_verdict=state.verdict.value,
+            rounds=state.round_number,
+        )
 
         # Construir resultado
         result = self._build_result(state)

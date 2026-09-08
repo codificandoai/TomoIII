@@ -226,7 +226,11 @@ def reasoning_run():
     if max_rounds is not None:
         max_rounds = min(max(int(max_rounds), 1), 10)
 
-    result = engine.reason(query=query, domain=domain, max_rounds=max_rounds)
+    context = data.get("context", {})
+    if not isinstance(context, dict):
+        context = {}
+
+    result = engine.reason(query=query, domain=domain, max_rounds=max_rounds, context=context)
     return jsonify(result.to_dict())
 
 

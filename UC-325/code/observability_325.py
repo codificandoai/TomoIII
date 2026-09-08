@@ -14,9 +14,8 @@ import uuid
 from dataclasses import dataclass, field
 
 
-# Intentar importar prometheus_client, fallback a counters internos
 try:
-    from prometheus_client import Counter, Histogram, Gauge, generate_latest
+    from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -75,6 +74,7 @@ class ObservabilityManager:
         self._spans: Dict[str, Span] = {}
 
         if PROMETHEUS_AVAILABLE:
+            self._prom_registry = CollectorRegistry()
             self._prom_counters: Dict[str, Counter] = {}
             self._prom_histograms: Dict[str, Histogram] = {}
             self._prom_gauges: Dict[str, Gauge] = {}
@@ -165,7 +165,8 @@ class ObservabilityManager:
             if key not in self._prom_counters:
                 label_names = list(labels.keys()) if labels else []
                 self._prom_counters[key] = Counter(
-                    key, f"UC-325 counter: {key}", label_names
+                    key, f"UC-325 counter: {key}", label_names,
+                    registry=self._prom_registry,
                 )
             if labels:
                 self._prom_counters[key].labels(**labels).inc(value)
@@ -187,7 +188,8 @@ class ObservabilityManager:
             if name not in self._prom_histograms:
                 label_names = list(labels.keys()) if labels else []
                 self._prom_histograms[name] = Histogram(
-                    name, f"UC-325 histogram: {name}", label_names
+                    name, f"UC-325 histogram: {name}", label_names,
+                    registry=self._prom_registry,
                 )
             if labels:
                 self._prom_histograms[name].labels(**labels).observe(value)
@@ -207,7 +209,8 @@ class ObservabilityManager:
             if name not in self._prom_gauges:
                 label_names = list(labels.keys()) if labels else []
                 self._prom_gauges[name] = Gauge(
-                    name, f"UC-325 gauge: {name}", label_names
+                    name, f"UC-325 gauge: {name}", label_names,
+                    registry=self._prom_registry,
                 )
             if labels:
                 self._prom_gauges[name].labels(**labels).set(value)
@@ -229,7 +232,7 @@ class ObservabilityManager:
     def export_prometheus(self) -> str:
         """Exporta métricas en formato Prometheus text."""
         if PROMETHEUS_AVAILABLE:
-            return generate_latest().decode("utf-8")
+            return generate_latest(self._prom_registry).decode("utf-8")
 
         lines = []
         for name, label_vals in self._counters.items():

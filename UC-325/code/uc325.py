@@ -35,6 +35,12 @@ from hallucination_detector import HallucinationDetector  # noqa: E402, F401
 from query_refiner import QueryRefiner  # noqa: E402, F401
 from retrieval_evaluator import RetrievalEvaluator  # noqa: E402, F401
 from convergence_monitor import ConvergenceMonitor  # noqa: E402, F401
+from meta_reasoning_orchestrator import (  # noqa: E402, F401
+    MetaReasoningOrchestrator,
+    ReasoningHeuristic,
+    HeuristicProfile,
+    MetaReasoningPlan,
+)
 from observability_325 import ObservabilityManager  # noqa: E402, F401
 
 __all__ = [
@@ -58,5 +64,9 @@ __all__ = [
     "QueryRefiner",
     "RetrievalEvaluator",
     "ConvergenceMonitor",
+    "MetaReasoningOrchestrator",
+    "ReasoningHeuristic",
+    "HeuristicProfile",
+    "MetaReasoningPlan",
     "ObservabilityManager",
 ]

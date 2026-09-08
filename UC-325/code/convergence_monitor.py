@@ -44,6 +44,10 @@ class ConvergenceMonitor:
         self._prev_chunk_count: int = 0
         self._prev_hypothesis_count: int = 0
 
+    @property
+    def stall_count(self) -> int:
+        return self._stall_count
+
     def should_stop(
         self,
         state: ReasoningState,
