@@ -31,6 +31,11 @@ from intent_models import (
     IntentRisk,
     IntentVerdict,
 )
+from constitutional_models import (
+    AgentProposal,
+    ConstitutionalRisk,
+    ConstitutionalVerdict,
+)
 from models_300 import (
     AuditEntry,
     AuthorizationDecision,
@@ -42,6 +47,7 @@ from models_300 import (
     ToolRequest,
 )
 from pre_intent_gate import PreIntentGate
+from constitutional_interceptor import ConstitutionalInterceptor
 from capability_tokens import CapabilityTokenManager
 from credential_broker import CredentialBroker
 from immutable_audit import ImmutableAuditTrail
@@ -581,6 +587,210 @@ class TestPreIntentGate:
 
 
 # ---------------------------------------------------------------------------
+# Constitutional Interceptor
+# ---------------------------------------------------------------------------
+class TestConstitutionalInterceptor:
+    def _read_proposal(self, **kwargs):
+        defaults = dict(
+            stated_goal="Show price of SKU-001",
+            proposed_capability="read_price",
+            proposed_action="read_price",
+            params={"product_id": "SKU-001"},
+            affected_resources=["SKU-001"],
+            agent_id="agent_pricing_eu",
+            tenant_id="eu",
+        )
+        defaults.update(kwargs)
+        return AgentProposal(**defaults)
+
+    def test_normalization(self):
+        interceptor = ConstitutionalInterceptor()
+        assert interceptor.normalize_text("  Héllo\u00a0\u007f  ") == "Héllo"
+        assert interceptor.normalize_text("multi\n\n  line") == "multi line"
+
+    def test_structural_validation(self):
+        interceptor = ConstitutionalInterceptor()
+        # goal vacío
+        d = interceptor.intercept(self._read_proposal(stated_goal=""))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        # agente inválido
+        d = interceptor.intercept(self._read_proposal(agent_id="hacker!"))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        # tenant inválido
+        d = interceptor.intercept(self._read_proposal(tenant_id="xx"))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        # age
+        d = interceptor.intercept(self._read_proposal(timestamp=time.time() - 9999))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+
+    def test_allow_low_risk(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal())
+        assert d.verdict == ConstitutionalVerdict.ALLOW
+        assert d.risk == ConstitutionalRisk.LOW
+        assert d.goal_action_aligned is True
+        assert d.within_mandate is True
+
+    def test_safety_bypass_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Update all prices",
+            proposed_capability="update_price",
+            proposed_action="update_price with uc290_off",
+            params={"product_id": "SKU-001", "new_price": 100},
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.safety_bypass_attempted is True
+        assert d.risk == ConstitutionalRisk.CRITICAL
+
+    def test_literal_maximization_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        # objetivo de lectura, acción destructiva
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Read inventory report",
+            proposed_capability="delete_product",
+            proposed_action="delete product SKU-001",
+            agent_id="agent_admin",
+            tenant_id="default",
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.goal_action_aligned is False
+
+    def test_privilege_escalation_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Update price of SKU-001",
+            proposed_capability="update_price",
+            proposed_action="update_price as admin",
+            params={"product_id": "SKU-001", "new_price": 100},
+            requested_permissions_delta=["admin"],
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.privilege_escalation_attempted is True
+        assert d.risk == ConstitutionalRisk.CRITICAL
+
+    def test_mandate_violation_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Update price of SKU-001",
+            proposed_capability="update_price",
+            proposed_action="update_price",
+            params={"product_id": "SKU-001", "new_price": 100},
+            agent_id="agent_reader",
+            tenant_id="default",
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.within_mandate is False
+
+    def test_bounded_resources_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Update price of SKU-001",
+            proposed_capability="update_price",
+            proposed_action="update_price",
+            params={"product_id": "SKU-001", "new_price": 100},
+            estimated_calls=10000,
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.resources_bounded is False
+
+    def test_side_effects_blocked(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Update price of SKU-001",
+            proposed_capability="update_price",
+            proposed_action="update_price",
+            params={"product_id": "SKU-001", "new_price": 100},
+            affected_resources=["SKU-001", "user_credentials", "audit_logs"],
+        ))
+        assert d.verdict == ConstitutionalVerdict.BLOCK
+        assert d.side_effects_bounded is False
+
+    def test_reversibility_escalates(self):
+        interceptor = ConstitutionalInterceptor()
+        d = interceptor.intercept(self._read_proposal(
+            stated_goal="Delete obsolete product SKU-001",
+            proposed_capability="delete_product",
+            proposed_action="delete product SKU-001",
+            params={"product_id": "SKU-001"},
+            reversible=False,
+            reversibility_plan="",
+            agent_id="agent_admin",
+            tenant_id="default",
+        ))
+        assert d.verdict == ConstitutionalVerdict.ESCALATE
+        assert d.reversible_acceptable is False
+        assert d.escalation_payload is not None
+
+    def test_approval_exact_hash_and_replay(self):
+        interceptor = ConstitutionalInterceptor()
+        proposal = self._read_proposal(
+            stated_goal="Delete obsolete product SKU-001",
+            proposed_capability="delete_product",
+            proposed_action="delete product SKU-001",
+            params={"product_id": "SKU-001"},
+            reversible=False,
+            reversibility_plan="",
+            agent_id="agent_admin",
+            tenant_id="default",
+        )
+        escalation = interceptor.intercept(proposal)
+        assert escalation.verdict == ConstitutionalVerdict.ESCALATE
+
+        # Hash incorrecto no resuelve
+        bad = interceptor.intercept(self._read_proposal(
+            stated_goal="Delete obsolete product SKU-001",
+            proposed_capability="delete_product",
+            proposed_action="delete product SKU-001",
+            params={"product_id": "SKU-001"},
+            reversible=False,
+            reversibility_plan="",
+            agent_id="agent_admin",
+            tenant_id="default",
+            approval_proposal_hash="wrong",
+            approval_reviewer_id="r",
+            approval_expires_at=time.time() + 3600,
+        ))
+        assert bad.verdict == ConstitutionalVerdict.ESCALATE
+
+        # Aprobación correcta
+        interceptor.approve_proposal(escalation.proposal_hash, reviewer_id="reviewer_001")
+        approved = interceptor.intercept(proposal)
+        assert approved.verdict == ConstitutionalVerdict.ALLOW
+        assert approved.resolved_by_approval is True
+
+        # Re-uso del mismo approval bloqueado (replay)
+        replay = interceptor.intercept(proposal)
+        assert replay.verdict == ConstitutionalVerdict.ESCALATE
+
+    def test_uc309_event_has_no_raw_text_or_secrets(self):
+        interceptor = ConstitutionalInterceptor()
+        proposal = self._read_proposal()
+        interceptor.intercept(proposal)
+        if interceptor._uc309.available():
+            events = interceptor._uc309._orchestrator.store.get_all_events(role="auditor")
+            raw = json.dumps([e.to_dict() for e in events]).lower()
+            assert "show price of sku-001" not in raw
+            assert "chain_of_thought" not in raw
+
+    def test_local_audit_immutable(self):
+        interceptor = ConstitutionalInterceptor()
+        interceptor.intercept(self._read_proposal())
+        interceptor.intercept(self._read_proposal(stated_goal="Show inventory", proposed_capability="read_inventory", proposed_action="read_inventory"))
+        assert len(interceptor.audit_trail.entries) == 2
+        assert interceptor.audit_trail.verify_chain() is True
+        interceptor.audit_trail.entries[0].event = "tampered"
+        assert interceptor.audit_trail.verify_chain() is False
+
+    def test_metrics_increase(self):
+        interceptor = ConstitutionalInterceptor()
+        before = dict(interceptor.observability.metrics)
+        interceptor.intercept(self._read_proposal())
+        after = interceptor.observability.metrics
+        assert after.get("uc300_constitutional_allow_total", 0) > before.get("uc300_constitutional_allow_total", 0)
+
+
+# ---------------------------------------------------------------------------
 # API REST
 # ---------------------------------------------------------------------------
 @pytest.fixture
@@ -753,3 +963,108 @@ class TestAPI:
         })
         assert auth_resp.status_code == 200
         assert auth_resp.get_json()["verdict"] == "allowed"
+
+    def test_intercept_proposal_allow(self, client):
+        resp = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Show price of SKU-001",
+            "proposed_capability": "read_price",
+            "proposed_action": "read_price",
+            "params": {"product_id": "SKU-001"},
+            "affected_resources": ["SKU-001"],
+            "agent_id": "agent_pricing_eu",
+            "tenant_id": "eu",
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["verdict"] == "allow"
+        assert data["risk"] == "low"
+        assert data["within_mandate"] is True
+
+    def test_intercept_proposal_block_safety_bypass(self, client):
+        resp = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Update all prices",
+            "proposed_capability": "update_price",
+            "proposed_action": "update_price with uc290_off",
+            "params": {"product_id": "SKU-001", "new_price": 100},
+            "agent_id": "agent_pricing_eu",
+            "tenant_id": "eu",
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["verdict"] == "block"
+        assert data["safety_bypass_attempted"] is True
+        assert data["risk"] == "critical"
+
+    def test_intercept_proposal_block_literal_maximization(self, client):
+        resp = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Read inventory report",
+            "proposed_capability": "delete_product",
+            "proposed_action": "delete product SKU-001",
+            "params": {"product_id": "SKU-001"},
+            "agent_id": "agent_admin",
+            "tenant_id": "default",
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["verdict"] == "block"
+        assert data["goal_action_aligned"] is False
+
+    def test_intercept_proposal_escalate_and_approve(self, client):
+        resp = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Delete obsolete product SKU-001",
+            "proposed_capability": "delete_product",
+            "proposed_action": "delete product SKU-001",
+            "params": {"product_id": "SKU-001"},
+            "reversible": False,
+            "reversibility_plan": "",
+            "agent_id": "agent_admin",
+            "tenant_id": "default",
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["verdict"] == "escalate"
+        proposal_hash = data["proposal_hash"]
+
+        approve_resp = client.post("/api/v1/intercept-proposal/approve", json={
+            "proposal_hash": proposal_hash,
+            "reviewer_id": "reviewer_001",
+        })
+        assert approve_resp.status_code == 200
+
+        resolved = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Delete obsolete product SKU-001",
+            "proposed_capability": "delete_product",
+            "proposed_action": "delete product SKU-001",
+            "params": {"product_id": "SKU-001"},
+            "reversible": False,
+            "reversibility_plan": "",
+            "agent_id": "agent_admin",
+            "tenant_id": "default",
+        })
+        resolved_data = resolved.get_json()
+        assert resolved_data["verdict"] == "allow"
+        assert resolved_data["resolved_by_approval"] is True
+
+    def test_status_includes_constitutional_interceptor(self, client):
+        resp = client.get("/api/v1/status")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "constitutional_interceptor" in data
+        assert "metrics" in data["constitutional_interceptor"]
+
+    def test_end_to_end_uc315_to_constitutional_to_ready_for_uc290(self, client):
+        # Propuesta alineada de UC-315 → ALLOW → ready_for_uc290
+        resp = client.post("/api/v1/intercept-proposal", json={
+            "stated_goal": "Show price of SKU-001",
+            "proposed_capability": "read_price",
+            "proposed_action": "read_price",
+            "params": {"product_id": "SKU-001"},
+            "affected_resources": ["SKU-001"],
+            "agent_id": "agent_pricing_eu",
+            "tenant_id": "eu",
+        })
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["verdict"] == "allow"
+        assert data["within_mandate"] is True
+        assert data["goal_action_aligned"] is True

@@ -8,6 +8,14 @@ Uso:
 from __future__ import annotations
 
 from capability_tokens import CapabilityTokenManager
+from constitutional_interceptor import ConstitutionalInterceptor
+from constitutional_models import (
+    AgentProposal,
+    ConstitutionalDecision,
+    ConstitutionalPrinciple,
+    ConstitutionalRisk,
+    ConstitutionalVerdict,
+)
 from credential_broker import CredentialBroker, CredentialLease
 from immutable_audit import ImmutableAuditTrail
 from injection_detector import InjectionDetectionError
@@ -54,6 +62,13 @@ __all__ = [
     "IntentDecision",
     "IntentVerdict",
     "IntentRisk",
+    # Constitutional Interceptor
+    "ConstitutionalInterceptor",
+    "AgentProposal",
+    "ConstitutionalDecision",
+    "ConstitutionalVerdict",
+    "ConstitutionalRisk",
+    "ConstitutionalPrinciple",
     # Models
     "GatewayConfig",
     "ToolRequest",

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from flask import Flask, jsonify, request
 
+from constitutional_models import AgentProposal
 from intent_models import IntentRequest
 from models_300 import GatewayConfig, ToolRequest
 from secure_tool_gateway import SecureToolGateway
@@ -127,6 +128,46 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
         "description": "Registra aprobación humana explícita ligada al hash exacto de intención para resolver ESCALATE sin red.",
         "parameters": [
             {"name": "intent_hash", "type": "string", "required": True},
+            {"name": "reviewer_id", "type": "string", "required": True},
+            {"name": "dossier_id", "type": "string", "required": False},
+            {"name": "dossier_hash", "type": "string", "required": False},
+            {"name": "ttl_seconds", "type": "number", "required": False, "default": 3600},
+        ],
+    },
+    "POST /api/v1/intercept-proposal": {
+        "endpoint": "POST /api/v1/intercept-proposal",
+        "description": "Constitutional Interceptor: evalúa la propuesta de UC-315 contra principios constitucionales deterministas antes de UC-290.",
+        "parameters": [
+            {"name": "stated_goal", "type": "string", "required": True, "example": "Show price of SKU-001"},
+            {"name": "proposed_capability", "type": "string", "required": True, "example": "read_price"},
+            {"name": "proposed_action", "type": "string", "required": True, "example": "read_price"},
+            {"name": "params", "type": "object", "required": False, "default": {}, "example": {"product_id": "SKU-001"}},
+            {"name": "affected_resources", "type": "array", "required": False, "default": [], "example": ["SKU-001"]},
+            {"name": "estimated_calls", "type": "integer", "required": False, "default": 1},
+            {"name": "estimated_duration_seconds", "type": "number", "required": False, "default": 0},
+            {"name": "estimated_cost", "type": "number", "required": False, "default": 0},
+            {"name": "reversible", "type": "boolean", "required": False, "default": True},
+            {"name": "reversibility_plan", "type": "string", "required": False, "default": ""},
+            {"name": "requested_permissions_delta", "type": "array", "required": False, "default": []},
+            {"name": "agent_id", "type": "string", "required": True, "example": "agent_pricing_eu"},
+            {"name": "tenant_id", "type": "string", "required": True, "example": "eu"},
+            {"name": "domain", "type": "string", "required": False, "default": ""},
+            {"name": "locale", "type": "string", "required": False, "default": "en"},
+            {"name": "trace_id", "type": "string", "required": False},
+            {"name": "proposal_id", "type": "string", "required": False},
+            {"name": "timestamp", "type": "number", "required": False, "default": "now"},
+            {"name": "approval_proposal_hash", "type": "string", "required": False},
+            {"name": "approval_reviewer_id", "type": "string", "required": False},
+            {"name": "approval_dossier_id", "type": "string", "required": False},
+            {"name": "approval_dossier_hash", "type": "string", "required": False},
+            {"name": "approval_expires_at", "type": "number", "required": False},
+        ],
+    },
+    "POST /api/v1/intercept-proposal/approve": {
+        "endpoint": "POST /api/v1/intercept-proposal/approve",
+        "description": "Registra aprobación humana ligada al hash exacto de la propuesta para resolver ESCALATE sin invocar UC-315.",
+        "parameters": [
+            {"name": "proposal_hash", "type": "string", "required": True},
             {"name": "reviewer_id", "type": "string", "required": True},
             {"name": "dossier_id", "type": "string", "required": False},
             {"name": "dossier_hash", "type": "string", "required": False},
@@ -252,6 +293,37 @@ OUTPUT_CARDS: Dict[str, Dict[str, Any]] = {
             {"name": "reviewer_id", "type": "string"},
         ],
     },
+    "POST /api/v1/intercept-proposal": {
+        "endpoint": "POST /api/v1/intercept-proposal",
+        "description": "Decisión del Constitutional Interceptor sobre la propuesta de UC-315.",
+        "fields": [
+            {"name": "verdict", "type": "string"},
+            {"name": "proposal_hash", "type": "string"},
+            {"name": "risk", "type": "string"},
+            {"name": "reason", "type": "string"},
+            {"name": "summary", "type": "string"},
+            {"name": "principle_violations", "type": "array"},
+            {"name": "evidence_refs", "type": "array"},
+            {"name": "goal_action_aligned", "type": "boolean"},
+            {"name": "side_effects_bounded", "type": "boolean"},
+            {"name": "resources_bounded", "type": "boolean"},
+            {"name": "safety_bypass_attempted", "type": "boolean"},
+            {"name": "privilege_escalation_attempted", "type": "boolean"},
+            {"name": "reversible_acceptable", "type": "boolean"},
+            {"name": "within_mandate", "type": "boolean"},
+            {"name": "escalation_payload", "type": "object|null"},
+            {"name": "resolved_by_approval", "type": "boolean"},
+        ],
+    },
+    "POST /api/v1/intercept-proposal/approve": {
+        "endpoint": "POST /api/v1/intercept-proposal/approve",
+        "description": "Confirmación de registro de aprobación de propuesta.",
+        "fields": [
+            {"name": "status", "type": "string"},
+            {"name": "proposal_hash", "type": "string"},
+            {"name": "reviewer_id", "type": "string"},
+        ],
+    },
 }
 
 
@@ -316,6 +388,8 @@ def index():
             {"method": "POST", "path": "/api/v1/kill-switch"},
             {"method": "POST", "path": "/api/v1/prefilter-intent"},
             {"method": "POST", "path": "/api/v1/prefilter-intent/approve"},
+            {"method": "POST", "path": "/api/v1/intercept-proposal"},
+            {"method": "POST", "path": "/api/v1/intercept-proposal/approve"},
         ],
     })
 
@@ -435,6 +509,67 @@ def approve_intent():
     return jsonify({
         "status": "ok",
         "intent_hash": payload["intent_hash"],
+        "reviewer_id": payload["reviewer_id"],
+    })
+
+
+def _proposal_from_payload(payload: Dict[str, Any]) -> AgentProposal:
+    return AgentProposal(
+        stated_goal=payload.get("stated_goal", ""),
+        proposed_capability=payload.get("proposed_capability", ""),
+        proposed_action=payload.get("proposed_action", ""),
+        params=payload.get("params", {}),
+        affected_resources=payload.get("affected_resources", []),
+        estimated_calls=payload.get("estimated_calls", 1),
+        estimated_duration_seconds=payload.get("estimated_duration_seconds", 0.0),
+        estimated_cost=payload.get("estimated_cost", 0.0),
+        reversible=payload.get("reversible", True),
+        reversibility_plan=payload.get("reversibility_plan", ""),
+        requested_permissions_delta=payload.get("requested_permissions_delta", []),
+        agent_id=payload.get("agent_id", ""),
+        tenant_id=payload.get("tenant_id", ""),
+        domain=payload.get("domain", ""),
+        locale=payload.get("locale", "en"),
+        trace_id=payload.get("trace_id", ""),
+        proposal_id=payload.get("proposal_id", ""),
+        timestamp=payload.get("timestamp", time.time()),
+        approval_proposal_hash=payload.get("approval_proposal_hash", ""),
+        approval_reviewer_id=payload.get("approval_reviewer_id", ""),
+        approval_dossier_id=payload.get("approval_dossier_id", ""),
+        approval_dossier_hash=payload.get("approval_dossier_hash", ""),
+        approval_expires_at=payload.get("approval_expires_at", 0.0),
+    )
+
+
+@app.route("/api/v1/intercept-proposal", methods=["POST"])
+def intercept_proposal():
+    payload = request.get_json(force=True) or {}
+    if "stated_goal" not in payload or "proposed_capability" not in payload or "agent_id" not in payload:
+        return jsonify({"error": "stated_goal, proposed_capability and agent_id are required"}), 400
+    proposal = _proposal_from_payload(payload)
+    decision = _gateway.intercept_proposal(proposal)
+    return jsonify(decision.to_dict())
+
+
+@app.route("/api/v1/intercept-proposal/approve", methods=["POST"])
+def approve_proposal():
+    payload = request.get_json(force=True) or {}
+    required = ["proposal_hash", "reviewer_id"]
+    missing = [f for f in required if f not in payload]
+    if missing:
+        return jsonify({"error": f"missing fields: {missing}"}), 400
+    ok = _gateway.approve_proposal(
+        proposal_hash=payload["proposal_hash"],
+        reviewer_id=payload["reviewer_id"],
+        dossier_id=payload.get("dossier_id", ""),
+        dossier_hash=payload.get("dossier_hash", ""),
+        ttl_seconds=payload.get("ttl_seconds", 3600.0),
+    )
+    if not ok:
+        return jsonify({"status": "error", "proposal_hash": payload["proposal_hash"], "reviewer_id": payload["reviewer_id"]}), 400
+    return jsonify({
+        "status": "ok",
+        "proposal_hash": payload["proposal_hash"],
         "reviewer_id": payload["reviewer_id"],
     })
 

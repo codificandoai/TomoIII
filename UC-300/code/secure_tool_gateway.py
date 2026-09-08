@@ -18,6 +18,13 @@ import time
 from typing import Any, Dict, List, Optional
 
 from capability_tokens import CapabilityTokenManager
+from constitutional_interceptor import ConstitutionalInterceptor
+from constitutional_models import (
+    AgentProposal,
+    ConstitutionalDecision,
+    ConstitutionalRisk,
+    ConstitutionalVerdict,
+)
 from credential_broker import CredentialBroker
 from immutable_audit import ImmutableAuditTrail
 from injection_detector import InjectionDetectionError, assert_clean
@@ -74,6 +81,7 @@ class SecureToolGateway:
         self.audit_trail = ImmutableAuditTrail()
         self.observability = ObservabilityManager()
         self.pre_intent_gate = PreIntentGate(config=self.config)
+        self.constitutional_interceptor = ConstitutionalInterceptor(config=self.config)
 
         # Estado interno
         self._consumed_nonces: set = set()
@@ -382,6 +390,56 @@ class SecureToolGateway:
         return self.pre_intent_gate.get_audit_trail(trace_id=trace_id)
 
     # -----------------------------------------------------------------------
+    # Constitutional Interceptor (después de UC-315, antes de UC-290)
+    # -----------------------------------------------------------------------
+
+    def intercept_proposal(self, proposal: AgentProposal) -> ConstitutionalDecision:
+        """Interceptor constitucional sobre la propuesta de UC-315."""
+        return self.constitutional_interceptor.intercept(proposal)
+
+    def process_agent_proposal(
+        self,
+        proposal: AgentProposal,
+    ) -> Dict[str, Any]:
+        """Pipeline UC-315 → Constitutional Interceptor.
+
+        Solo devuelve ready_for_uc290=true si el veredicto es ALLOW.
+        """
+        start = time.time()
+        decision = self.constitutional_interceptor.intercept(proposal)
+        return {
+            "ready_for_uc290": decision.verdict == ConstitutionalVerdict.ALLOW,
+            "verdict": decision.verdict.value,
+            "proposal_hash": decision.proposal_hash,
+            "risk": decision.risk.value,
+            "reason": decision.reason,
+            "proposed_capability": proposal.proposed_capability,
+            "principle_violations": decision.principle_violations,
+            "decision": decision.to_dict(),
+            "duration_ms": (time.time() - start) * 1000,
+        }
+
+    def approve_proposal(
+        self,
+        proposal_hash: str,
+        reviewer_id: str,
+        dossier_id: str = "",
+        dossier_hash: str = "",
+        ttl_seconds: float = 3600.0,
+    ) -> bool:
+        """Registra aprobación humana ligada al hash exacto de la propuesta."""
+        return self.constitutional_interceptor.approve_proposal(
+            proposal_hash=proposal_hash,
+            reviewer_id=reviewer_id,
+            dossier_id=dossier_id,
+            dossier_hash=dossier_hash,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def get_constitutional_audit_trail(self, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        return self.constitutional_interceptor.get_audit_trail(trace_id=trace_id)
+
+    # -----------------------------------------------------------------------
     # Human approval helpers
     # -----------------------------------------------------------------------
 
@@ -425,6 +483,7 @@ class SecureToolGateway:
             "sandbox_products": self.sandbox_executor.get_state_snapshot()["products"],
             "observability": self.observability.get_summary(),
             "pre_intent_gate": self.pre_intent_gate.get_status(),
+            "constitutional_interceptor": self.constitutional_interceptor.get_status(),
         }
 
     def get_audit_trail(self, trace_id: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -449,6 +508,7 @@ class SecureToolGateway:
         self.audit_trail.reset()
         self.observability.reset()
         self.pre_intent_gate.reset()
+        self.constitutional_interceptor.reset()
         self._consumed_nonces.clear()
         self._kill_switch = False
 

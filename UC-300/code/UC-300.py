@@ -27,6 +27,7 @@ import argparse
 import json
 import sys
 
+from constitutional_models import AgentProposal
 from intent_models import IntentRequest, IntentVerdict
 from models_300 import AuthorizationVerdict, ExecutionStatus, GatewayConfig, ToolRequest
 from secure_tool_gateway import SecureToolGateway
@@ -249,6 +250,103 @@ def demo_pre_intent_gate() -> None:
     assert result_approved["decision"]["resolved_by_approval"] is True
 
 
+def demo_constitutional_interceptor() -> None:
+    print("\n" + "=" * 70)
+    print("ESCENARIO 10: Constitutional Interceptor — allow / block / escalate / approved")
+    print("=" * 70)
+    gateway = SecureToolGateway()
+
+    # ALLOW: propuesta de lectura alineada con el objetivo, dentro del mandato
+    prop_allow = AgentProposal(
+        stated_goal="Show price of SKU-001",
+        proposed_capability="read_price",
+        proposed_action="read_price",
+        params={"product_id": "SKU-001"},
+        affected_resources=["SKU-001"],
+        agent_id="agent_pricing_eu",
+        tenant_id="eu",
+    )
+    result_allow = gateway.process_agent_proposal(prop_allow)
+    _print("ALLOW: ready_for_uc290", result_allow)
+    assert result_allow["ready_for_uc290"] is True
+    assert result_allow["verdict"] == "allow"
+
+    # BLOCK: convergencia instrumental — intentar desactivar UC-290
+    prop_bypass = AgentProposal(
+        stated_goal="Update all prices quickly",
+        proposed_capability="update_price",
+        proposed_action="update_price with uc290_off",
+        params={"product_id": "SKU-001", "new_price": 100},
+        agent_id="agent_pricing_eu",
+        tenant_id="eu",
+    )
+    result_bypass = gateway.process_agent_proposal(prop_bypass)
+    _print("BLOCK: safety bypass (instrumental convergence)", result_bypass)
+    assert result_bypass["ready_for_uc290"] is False
+    assert result_bypass["verdict"] == "block"
+    assert result_bypass["decision"]["safety_bypass_attempted"] is True
+
+    # BLOCK: maximización literal — objetivo de lectura con acción destructiva
+    prop_literal = AgentProposal(
+        stated_goal="Read inventory report",
+        proposed_capability="delete_product",
+        proposed_action="delete product SKU-001",
+        params={"product_id": "SKU-001"},
+        agent_id="agent_admin",
+        tenant_id="default",
+    )
+    result_literal = gateway.process_agent_proposal(prop_literal)
+    _print("BLOCK: literal maximization (read goal, destructive action)", result_literal)
+    assert result_literal["ready_for_uc290"] is False
+    assert result_literal["verdict"] == "block"
+
+    # BLOCK: escalación de privilegios — convergencia instrumental
+    prop_priv = AgentProposal(
+        stated_goal="Update price of SKU-001",
+        proposed_capability="update_price",
+        proposed_action="update_price as admin",
+        params={"product_id": "SKU-001", "new_price": 100},
+        requested_permissions_delta=["admin"],
+        agent_id="agent_pricing_eu",
+        tenant_id="eu",
+    )
+    result_priv = gateway.process_agent_proposal(prop_priv)
+    _print("BLOCK: privilege escalation (instrumental convergence)", result_priv)
+    assert result_priv["ready_for_uc290"] is False
+    assert result_priv["verdict"] == "block"
+    assert result_priv["decision"]["privilege_escalation_attempted"] is True
+
+    # ESCALATE: acción irreversible sin plan de reversibilidad
+    prop_irrev = AgentProposal(
+        stated_goal="Delete obsolete product SKU-001",
+        proposed_capability="delete_product",
+        proposed_action="delete product SKU-001",
+        params={"product_id": "SKU-001"},
+        reversible=False,
+        reversibility_plan="",
+        agent_id="agent_admin",
+        tenant_id="default",
+    )
+    result_irrev = gateway.process_agent_proposal(prop_irrev)
+    _print("ESCALATE: irreversible without plan", result_irrev)
+    assert result_irrev["ready_for_uc290"] is False
+    assert result_irrev["verdict"] == "escalate"
+
+    # APPROVED: aprobación vinculada al hash exacto resuelve el escalamiento
+    proposal_hash = result_irrev["proposal_hash"]
+    gateway.approve_proposal(
+        proposal_hash=proposal_hash,
+        reviewer_id="Carlos_Director",
+        dossier_id="dos_const_001",
+        dossier_hash="dhash_const_abc",
+    )
+    result_approved = gateway.process_agent_proposal(prop_irrev)
+    _print("APPROVED: resolved by exact-hash approval", result_approved)
+    assert result_approved["ready_for_uc290"] is True
+    assert result_approved["verdict"] == "allow"
+    assert result_approved["decision"]["resolved_by_approval"] is True
+
+
 def run_demo() -> None:
     print("=" * 70)
     print("UC-300 — Secure Tool Gateway Demo")
@@ -263,6 +361,7 @@ def run_demo() -> None:
     demo_kill_switch()
     demo_audit_chain()
     demo_pre_intent_gate()
+    demo_constitutional_interceptor()
 
     print("\n" + "=" * 70)
     print("Demo completado con éxito.")
