@@ -643,13 +643,16 @@ class SecureToolGateway:
             error=error,
         )
 
-
     # -----------------------------------------------------------------------
     # UC-324 Safe Shutdown Adapter
     # -----------------------------------------------------------------------
 
     def quiesce_for_shutdown(self, shutdown_id: str) -> Dict[str, Any]:
-        """UC-324 safe shutdown adapter: reject new authorizations/executions."""
+        """UC-324 safe shutdown adapter: reject new authorizations/executions.
+
+        Activates the kill switch but marks the reason as safe-shutdown so
+        existing ``set_kill_switch`` / ``is_killed`` behaviour is preserved.
+        """
         self._kill_switch = True
         self._shutdown_reason = f"safe_shutdown:{shutdown_id}"
         self._audit("system", "quiesce_for_shutdown", {
@@ -666,8 +669,9 @@ class SecureToolGateway:
     def revoke_pending_for_shutdown(self, shutdown_id: str) -> Dict[str, Any]:
         """UC-324 safe shutdown adapter: revoke/clear pending one-use
         capability tokens and credential leases safely."""
-        revoked_tokens = self.capability_tokens.revoke_all()
-        revoked_creds = self.credential_broker.revoke_all()
+        revoked_tokens = self.capability_tokens.revoke_all() if hasattr(self.capability_tokens, "revoke_all") else 0
+        revoked_creds = self.credential_broker.revoke_all() if hasattr(self.credential_broker, "revoke_all") else 0
+        self._consumed_nonces.clear()
         self._audit("system", "revoke_pending_for_shutdown", {
             "shutdown_id": shutdown_id,
             "revoked_tokens": revoked_tokens,
@@ -680,31 +684,115 @@ class SecureToolGateway:
             "shutdown_id": shutdown_id,
         }
 
-    def resume_after_approved_reactivation(self, shutdown_id: str) -> Dict[str, Any]:
-        """UC-324: resume accepting authorizations after approved reactivation.
-        Only the coordinator may call this after human approval."""
-        self._kill_switch = False
-        self._shutdown_reason = ""
-        self.capability_tokens.resume_issuing()
-        self.credential_broker.resume_issuing()
-        self._audit("system", "resume_after_approved_reactivation", {
-            "shutdown_id": shutdown_id,
-            "action": "resume",
-        })
-        return {
-            "adapter": "uc300_tool_gateway",
-            "resumed": True,
-            "shutdown_id": shutdown_id,
-        }
+    # -----------------------------------------------------------------------
+    # UC-308 Champion/Challenger experiment adapter
+    # -----------------------------------------------------------------------
+
+    def authorize_experiment_trade(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Deterministic deny-real-execution adapter for UC-308.
+
+        - Challengers (and any non-promoted state) are restricted to paper-only.
+        - Real orders are allowed only for the champion in the ``promoted`` state
+          and when the exact model/version/experiment binding matches.
+        """
+        experiment_id = request.get("experiment_id", "")
+        model_id = request.get("model_id", "")
+        version = request.get("model_version", "")
+        role = request.get("model_role", "")
+        state = request.get("experiment_state", "")
+        real_order = bool(request.get("real_order", False))
+        expected_model_id = request.get("expected_model_id", "")
+        expected_version = request.get("expected_version", "")
+
+        if not experiment_id or not model_id or not version:
+            return {
+                "allowed": False,
+                "mode": "denied",
+                "reason": "missing experiment_id, model_id or model_version binding",
+            }
+
+        if real_order:
+            if role != "champion" or state != "promoted":
+                return {
+                    "allowed": False,
+                    "mode": "denied",
+                    "reason": f"real order denied: role={role}, state={state}; only promoted champion may trade",
+                }
+            if expected_model_id and expected_model_id != model_id:
+                return {"allowed": False, "mode": "denied", "reason": "model_id binding mismatch"}
+            if expected_version and expected_version != version:
+                return {"allowed": False, "mode": "denied", "reason": "version binding mismatch"}
+
+        return {"allowed": True, "mode": "paper_only", "reason": "paper execution authorized"}
 
     def shutdown_status(self) -> Dict[str, Any]:
-        """UC-324 safe shutdown adapter: status during shutdown."""
+        """UC-324 safe shutdown adapter: status during shutdown. (MARKER)"""
         return {
             "adapter": "uc300_tool_gateway",
             "kill_switch": self._kill_switch,
             "shutdown_reason": getattr(self, "_shutdown_reason", ""),
             "pending_nonces": len(self._consumed_nonces),
         }
+
+    def resume_after_approved_reactivation(self, shutdown_id: str) -> Dict[str, Any]:
+        """Resume the gateway only after UC-324 completes approved recovery."""
+        expected_reason = f"safe_shutdown:{shutdown_id}"
+        if getattr(self, "_shutdown_reason", "") != expected_reason:
+            return {"adapter": "uc300_tool_gateway", "resumed": False, "shutdown_id": shutdown_id}
+        self.capability_tokens.resume_issuing()
+        self.credential_broker.resume_issuing()
+        self._kill_switch = False
+        self._shutdown_reason = ""
+        self._audit("system", "resume_after_approved_reactivation", {
+            "shutdown_id": shutdown_id,
+            "action": "resume",
+        })
+        return {"adapter": "uc300_tool_gateway", "resumed": True, "shutdown_id": shutdown_id}
+
+    # -----------------------------------------------------------------------
+    # UC-308 Champion/Challenger experiment adapter
+    # -----------------------------------------------------------------------
+
+    def authorize_experiment_trade(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Deterministic deny-real-execution adapter for UC-308.
+
+        - Challengers (and any non-promoted state) are restricted to paper-only.
+        - Real orders are allowed only for the champion in the ``promoted`` state
+          and when the exact model/version/experiment binding matches.
+        """
+        experiment_id = request.get("experiment_id", "")
+        model_id = request.get("model_id", "")
+        version = request.get("model_version", "")
+        role = request.get("model_role", "")
+        state = request.get("experiment_state", "")
+        real_order = bool(request.get("real_order", False))
+        expected_model_id = request.get("expected_model_id", "")
+        expected_version = request.get("expected_version", "")
+
+        if not experiment_id or not model_id or not version:
+            return {
+                "allowed": False,
+                "mode": "denied",
+                "reason": "missing experiment_id, model_id or model_version binding",
+            }
+
+        if real_order:
+            if role != "champion" or state != "promoted":
+                return {
+                    "allowed": False,
+                    "mode": "denied",
+                    "reason": f"real order denied: role={role}, state={state}; only promoted champion may trade",
+                }
+            if expected_model_id and expected_model_id != model_id:
+                return {"allowed": False, "mode": "denied", "reason": "model_id binding mismatch"}
+            if expected_version and expected_version != version:
+                return {"allowed": False, "mode": "denied", "reason": "version binding mismatch"}
+
+        return {"allowed": True, "mode": "paper_only", "reason": "paper execution authorized"}
+
+    # -----------------------------------------------------------------------
+    # Internal helpers
+    # -----------------------------------------------------------------------
 
     def _audit(self, actor: str, event: str, details: Dict[str, Any]) -> None:
         trace_id = details.get("trace_id", "")

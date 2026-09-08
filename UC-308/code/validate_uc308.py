@@ -50,6 +50,12 @@ def import_core_modules() -> List[str]:
         "monitoring_generator_308",
         "api_308",
         "uc308",
+        "cc_models_308",
+        "cc_predictors_308",
+        "cc_execution_308",
+        "cc_metrics_308",
+        "cc_audit_308",
+        "champion_challenger_experiment_308",
     ]
     for name in modules:
         try:
@@ -124,6 +130,57 @@ def smoke_test() -> List[str]:
     return errors
 
 
+def smoke_test_champion_challenger() -> List[str]:
+    errors: List[str] = []
+    try:
+        from champion_challenger_experiment_308 import ChampionChallengerExperiment, generate_market_events
+        from cc_predictors_308 import ChampionDemoPredictor, ChallengerDemoPredictor
+        from cc_models_308 import ExperimentConfig
+
+        config = ExperimentConfig(experiment_id="validate-cc-001", paper_samples=10)
+        exp = ChampionChallengerExperiment(config=config)
+        exp.register_champion("champion", "1.0.0", ChampionDemoPredictor())
+        exp.register_challenger("challenger", "2.0.0", ChallengerDemoPredictor())
+        start = exp.start("paper")
+        if not start.get("success"):
+            errors.append(f"cc start failed: {start.get('reason')}")
+            return errors
+
+        events = generate_market_events(n=10, seed=12345)
+        for event in events:
+            result = exp.ingest_event(event)
+            if not result.get("success"):
+                errors.append(f"cc ingest failed: {result.get('reason')}")
+                break
+
+        if len(exp.predictions["champion"]) != len(events):
+            errors.append("cc champion prediction count mismatch")
+        if len(exp.predictions["challenger"]) != len(events):
+            errors.append("cc challenger prediction count mismatch")
+
+        if exp.predictions["champion"] and exp.predictions["challenger"]:
+            cp = exp.predictions["champion"][0]
+            cc = exp.predictions["challenger"][0]
+            if cp.input_hash != cc.input_hash:
+                errors.append("cc predictions did not share event input hash")
+            if cp.correlation_id != cc.correlation_id:
+                errors.append("cc predictions did not share correlation_id")
+
+        metrics = exp.compute_metrics()
+        for role in ("champion", "challenger"):
+            if metrics[role].sample_count != len(events):
+                errors.append(f"cc {role} metrics sample_count mismatch")
+
+        shutdown = exp.shutdown_experiment("validate")
+        if not shutdown.get("success"):
+            errors.append(f"cc shutdown failed")
+        if not exp.audit.verify_chain():
+            errors.append("cc audit chain invalid after shutdown")
+    except Exception as exc:
+        errors.append(f"cc smoke test exception: {exc}")
+    return errors
+
+
 def main() -> int:
     directory = Path(__file__).parent
     print("UC-308 validation")
@@ -152,6 +209,14 @@ def main() -> int:
             print(f"  {err}")
         return 1
     print("[PASS] smoke test (healthy + drift + signature)")
+
+    cc_errors = smoke_test_champion_challenger()
+    if cc_errors:
+        print("[FAIL] champion/challenger smoke test errors:")
+        for err in cc_errors:
+            print(f"  {err}")
+        return 1
+    print("[PASS] champion/challenger smoke test")
 
     print("-" * 40)
     print("[PASS] UC-308 validation complete")

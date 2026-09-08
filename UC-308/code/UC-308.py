@@ -111,6 +111,80 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return validate_uc308.main()
 
 
+def cmd_champion_challenger(args: argparse.Namespace) -> int:
+    from champion_challenger_experiment_308 import ChampionChallengerExperiment, generate_market_events
+    from cc_predictors_308 import ChampionDemoPredictor, ChallengerDemoPredictor
+    from cc_models_308 import ExperimentConfig
+
+    print("=== UC-308 Champion/Challenger Experiment Demo ===")
+    config = ExperimentConfig(
+        experiment_id="demo-cc-001",
+        symbol="DEMO",
+        min_paired_samples=30,
+        walk_forward_samples=30,
+        shadow_samples=30,
+        paper_samples=30,
+    )
+    exp = ChampionChallengerExperiment(config=config)
+    exp.register_champion("champion", "1.0.0", ChampionDemoPredictor())
+    exp.register_challenger("challenger", "2.0.0", ChallengerDemoPredictor())
+    print(f"Experiment {exp.experiment_id} registered champion and challenger.")
+
+    stage_samples = {
+        "historical": config.min_paired_samples,
+        "walk_forward": config.walk_forward_samples,
+        "shadow": config.shadow_samples,
+        "paper": config.paper_samples,
+    }
+    total_samples = sum(stage_samples.values())
+    all_events = generate_market_events(symbol=config.symbol, n=total_samples, seed=args.seed)
+    cursor = 0
+    stages = ("historical", "walk_forward", "shadow", "paper")
+    for i, stage in enumerate(stages):
+        if i == 0:
+            result = exp.start(stage)
+        else:
+            result = exp.transition(stage)
+        if not result.get("success"):
+            print(f"Start/transition to {stage} failed: {result.get('reason')}")
+            return 1
+        n = stage_samples[stage]
+        events = all_events[cursor:cursor + n]
+        cursor += n
+        for event in events:
+            exp.ingest_event(event)
+        gate = exp.evaluate_stage_gate()
+        metrics = exp.compute_metrics()
+        print(f"\n[{stage}] events={len(events)} gate={gate.get('gate') or gate.get('reason')}")
+        for role in ("champion", "challenger"):
+            m = metrics[role]
+            print(f"  {role}: bid_mae={m.bid_mae:.4f} ask_mae={m.ask_mae:.4f} pnl={m.total_pnl:.2f} drawdown={m.max_drawdown:.4f}")
+        if exp.state in ("rejected", "contained"):
+            print(f"Experiment ended in state {exp.state}")
+            break
+        if exp.state == "awaiting_approval":
+            break
+
+    rec = exp.recommend_promotion()
+    print(f"\nRecommendation: action={rec.recommended_action} report_hash={rec.report_hash[:16]}...")
+    print(f"  reason: {rec.reason}")
+
+    # Simulate explicit human approval.
+    approval = exp.approve_promotion(
+        rec.report_hash,
+        reviewer_id="human-operator-1",
+        request_id="demo-req-001",
+        ttl_seconds=3600.0,
+    )
+    print(f"Approval result: success={approval.get('success')} state={exp.state} reason={approval.get('reason', '')}")
+
+    # Shutdown and reconcile.
+    shutdown = exp.shutdown_experiment("demo-complete")
+    print(f"Shutdown final_state={shutdown['final_state']} events_ingested={shutdown['reconciliation']['events_ingested']}")
+    print(f"Audit chain valid: {exp.audit.verify_chain()}")
+    return 0
+
+
 def main(argv: list = sys.argv[1:]) -> int:
     parser = argparse.ArgumentParser(
         prog="UC-308",
@@ -131,6 +205,9 @@ def main(argv: list = sys.argv[1:]) -> int:
 
     p_validate = sub.add_parser("validate", help="Run validation checks")
 
+    p_cc = sub.add_parser("champion-challenger", help="Run Champion/Challenger experiment demo")
+    p_cc.add_argument("--seed", type=int, default=SEED, help="Random seed for reproducibility")
+
     args = parser.parse_args(argv)
 
     commands = {
@@ -138,6 +215,7 @@ def main(argv: list = sys.argv[1:]) -> int:
         "run": cmd_run,
         "demo": cmd_demo,
         "validate": cmd_validate,
+        "champion-challenger": cmd_champion_challenger,
     }
     return commands[args.command](args)
 

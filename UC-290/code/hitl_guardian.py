@@ -251,6 +251,66 @@ class HITLGuardian:
     # Gestión
     # -----------------------------------------------------------------------
 
+    # -----------------------------------------------------------------------
+    # UC-308 Champion/Challenger promotion approval adapter
+    # -----------------------------------------------------------------------
+
+    def approve_experiment_promotion(self, request: Dict[str, Any]) -> Dict[str, Any]:
+        """Explicit human approval for a UC-308 promotion recommendation.
+
+        Bound to experiment_id + report_hash + champion/challenger versions,
+        with TTL and anti-replay. Requires an explicit reviewer_id; cannot
+        auto-approve.
+        """
+        experiment_id = request.get("experiment_id", "")
+        report_hash = request.get("report_hash", "")
+        reviewer_id = request.get("reviewer_id", "")
+        request_id = request.get("request_id", "")
+        timestamp = request.get("timestamp", 0.0)
+        ttl_seconds = request.get("ttl_seconds", 3600.0)
+        champion_version = request.get("champion_version", "")
+        challenger_version = request.get("challenger_version", "")
+
+        if ttl_seconds <= 0:
+            return {"approved": False, "reason": "ttl_seconds must be > 0"}
+        if not reviewer_id or not reviewer_id.strip():
+            return {"approved": False, "reason": "reviewer_id required; cannot auto-approve"}
+        if not experiment_id or not report_hash:
+            return {"approved": False, "reason": "experiment_id and report_hash required"}
+
+        now = time.time()
+        if timestamp > now + 60.0:
+            return {"approved": False, "reason": "timestamp unreasonably far in the future"}
+        if (now - timestamp) > ttl_seconds:
+            return {"approved": False, "reason": "approval request expired (TTL)"}
+        if request_id in self._used_reactivation_ids:
+            return {"approved": False, "reason": "request_id already used (anti-replay)"}
+        self._used_reactivation_ids.add(request_id)
+
+        self.observability.log(
+            "INFO",
+            f"Experiment promotion approved: {experiment_id}",
+            experiment_id,
+            {
+                "report_hash": report_hash,
+                "reviewer_id": reviewer_id,
+                "champion_version": champion_version,
+                "challenger_version": challenger_version,
+                "request_id": request_id,
+            },
+        )
+        self.observability.increment("hitl_experiment_promotion_approved_total")
+        return {
+            "approved": True,
+            "reason": "promotion approved by human reviewer",
+            "reviewer_id": reviewer_id,
+            "experiment_id": experiment_id,
+            "report_hash": report_hash,
+            "champion_version": champion_version,
+            "challenger_version": challenger_version,
+            "request_id": request_id,
+        }
+
     def reset(self, config: HITLConfig = None):
         """Reinicia el guardian."""
         if config:
@@ -273,10 +333,8 @@ class HITLGuardian:
                 self.observability.increment("hitl_timeout_total")
         return expired
 
-
     # -------------------------------------------------------------------
-    # UC-324 Safe Shutdown: reactivation approval
-    # -------------------------------------------------------------------
+    # UC-308 Champion/Challenger promotion approval adapter
 
     def approve_reactivation(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """Narrow reactivation approval mechanism for UC-324 safe shutdown.

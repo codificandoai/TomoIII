@@ -118,6 +118,74 @@
           }
         ],
         "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      },
+      {
+        "id": 10,
+        "title": "CC Bid/Ask MAE (Champion vs Challenger)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_cc_bid_mae",
+            "legendFormat": "bid-{{role}}"
+          },
+          {
+            "expr": "uc308_cc_ask_mae",
+            "legendFormat": "ask-{{role}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40}
+      },
+      {
+        "id": 11,
+        "title": "CC PnL (Champion vs Challenger)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_cc_pnl",
+            "legendFormat": "pnl-{{role}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40}
+      },
+      {
+        "id": 12,
+        "title": "CC Exposure & Drawdown",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_cc_exposure",
+            "legendFormat": "exposure-{{role}}"
+          },
+          {
+            "expr": "uc308_cc_drawdown",
+            "legendFormat": "drawdown-{{role}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48}
+      },
+      {
+        "id": 13,
+        "title": "CC Authority Denials",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_cc_authority_denials_total",
+            "legendFormat": "denials-{{role}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48}
+      },
+      {
+        "id": 14,
+        "title": "CC Experiment State",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_cc_experiment_state",
+            "legendFormat": "state-{{experiment_id}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56}
       }
     ]
   },

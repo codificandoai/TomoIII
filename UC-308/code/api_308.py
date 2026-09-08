@@ -18,6 +18,22 @@ from environment_simulator import SimulatedExternalEnvironment
 from golden_dataset import build_default_golden_dataset
 from models_308 import DriftConfig
 
+from cc_models_308 import ExperimentConfig, MarketEvent
+from champion_challenger_experiment_308 import (
+    ChampionChallengerExperiment,
+    ChampionChallengerManager,
+    generate_market_events,
+)
+from cc_predictors_308 import ChampionDemoPredictor, ChallengerDemoPredictor, UC315SkillPredictorAdapter
+
+from cc_models_308 import ExperimentConfig, MarketEvent
+from champion_challenger_experiment_308 import (
+    ChampionChallengerExperiment,
+    ChampionChallengerManager,
+    generate_market_events,
+)
+from cc_predictors_308 import ChampionDemoPredictor, ChallengerDemoPredictor, UC315SkillPredictorAdapter
+
 app = Flask(__name__)
 
 
@@ -34,6 +50,12 @@ def _create_orchestrator() -> DriftOrchestrator:
 
 
 _orchestrator: DriftOrchestrator = _create_orchestrator()
+
+
+_cc_manager: ChampionChallengerManager = ChampionChallengerManager()
+
+
+_cc_manager: ChampionChallengerManager = ChampionChallengerManager()
 
 
 def _ensure_baselines() -> None:
@@ -127,6 +149,90 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
         "description": "Reinicia el estado del orquestador (dataset se recarga por defecto).",
         "parameters": [
             {"name": "reinitialize", "type": "boolean", "required": False, "default": True},
+        ],
+    },
+    "POST /api/v1/cc-experiments": {
+        "endpoint": "POST /api/v1/cc-experiments",
+        "description": "Create a new Champion/Challenger experiment (deterministic paper-only).",
+        "parameters": [
+            {"name": "experiment_id", "type": "string", "required": False},
+            {"name": "symbol", "type": "string", "required": False, "default": "DEMO"},
+            {"name": "initial_cash", "type": "number", "required": False, "default": 1000000.0},
+            {"name": "min_paired_samples", "type": "integer", "required": False, "default": 30},
+            {"name": "walk_forward_samples", "type": "integer", "required": False, "default": 30},
+            {"name": "shadow_samples", "type": "integer", "required": False, "default": 30},
+            {"name": "paper_samples", "type": "integer", "required": False, "default": 30},
+        ],
+    },
+    "GET /api/v1/cc-experiments": {
+        "endpoint": "GET /api/v1/cc-experiments",
+        "description": "List active Champion/Challenger experiments.",
+        "parameters": [],
+    },
+    "GET /api/v1/cc-experiments/<id>": {
+        "endpoint": "GET /api/v1/cc-experiments/<id>",
+        "description": "Get experiment status.",
+        "parameters": [],
+    },
+    "POST /api/v1/cc-experiments/<id>/register": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/register",
+        "description": "Register deterministic demo champion/challenger predictors.",
+        "parameters": [
+            {"name": "champion_model_id", "type": "string", "required": False, "default": "champion"},
+            {"name": "champion_version", "type": "string", "required": False, "default": "1.0.0"},
+            {"name": "challenger_model_id", "type": "string", "required": False, "default": "challenger"},
+            {"name": "challenger_version", "type": "string", "required": False, "default": "2.0.0"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/start": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/start",
+        "description": "Start the experiment in a given stage.",
+        "parameters": [
+            {"name": "stage", "type": "string", "required": False, "default": "historical"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/ingest": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/ingest",
+        "description": "Ingest one canonical market event.",
+        "parameters": [
+            {"name": "event_id", "type": "string", "required": True},
+            {"name": "source_ts", "type": "number", "required": True},
+            {"name": "receive_ts", "type": "number", "required": True},
+            {"name": "symbol", "type": "string", "required": True},
+            {"name": "bid", "type": "number", "required": True},
+            {"name": "ask", "type": "number", "required": True},
+            {"name": "bid_size", "type": "number", "required": True},
+            {"name": "ask_size", "type": "number", "required": True},
+            {"name": "reference_bid", "type": "number", "required": True},
+            {"name": "reference_ask", "type": "number", "required": True},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/evaluate": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/evaluate",
+        "description": "Evaluate current metrics and stage gate.",
+        "parameters": [],
+    },
+    "POST /api/v1/cc-experiments/<id>/recommend": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/recommend",
+        "description": "Generate a promotion recommendation (no auto-promotion).",
+        "parameters": [],
+    },
+    "POST /api/v1/cc-experiments/<id>/approve": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/approve",
+        "description": "Explicit human approval bound to report_hash + versions with TTL and anti-replay.",
+        "parameters": [
+            {"name": "report_hash", "type": "string", "required": True},
+            {"name": "reviewer_id", "type": "string", "required": True},
+            {"name": "request_id", "type": "string", "required": True},
+            {"name": "ttl_seconds", "type": "number", "required": False, "default": 3600.0},
+            {"name": "timestamp", "type": "number", "required": False},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/shutdown": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/shutdown",
+        "description": "Safely shutdown the experiment: reject events, cancel paper orders, reconcile.",
+        "parameters": [
+            {"name": "reason", "type": "string", "required": False, "default": "api-request"},
         ],
     },
 }
@@ -239,6 +345,96 @@ OUTPUT_CARDS: Dict[str, Dict[str, Any]] = {
         "endpoint": "POST /api/v1/reset",
         "description": "Confirmación de reinicio.",
         "fields": [{"name": "status", "type": "string"}],
+    },
+    "POST /api/v1/cc-experiments": {
+        "endpoint": "POST /api/v1/cc-experiments",
+        "description": "Created experiment summary.",
+        "fields": [
+            {"name": "experiment_id", "type": "string"},
+            {"name": "state", "type": "string"},
+            {"name": "config", "type": "object"},
+        ],
+    },
+    "GET /api/v1/cc-experiments": {
+        "endpoint": "GET /api/v1/cc-experiments",
+        "description": "List of experiments.",
+        "fields": [{"name": "experiments", "type": "array"}],
+    },
+    "GET /api/v1/cc-experiments/<id>": {
+        "endpoint": "GET /api/v1/cc-experiments/<id>",
+        "description": "Experiment status.",
+        "fields": [
+            {"name": "experiment_id", "type": "string"},
+            {"name": "state", "type": "string"},
+            {"name": "samples_in_stage", "type": "integer"},
+            {"name": "total_events", "type": "integer"},
+            {"name": "audit_chain_valid", "type": "boolean"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/register": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/register",
+        "description": "Registered champion/challenger models.",
+        "fields": [
+            {"name": "experiment_id", "type": "string"},
+            {"name": "champion", "type": "object"},
+            {"name": "challenger", "type": "object"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/start": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/start",
+        "description": "Stage transition result.",
+        "fields": [
+            {"name": "success", "type": "boolean"},
+            {"name": "stage", "type": "string"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/ingest": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/ingest",
+        "description": "Ingestion result.",
+        "fields": [
+            {"name": "success", "type": "boolean"},
+            {"name": "event_id", "type": "string"},
+            {"name": "correlation_id", "type": "string"},
+            {"name": "stage", "type": "string"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/evaluate": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/evaluate",
+        "description": "Metrics and stage gate.",
+        "fields": [
+            {"name": "experiment_id", "type": "string"},
+            {"name": "stage", "type": "string"},
+            {"name": "gate", "type": "object"},
+            {"name": "metrics", "type": "object"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/recommend": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/recommend",
+        "description": "Promotion recommendation with report hash.",
+        "fields": [
+            {"name": "experiment_id", "type": "string"},
+            {"name": "report_hash", "type": "string"},
+            {"name": "recommended_action", "type": "string"},
+            {"name": "reason", "type": "string"},
+            {"name": "metrics_summary", "type": "object"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/approve": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/approve",
+        "description": "Approval result.",
+        "fields": [
+            {"name": "success", "type": "boolean"},
+            {"name": "state", "type": "string"},
+        ],
+    },
+    "POST /api/v1/cc-experiments/<id>/shutdown": {
+        "endpoint": "POST /api/v1/cc-experiments/<id>/shutdown",
+        "description": "Shutdown result.",
+        "fields": [
+            {"name": "success", "type": "boolean"},
+            {"name": "final_state", "type": "string"},
+            {"name": "reconciliation", "type": "object"},
+        ],
     },
 }
 
@@ -378,6 +574,163 @@ def reset():
     if payload.get("reinitialize", True):
         _orchestrator.initialize_baselines(scenario="healthy")
     return jsonify({"status": "ok"})
+
+
+# ---------------------------------------------------------------------------
+# Champion/Challenger experiment endpoints
+# ---------------------------------------------------------------------------
+
+def _get_experiment(exp_id: str):
+    exp = _cc_manager.get(exp_id)
+    if exp is None:
+        return None, (jsonify({"error": "experiment not found", "experiment_id": exp_id}), 404)
+    return exp, None
+
+
+@app.route("/api/v1/cc-experiments", methods=["POST"])
+def cc_create():
+    payload = request.get_json(silent=True) or {}
+    try:
+        cfg = ExperimentConfig(**payload) if payload else ExperimentConfig()
+    except TypeError as exc:
+        return jsonify({"error": f"invalid config: {exc}"}), 400
+    exp = _cc_manager.create(config=cfg)
+    return jsonify({"experiment_id": exp.experiment_id, "state": exp.state, "config": exp.config.to_dict()})
+
+
+@app.route("/api/v1/cc-experiments", methods=["GET"])
+def cc_list():
+    return jsonify({"experiments": _cc_manager.list_experiments()})
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>", methods=["GET"])
+def cc_status(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    return jsonify(exp.status())
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/register", methods=["POST"])
+def cc_register(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    champion_id = payload.get("champion_model_id", "champion")
+    champion_version = payload.get("champion_version", "1.0.0")
+    challenger_id = payload.get("challenger_model_id", "challenger")
+    challenger_version = payload.get("challenger_version", "2.0.0")
+    if exp.champion_reg is None:
+        exp.register_champion(champion_id, champion_version, ChampionDemoPredictor(), metadata=payload.get("champion_metadata", {}))
+    if exp.challenger_reg is None:
+        exp.register_challenger(challenger_id, challenger_version, ChallengerDemoPredictor(), metadata=payload.get("challenger_metadata", {}))
+    return jsonify({
+        "experiment_id": exp_id,
+        "champion": exp.champion_reg.to_dict() if exp.champion_reg else None,
+        "challenger": exp.challenger_reg.to_dict() if exp.challenger_reg else None,
+    })
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/start", methods=["POST"])
+def cc_start(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    stage = payload.get("stage", "historical")
+    result = exp.start(stage)
+    if not result.get("success"):
+        return jsonify({"error": result.get("reason", "start failed"), "experiment_id": exp_id}), 400
+    return jsonify(result)
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/ingest", methods=["POST"])
+def cc_ingest(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    try:
+        event = MarketEvent(**payload)
+    except (TypeError, ValueError) as exc:
+        return jsonify({"error": f"invalid market event: {exc}", "experiment_id": exp_id}), 400
+    result = exp.ingest_event(event)
+    return jsonify(result)
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/evaluate", methods=["POST"])
+def cc_evaluate(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    result = exp.evaluate_stage_gate()
+    metrics = exp.compute_metrics()
+    return jsonify({
+        "experiment_id": exp_id,
+        "stage": exp.state,
+        "gate": result,
+        "metrics": {role: m.to_dict() for role, m in metrics.items()},
+    })
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/recommend", methods=["POST"])
+def cc_recommend(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    rec = exp.recommend_promotion()
+    return jsonify(rec.to_dict())
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/approve", methods=["POST"])
+def cc_approve(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    report_hash = payload.get("report_hash")
+    reviewer_id = payload.get("reviewer_id")
+    request_id = payload.get("request_id")
+    ttl = payload.get("ttl_seconds", 3600.0)
+    ts = payload.get("timestamp")
+    if not report_hash or not reviewer_id or not request_id:
+        return jsonify({"error": "report_hash, reviewer_id and request_id are required", "experiment_id": exp_id}), 400
+    result = exp.approve_promotion(report_hash, reviewer_id, request_id, ttl_seconds=ttl, timestamp=ts)
+    return jsonify(result)
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/shutdown", methods=["POST"])
+def cc_shutdown(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    result = exp.shutdown_experiment(payload.get("reason", "api-request"))
+    return jsonify(result)
+
+
+@app.route("/api/v1/cc-experiments/<exp_id>/generate-events", methods=["POST"])
+def cc_generate_events(exp_id: str):
+    exp, err = _get_experiment(exp_id)
+    if err:
+        return err
+    payload = request.get_json(silent=True) or {}
+    n = int(payload.get("n", 100))
+    if not (1 <= n <= 10_000):
+        return jsonify({"error": "n must be between 1 and 10000", "experiment_id": exp_id}), 400
+    symbol = payload.get("symbol", exp.config.symbol)
+    seed = int(payload.get("seed", 42))
+    events = generate_market_events(symbol=symbol, n=n, seed=seed)
+    ingested = 0
+    rejected = 0
+    for event in events:
+        result = exp.ingest_event(event)
+        if result.get("success"):
+            ingested += 1
+        else:
+            rejected += 1
+    return jsonify({"experiment_id": exp_id, "generated": n, "ingested": ingested, "rejected": rejected})
 
 
 def main() -> None:

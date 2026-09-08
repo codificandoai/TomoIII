@@ -186,6 +186,44 @@ class ObservabilityOrchestrator:
             "trace_id": event.trace_id,
         }
 
+    # -------------------------------------------------------------------
+    # UC-308 Champion/Challenger experiment snapshot ingestion
+    # -------------------------------------------------------------------
+
+    def ingest_uc308_experiment_snapshot(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
+        """Narrow ingestion for UC-308 Champion/Challenger promotion snapshots.
+
+        Sanitizes through the privacy guard and stores a canonical event with no
+        raw chain-of-thought or secrets. Does not execute any external call.
+        """
+        payload = {
+            "trace_id": snapshot.get("experiment_id", ""),
+            "span_id": (snapshot.get("report_hash", "")[:16] or "uc308-cc"),
+            "agent_id": "uc308_champion_challenger",
+            "agent_version": snapshot.get("champion_version", ""),
+            "event_type": "observation",
+            "action_proposed": {"recommended_action": snapshot.get("recommended_action", "continue")},
+            "observation_summary": snapshot.get("reason", ""),
+            "uc308": {
+                "experiment_id": snapshot.get("experiment_id", ""),
+                "state": snapshot.get("state", ""),
+                "report_hash": snapshot.get("report_hash", ""),
+                "champion_version": snapshot.get("champion_version", ""),
+                "challenger_version": snapshot.get("challenger_version", ""),
+            },
+            "timestamp_ns": int(snapshot.get("timestamp", 0) * 1e9),
+        }
+        safe = self.privacy.sanitize(payload)
+        event = CanonicalEvent.from_dict(safe)
+        self.store.store(event)
+        self._refresh_derived()
+        return {
+            "adapter": "uc309_observability",
+            "ingested": True,
+            "event_hash": event.event_hash,
+            "trace_id": event.trace_id,
+        }
+
     def reset(self, role: Optional[str] = None):
         self.store.reset(role=role)
         self.metrics.reset()

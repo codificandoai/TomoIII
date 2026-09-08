@@ -102,3 +102,133 @@ groups:
         annotations:
           summary: "UC-308: behavioral drift"
           description: "Agent behavior (steps/retries/escalations) degraded."
+
+      - alert: UC308CCPredictionDivergence
+        expr: |
+          (
+            abs(uc308_cc_bid_mae{role="champion"} - uc308_cc_bid_mae{role="challenger"})
+            +
+            abs(uc308_cc_ask_mae{role="champion"} - uc308_cc_ask_mae{role="challenger"})
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: significant prediction divergence between champion and challenger"
+          description: "Bid/ask MAE difference between champion and challenger exceeds 0.05."
+
+      - alert: UC308CCDrawdownViolation
+        expr: uc308_cc_drawdown{role="challenger"} > 0.10
+        for: 1m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: challenger drawdown limit exceeded"
+          description: "Challenger max drawdown {{ $value }} is above the configured risk gate."
+
+      - alert: UC308CCExposureViolation
+        expr: uc308_cc_exposure{role="challenger"} > 200000
+        for: 1m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: challenger exposure limit exceeded"
+          description: "Challenger exposure {{ $value }} exceeded the risk limit."
+
+      - alert: UC308CCStaleFeed
+        expr: rate(uc308_cc_events_ingested_total[1m]) == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: stale market feed"
+          description: "No market events ingested in the last 2 minutes."
+
+      - alert: UC308CCAuthorityViolation
+        expr: rate(uc308_cc_authority_denials_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: authority violation detected"
+          description: "A real-order authority check was denied for the challenger."
+
+      - alert: UC308CCExperimentContained
+        expr: uc308_cc_experiment_state == 9
+        for: 0m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: experiment moved to contained state"
+          description: "A risk gate or shutdown moved the champion/challenger experiment to contained."
+
+      - alert: UC308CCPredictionDivergence
+        expr: |
+          (
+            abs(uc308_cc_bid_mae{role="champion"} - uc308_cc_bid_mae{role="challenger"})
+            +
+            abs(uc308_cc_ask_mae{role="champion"} - uc308_cc_ask_mae{role="challenger"})
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: significant prediction divergence between champion and challenger"
+          description: "Bid/ask MAE difference between champion and challenger exceeds 0.05."
+
+      - alert: UC308CCDrawdownViolation
+        expr: uc308_cc_drawdown{role="challenger"} > 0.10
+        for: 1m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: challenger drawdown limit exceeded"
+          description: "Challenger max drawdown {{ $value }} is above the configured risk gate."
+
+      - alert: UC308CCExposureViolation
+        expr: uc308_cc_exposure{role="challenger"} > 200000
+        for: 1m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: challenger exposure limit exceeded"
+          description: "Challenger exposure {{ $value }} exceeded the risk limit."
+
+      - alert: UC308CCStaleFeed
+        expr: rate(uc308_cc_events_ingested_total[1m]) == 0
+        for: 2m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: stale market feed"
+          description: "No market events ingested in the last 2 minutes."
+
+      - alert: UC308CCAuthorityViolation
+        expr: rate(uc308_cc_authority_denials_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: authority violation detected"
+          description: "A real-order authority check was denied for the challenger."
+
+      - alert: UC308CCExperimentContained
+        expr: uc308_cc_experiment_state == 9
+        for: 0m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308 CC: experiment moved to contained state"
+          description: "A risk gate or shutdown moved the champion/challenger experiment to contained."

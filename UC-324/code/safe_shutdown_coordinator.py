@@ -918,3 +918,31 @@ class SafeShutdownCoordinator:
         result.reason = "reactivation approved"
         result.new_state = ShutdownState.RUNNING.value
         return result
+
+    # ------------------------------------------------------------------
+    # UC-308 Champion/Challenger experiment containment
+    # ------------------------------------------------------------------
+    def stop_experiment(
+        self,
+        experiment_id: str,
+        trace_id: Optional[str] = None,
+        rollback_fn: Optional[Callable[[], Dict[str, Any]]] = None,
+        reason: str = "uc308_experiment_containment",
+    ) -> ShutdownStatus:
+        """Narrow safe-shutdown entry point for a UC-308 experiment.
+
+        If the coordinator is already RUNNING it registers the optional rollback
+        function under the experiment identifier and initiates a normal shutdown.
+        If the coordinator is already shutting down it returns the current
+        terminal status, preserving idempotency.
+        """
+        if rollback_fn is not None:
+            self._rollback_registry.register(
+                name=f"experiment_{experiment_id}_rollback",
+                rollback_fn=rollback_fn,
+                metadata={"experiment_id": experiment_id, "trace_id": trace_id or ""},
+            )
+        if self._state != ShutdownState.RUNNING:
+            return self._build_status()
+        shutdown_id = f"uc308-{experiment_id}-{uuid.uuid4().hex[:8]}"
+        return self.initiate_shutdown(reason=reason, shutdown_id=shutdown_id, trace_id=trace_id)

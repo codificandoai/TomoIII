@@ -533,6 +533,35 @@ class ContainmentSandbox:
             return self._shutdown_coordinator.get_evidence()
         return []
 
+    def contain_experiment(
+        self,
+        experiment_id: str,
+        reason: str = "uc308_experiment_containment",
+    ) -> Dict[str, Any]:
+        """Narrow containment marker for a UC-308 Champion/Challenger experiment.
+
+        Activates the raw kill latch and records a ContainmentDecision for the
+        experiment. Safe shutdown/reconciliation should still be coordinated
+        via SafeShutdownCoordinator; this method only provides an immediate
+        containment signal and audit marker.
+        """
+        self._raw_kill()
+        decision = ContainmentDecision(
+            plan_id=str(uuid.uuid4())[:8],
+            step_id="uc308_experiment_containment",
+            allowed=False,
+            gate="UC308_EXPERIMENT_CONTAINMENT",
+            issues=[f"experiment {experiment_id} contained: {reason}"],
+        )
+        self._audit_log.append(decision)
+        return {
+            "contained": True,
+            "experiment_id": experiment_id,
+            "reason": reason,
+            "raw_kill_switch": self._raw_kill_switch,
+            "audit_decisions": len(self._audit_log),
+        }
+
     def request_reactivation(
         self,
         shutdown_id: str,
