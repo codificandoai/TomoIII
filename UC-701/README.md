@@ -2,7 +2,7 @@
 ## AI-Native Operations &amp; Agentic Patterns
 ### CASE: UC
 
-#### USO: . EXTERNO
+#### USO: . INTERNO
 
 #### EXECUTION
 ```bash
