@@ -1,0 +1,54 @@
+# UC-308 — PromQL queries for Agent Drift / Environmental Degradation
+
+# Main success rate panel
+agent_drift_success_rate or uc308_success_rate
+
+# Success rate percentage by agent/environment/version
+uc308_success_rate * 100
+
+# Quality score over time
+uc308_quality_score
+
+# Current run status (0=normal, 1=warning, 2=degraded, 3=critical)
+uc308_run_status
+
+# Task results rate by tool and status
+sum(rate(uc308_task_results_total[5m])) by (tool, status)
+
+# Failure rate by tool
+sum(rate(uc308_task_results_total{status!="success"}[5m])) by (tool)
+  /
+sum(rate(uc308_task_results_total[5m])) by (tool)
+
+# Average latency per tool (seconds)
+rate(uc308_latency_seconds_sum[5m]) / rate(uc308_latency_seconds_count[5m])
+
+# 95th percentile latency approximation per tool
+uc308_latency_seconds_bucket{le="5"}
+
+# Token consumption rate per tool
+rate(uc308_tokens_total[5m]) by (tool)
+
+# Resource usage rate per tool/resource
+sum(rate(uc308_resource_usage_total[5m])) by (tool, resource)
+
+# Drift score by type
+topk(10, max_over_time(uc308_drift_score[5m])) by (drift_type)
+
+# Drift status by type (0/1/2/3)
+max by (drift_type) (uc308_drift_status)
+
+# Total alerts emitted by severity
+uc308_alerts_total
+
+# UC-300 block signals
+uc308_uc300_block_signals_total
+
+# UC-290 override signals
+uc308_uc290_override_signals_total
+
+# Telemetry received from other UCs
+rate(uc308_telemetry_received_total[5m]) by (source)
+
+# Gauge: compare current success rate against baseline threshold 0.8
+uc308_success_rate < bool 0.8

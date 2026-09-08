@@ -1,0 +1,4 @@
+# UC-308 — Agent Drift / Environmental Degradation
+# Dependencias mínimas: stdlib + Flask + pytest.
+Flask>=2.0.0
+pytest>=7.0.0

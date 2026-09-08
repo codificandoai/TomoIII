@@ -1,0 +1,125 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "UC-308 Agent Drift / Environmental Degradation",
+    "tags": ["uc308", "agent-drift", "mlops"],
+    "timezone": "utc",
+    "schemaVersion": 38,
+    "time": {"from": "now-6h", "to": "now"},
+    "panels": [
+      {
+        "id": 1,
+        "title": "Success Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_success_rate",
+            "legendFormat": "{{agent_id}}/{{environment}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Quality Score",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_quality_score",
+            "legendFormat": "{{agent_id}}/{{environment}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Run Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_run_status",
+            "legendFormat": "status"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Latency by Tool",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(uc308_latency_seconds_sum[5m]) / rate(uc308_latency_seconds_count[5m])",
+            "legendFormat": "{{tool}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Task Results by Tool/Status",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "sum(rate(uc308_task_results_total[5m])) by (tool, status)",
+            "legendFormat": "{{tool}}-{{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Drift Score by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_drift_score",
+            "legendFormat": "{{drift_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Drift Status by Type",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_drift_status",
+            "legendFormat": "{{drift_type}}-{{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Alerts Emitted",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_alerts_total",
+            "legendFormat": "{{severity}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32}
+      },
+      {
+        "id": 9,
+        "title": "UC-300 Block / UC-290 Override Signals",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_uc300_block_signals_total",
+            "legendFormat": "uc300 blocks"
+          },
+          {
+            "expr": "uc308_uc290_override_signals_total",
+            "legendFormat": "uc290 overrides"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32}
+      }
+    ]
+  },
+  "overwrite": false
+}

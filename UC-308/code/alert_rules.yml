@@ -1,0 +1,104 @@
+groups:
+  - name: uc308_agent_drift
+    rules:
+      - alert: UC308DriftCritical
+        expr: |
+          (
+            uc308_run_status >= 3
+            or
+            uc308_success_rate < 0.6
+          )
+        for: 1m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "UC-308: critical agent drift or environmental degradation detected"
+          description: "The UC-308 nightly run reported critical status or success rate below 60%. Manual intervention is required."
+
+      - alert: UC308DriftDegraded
+        expr: |
+          (
+            uc308_run_status >= 2
+            or
+            (uc308_success_rate < 0.8 and uc308_success_rate >= 0.6)
+          )
+        for: 2m
+        labels:
+          severity: degraded
+          team: ai-operations
+        annotations:
+          summary: "UC-308: degraded agent performance"
+          description: "The UC-308 run status is degraded or success rate is between 60% and 80%."
+
+      - alert: UC308DriftWarning
+        expr: |
+          (
+            uc308_run_status >= 1
+            or
+            (uc308_success_rate < 0.9 and uc308_success_rate >= 0.8)
+            or
+            (uc308_quality_score < 0.9 and uc308_quality_score >= 0.75)
+          )
+        for: 5m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308: early drift warning"
+          description: "Early signs of drift detected; monitor closely before it escalates."
+
+      - alert: UC308ToolOperationalLatency
+        expr: |
+          (
+            rate(uc308_latency_seconds_sum[5m])
+            /
+            rate(uc308_latency_seconds_count[5m])
+          ) > 2
+        for: 2m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "UC-308: tool latency regression"
+          description: "Average latency for tool {{ $labels.tool }} is above 2 seconds."
+
+      - alert: UC308APIContractDrift
+        expr: uc308_drift_status{drift_type="contract_api"} >= 2
+        for: 1m
+        labels:
+          severity: degraded
+          team: ai-operations
+        annotations:
+          summary: "UC-308: API contract drift"
+          description: "Detected contract/schema drift in {{ $labels.tool }}."
+
+      - alert: UC308HTMLInterfaceDrift
+        expr: uc308_drift_status{drift_type="html_interface"} >= 2
+        for: 1m
+        labels:
+          severity: degraded
+          team: ai-operations
+        annotations:
+          summary: "UC-308: HTML interface drift"
+          description: "Detected HTML/interface selector drift in {{ $labels.tool }}."
+
+      - alert: UC308DataDistributionDrift
+        expr: uc308_drift_score{drift_type="data_distribution"} > 0.25
+        for: 2m
+        labels:
+          severity: degraded
+          team: ai-operations
+        annotations:
+          summary: "UC-308: data distribution drift"
+          description: "Detected data distribution shift with PSI/JS above threshold."
+
+      - alert: UC308BehavioralDrift
+        expr: uc308_drift_status{drift_type="behavioral"} >= 2
+        for: 2m
+        labels:
+          severity: degraded
+          team: ai-operations
+        annotations:
+          summary: "UC-308: behavioral drift"
+          description: "Agent behavior (steps/retries/escalations) degraded."
