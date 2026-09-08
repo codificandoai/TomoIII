@@ -1,0 +1,15 @@
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'uc309@example.com'
+
+route:
+  receiver: 'default'
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: 'default'
+    web_configs:
+      - url: 'http://localhost:8500/alerts'

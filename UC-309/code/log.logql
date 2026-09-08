@@ -1,0 +1,21 @@
+# UC-309 LogQL query catalog for Loki (low-cardinality labels; trace_id used as line filter only)
+
+# Recent agent tool calls
+{event_type="tool_call"}
+
+# Error observations by tool
+{event_type="observation"} | json | line_format "{{.tool_name}}: {{.error}}"
+
+# Filter a specific trace inside the JSON line (do not index high-cardinality trace_id as label)
+{agent_id="uc315"} |= "trace_id"
+
+# Tool call frequency from logs by tool name
+sum by (tool_name) (count_over_time({event_type="tool_call"}[5m]))
+
+# Error rate by tool from log events
+sum by (tool_name) (count_over_time({event_type="observation"} |= "error"[5m]))
+/
+sum by (tool_name) (count_over_time({event_type="tool_call"}[5m]))
+
+# Redaction findings
+{event_type="observation"} |= "[REDACTED]"

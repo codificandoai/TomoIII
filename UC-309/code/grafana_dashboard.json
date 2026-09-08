@@ -1,0 +1,82 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "uc309-agentic-obs",
+    "title": "UC-309 Agentic Observability",
+    "tags": ["uc309", "agentic", "observability"],
+    "timezone": "browser",
+    "schemaVersion": 36,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Tool Calls",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(uc309_tool_calls_total[5m])) by (tool_name)",
+            "legendFormat": "{{tool_name}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Tool Error Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "sum(rate(uc309_tool_calls_total{status=\"error\"}[5m])) by (tool_name) / sum(rate(uc309_tool_calls_total[5m])) by (tool_name)",
+            "legendFormat": "{{tool_name}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Latency p95",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "uc309_latency_p95_ms",
+            "legendFormat": "p95"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Steps per Task",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "uc309_avg_steps",
+            "legendFormat": "avg steps"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "UC Signals",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(uc309_uc300_blocks_total) or vector(0)",
+            "legendFormat": "UC-300 blocks"
+          },
+          {
+            "expr": "sum(uc309_uc290_escalations_total) or vector(0)",
+            "legendFormat": "UC-290 escalations"
+          },
+          {
+            "expr": "sum(uc309_uc324_containments_total) or vector(0)",
+            "legendFormat": "UC-324 containments"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      }
+    ]
+  },
+  "overwrite": true
+}

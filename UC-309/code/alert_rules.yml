@@ -1,0 +1,44 @@
+groups:
+  - name: uc309_alerts
+    rules:
+      - alert: UC309HighToolErrorRate
+        expr: |
+          (
+            sum(rate(uc309_tool_calls_total{status="error"}[5m])) by (tool_name)
+            /
+            sum(rate(uc309_tool_calls_total[5m])) by (tool_name)
+          ) > 0.20
+        for: 2m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "High error rate on tool {{ $labels.tool_name }}"
+          description: "Tool {{ $labels.tool_name }} is failing more than 20% in the last 5 minutes."
+
+      - alert: UC309LongReasoningLoop
+        expr: histogram_quantile(0.95, rate(uc309_steps_total_bucket[10m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent entering long reasoning loops"
+          description: "p95 steps per task exceeds 10 in the last 10 minutes."
+
+      - alert: UC309ExcessiveTokenRate
+        expr: rate(uc309_tokens_total[15m]) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Excessive token consumption rate"
+          description: "Token rate exceeds 5000 per second; risk of cost leakage."
+
+      - alert: UC309IncompleteTelemetry
+        expr: rate(uc309_telemetry_incomplete_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Incomplete telemetry detected"
+          description: "Traces are missing start or end events. Check agent observer integration."
