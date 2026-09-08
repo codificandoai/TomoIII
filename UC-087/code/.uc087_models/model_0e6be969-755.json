@@ -1,19 +1,19 @@
 {
   "weights": [
-    0.36649414540509606,
-    0.38711730875194805,
-    -0.15434012849503298,
-    -0.08378222852702859
+    0.3682851495433852,
+    0.3475703592097246,
+    -0.13097503085542725,
+    -0.06756539537856306
   ],
-  "bias": 0.013965548844190413,
+  "bias": 0.005416677930379565,
   "dim": 4,
   "trained": true,
   "robustness_report": {
     "reports": {
       "pgd": {
         "clean_accuracy": 0.9512,
-        "adversarial_accuracy": 0.9268,
-        "robustness_gap": 0.0244,
+        "adversarial_accuracy": 0.9512,
+        "robustness_gap": 0.0,
         "passed": true,
         "attack_type": "pgd",
         "details": {
@@ -24,12 +24,12 @@
       }
     },
     "worst_attack": "pgd",
-    "worst_gap": 0.024390243902438935,
+    "worst_gap": 0.0,
     "passed_all": true
   },
   "backdoor_report": {
     "entropy_alert": true,
-    "entropy_zscore": 3.3905,
+    "entropy_zscore": 3.4432,
     "slice_alerts": [],
     "suspicious_features": []
   },

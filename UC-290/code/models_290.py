@@ -99,6 +99,16 @@ class HITLConfig:
     allow_auto_execute_low_risk: bool = True
     max_auto_confidence: float = 0.85  # Confiar hasta 85% sin humano
 
+    # SLA por nivel de riesgo (horas)
+    sla_hours_medium: int = 24
+    sla_hours_high: int = 8
+    sla_hours_critical: int = 2
+
+    # Asignación de revisores por nivel de riesgo
+    reviewers_medium: List[str] = field(default_factory=lambda: ["domain_expert"])
+    reviewers_high: List[str] = field(default_factory=lambda: ["domain_expert", "compliance_officer"])
+    reviewers_critical: List[str] = field(default_factory=lambda: ["domain_expert", "compliance_officer", "ethics_reviewer"])
+
     # Audit
     audit_hash_algorithm: str = "sha256"
     retain_dossiers: int = 1000
@@ -124,9 +134,35 @@ class HITLConfig:
             "require_human_for_high_risk": self.require_human_for_high_risk,
             "allow_auto_execute_low_risk": self.allow_auto_execute_low_risk,
             "max_auto_confidence": self.max_auto_confidence,
+            "sla_hours_medium": self.sla_hours_medium,
+            "sla_hours_high": self.sla_hours_high,
+            "sla_hours_critical": self.sla_hours_critical,
+            "reviewers_medium": self.reviewers_medium,
+            "reviewers_high": self.reviewers_high,
+            "reviewers_critical": self.reviewers_critical,
             "audit_hash_algorithm": self.audit_hash_algorithm,
             "retain_dossiers": self.retain_dossiers,
         }
+
+    def get_sla_hours(self, risk_level: "RiskLevel") -> int:
+        """Devuelve el SLA en horas según el nivel de riesgo."""
+        if risk_level == RiskLevel.CRITICAL:
+            return self.sla_hours_critical
+        if risk_level == RiskLevel.HIGH:
+            return self.sla_hours_high
+        if risk_level == RiskLevel.MEDIUM:
+            return self.sla_hours_medium
+        return 0
+
+    def get_reviewers(self, risk_level: "RiskLevel") -> List[str]:
+        """Asigna revisores según el nivel de riesgo."""
+        if risk_level == RiskLevel.CRITICAL:
+            return list(self.reviewers_critical)
+        if risk_level == RiskLevel.HIGH:
+            return list(self.reviewers_high)
+        if risk_level == RiskLevel.MEDIUM:
+            return list(self.reviewers_medium)
+        return []
 
 
 # ---------------------------------------------------------------------------

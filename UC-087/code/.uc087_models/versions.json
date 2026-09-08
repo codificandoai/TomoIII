@@ -1,82 +1,8 @@
 [
   {
-    "version_id": "49eeb252-09b",
-    "timestamp": 1788822248.666492,
-    "path": ".uc087_models/model_49eeb252-09b.json",
-    "metrics": {
-      "clean_acc": 0.9152542372881356,
-      "adv_acc": 0.8813559322033898,
-      "robustness_gap": 0.03389830508474578
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
-    "version_id": "6cf49b5c-749",
-    "timestamp": 1788908580.169853,
-    "path": ".uc087_models/model_6cf49b5c-749.json",
-    "metrics": {
-      "baseline": true
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "fea4d35e-286",
-    "timestamp": 1788908580.1710951,
-    "path": ".uc087_models/model_fea4d35e-286.json",
-    "metrics": {
-      "baseline": true
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "f90dac4e-b98",
-    "timestamp": 1788908580.1718771,
-    "path": ".uc087_models/model_f90dac4e-b98.json",
-    "metrics": {
-      "baseline": true
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "39a4d0a6-fbc",
-    "timestamp": 1788908580.1727092,
-    "path": ".uc087_models/model_39a4d0a6-fbc.json",
-    "metrics": {
-      "baseline": true
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "627137e3-b23",
-    "timestamp": 1788908580.173559,
-    "path": ".uc087_models/model_627137e3-b23.json",
-    "metrics": {
-      "baseline": true
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "be722e63-69d",
-    "timestamp": 1788908580.1855948,
-    "path": ".uc087_models/model_be722e63-69d.json",
+    "version_id": "cad84956-d5d",
+    "timestamp": 1788911810.050855,
+    "path": ".uc087_models/model_cad84956-d5d.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -88,9 +14,69 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "4430f777-c28",
-    "timestamp": 1788908580.197205,
-    "path": ".uc087_models/model_4430f777-c28.json",
+    "version_id": "0c9c5962-305",
+    "timestamp": 1788911810.0604758,
+    "path": ".uc087_models/model_0c9c5962-305.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "747b6cb0-714",
+    "timestamp": 1788911810.06127,
+    "path": ".uc087_models/model_747b6cb0-714.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "6658a849-413",
+    "timestamp": 1788911810.0619462,
+    "path": ".uc087_models/model_6658a849-413.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "45d76948-5c7",
+    "timestamp": 1788911810.06271,
+    "path": ".uc087_models/model_45d76948-5c7.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "bbeefb30-4a8",
+    "timestamp": 1788911810.063741,
+    "path": ".uc087_models/model_bbeefb30-4a8.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "0e6be969-755",
+    "timestamp": 1788911810.075822,
+    "path": ".uc087_models/model_0e6be969-755.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -102,9 +88,23 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "d49c40e5-750",
-    "timestamp": 1788908580.2090108,
-    "path": ".uc087_models/model_d49c40e5-750.json",
+    "version_id": "85302e80-503",
+    "timestamp": 1788911810.0890749,
+    "path": ".uc087_models/model_85302e80-503.json",
+    "metrics": {
+      "robustness_approved": null,
+      "slice_alerts": 0,
+      "suspicious_features": []
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "997b247b-161",
+    "timestamp": 1788911810.102378,
+    "path": ".uc087_models/model_997b247b-161.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -116,9 +116,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "39335d73-692",
-    "timestamp": 1788908580.209368,
-    "path": ".uc087_models/model_39335d73-692.json",
+    "version_id": "38837407-ea2",
+    "timestamp": 1788911810.1029491,
+    "path": ".uc087_models/model_38837407-ea2.json",
     "metrics": {},
     "is_canary": false,
     "promoted": false,
