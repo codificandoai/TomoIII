@@ -9,10 +9,15 @@ from baseline_manager import BaselineManager
 from drift_detectors import (
     APIContractDriftDetector,
     BehavioralDriftDetector,
+    ConceptDriftDetector,
     DataDistributionDriftDetector,
     HTMLInterfaceDriftDetector,
     QualityDriftDetector,
     ToolOperationalDriftDetector,
+)
+from prediction_drift_monitor import (
+    PredictionDriftMonitor,
+    PredictionWindow,
 )
 from drift_orchestrator import DriftOrchestrator
 from environment_simulator import SimulatedExternalEnvironment
@@ -110,8 +115,11 @@ __all__ = [
     "AgentResult",
     "APIContractDriftDetector",
     "BehavioralDriftDetector",
+    "ConceptDriftDetector",
     "DataDistributionDriftDetector",
     "HTMLInterfaceDriftDetector",
+    "PredictionDriftMonitor",
+    "PredictionWindow",
     "QualityDriftDetector",
     "ToolOperationalDriftDetector",
     "MitigationAdvisor",

@@ -22,6 +22,7 @@ from models_308 import (
     DriftConfig,
     DriftSignal,
     DriftStatus,
+    DriftType,
     EvaluationRun,
     SystemStatus,
 )
@@ -158,6 +159,30 @@ class DriftOrchestrator:
                 "status": run.system_status.value,
             },
         )
+
+        # Concept drift specific counter
+        concept_signals = [s for s in signals if s.drift_type == DriftType.CONCEPT]
+        for signal in concept_signals:
+            self.observability.increment(
+                "uc308_concept_drift_detected_total",
+                1,
+                {
+                    "tool": signal.tool or "unknown",
+                    "status": signal.status.value,
+                    "dimension": signal.dimension,
+                },
+            )
+            self.observability.log(
+                level="WARN" if signal.status != DriftStatus.NORMAL else "INFO",
+                message=f"Concept drift: {signal.message}",
+                extra={
+                    "drift_type": "concept",
+                    "tool": signal.tool,
+                    "status": signal.status.value,
+                    "score": signal.score,
+                    "evidence": signal.evidence,
+                },
+            )
 
         # Drift signals
         for signal in signals:

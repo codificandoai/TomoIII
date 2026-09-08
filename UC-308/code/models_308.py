@@ -25,6 +25,7 @@ class DriftType(str, Enum):
     TOOL_OPERATIONAL = "tool_operational"
     BEHAVIORAL = "behavioral"
     QUALITY = "quality"
+    CONCEPT = "concept"
 
 
 class DriftStatus(str, Enum):
@@ -44,11 +45,12 @@ class SystemStatus(str, Enum):
 
 
 class RecommendationAction(str, Enum):
-    """Tipos de recomendación de mitigación. Nunca implican auto-modificación."""
+    """Tipos recomendación de mitigación. Nunca implican auto-modificación."""
     ALERT_TEAM = "alert_team"
     INCREASE_HITL_UC290 = "increase_hitl_uc290"
     DISABLE_TOOL_UC300 = "disable_tool_uc300"
     CONTAINMENT_ROLLBACK_UC324 = "containment_rollback_uc324"
+    RETRAIN_UC087 = "retrain_uc087"
 
 
 @dataclass
@@ -478,6 +480,9 @@ class DriftConfig:
     html_selector_missing_degraded: int = 2
     psi_warning: float = 0.20
     psi_degraded: float = 0.50
+    concept_drift_warning: float = 0.10
+    concept_drift_degraded: float = 0.20
+    concept_drift_critical: float = 0.40
     behavioral_relative_warning: float = 0.30
     behavioral_relative_degraded: float = 0.60
     consecutive_degraded_to_alert: int = 2
@@ -511,6 +516,9 @@ class DriftConfig:
             "html_selector_missing_degraded": self.html_selector_missing_degraded,
             "psi_warning": self.psi_warning,
             "psi_degraded": self.psi_degraded,
+            "concept_drift_warning": self.concept_drift_warning,
+            "concept_drift_degraded": self.concept_drift_degraded,
+            "concept_drift_critical": self.concept_drift_critical,
             "behavioral_relative_warning": self.behavioral_relative_warning,
             "behavioral_relative_degraded": self.behavioral_relative_degraded,
             "consecutive_degraded_to_alert": self.consecutive_degraded_to_alert,

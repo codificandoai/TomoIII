@@ -80,6 +80,13 @@ class MitigationAdvisor:
                     reason=f"HTML interface drift in {tool}: selectors changed; disable until fix.",
                     auto_apply=False,
                 ))
+            if signal.drift_type == DriftType.CONCEPT and signal.status in (DriftStatus.DEGRADED, DriftStatus.CRITICAL):
+                recommendations.append(Recommendation(
+                    action=RecommendationAction.RETRAIN_UC087,
+                    target_tool=tool,
+                    reason=f"Concept drift in {tool}: prediction distribution changed. Request retrain through UC-087/MLSecOps pipeline.",
+                    auto_apply=False,
+                ))
 
         # Si el estado es crítico, solicitar contención/rollback a UC-324.
         if system_status == SystemStatus.CRITICAL:

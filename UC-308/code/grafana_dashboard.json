@@ -186,6 +186,42 @@
           }
         ],
         "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56}
+      },
+      {
+        "id": 15,
+        "title": "Concept Drift KS Statistic",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "uc308_drift_score{drift_type=\"concept\"}",
+            "legendFormat": "{{tool}}-{{dimension}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56}
+      },
+      {
+        "id": 16,
+        "title": "Concept Drift Events",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(uc308_concept_drift_detected_total) by (tool, status)",
+            "legendFormat": "{{tool}}-{{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 64}
+      },
+      {
+        "id": 17,
+        "title": "Concept Drift Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "uc308_drift_status{drift_type=\"concept\"}",
+            "legendFormat": "{{tool}}-{{status}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 64}
       }
     ]
   },

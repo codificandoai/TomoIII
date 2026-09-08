@@ -13,6 +13,36 @@ import random
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+
+def _ks_2sample_statistic(sample1: List[float], sample2: List[float]) -> float:
+    """Estadístico D de Kolmogorov-Smirnov two-sample."""
+    if not sample1 or not sample2:
+        return 0.0
+    n1 = len(sample1)
+    n2 = len(sample2)
+    all_values = sorted(set(sample1) | set(sample2))
+    diffs = []
+    for v in all_values:
+        cdf1 = sum(1 for x in sample1 if x <= v) / n1
+        cdf2 = sum(1 for x in sample2 if x <= v) / n2
+        diffs.append(abs(cdf1 - cdf2))
+    return max(diffs) if diffs else 0.0
+
+
+def _cramer_von_mises_2sample(sample1: List[float], sample2: List[float]) -> float:
+    """Estadístico T de Cramér-von Mises two-sample (versión simplificada)."""
+    if not sample1 or not sample2:
+        return 0.0
+    n1 = len(sample1)
+    n2 = len(sample2)
+    all_values = sorted(set(sample1) | set(sample2))
+    t = 0.0
+    for v in all_values:
+        cdf1 = sum(1 for x in sample1 if x <= v) / n1
+        cdf2 = sum(1 for x in sample2 if x <= v) / n2
+        t += (cdf1 - cdf2) ** 2
+    return t
+
 from models_308 import (
     AgentResult,
     Baseline,
@@ -769,6 +799,85 @@ class BehavioralDriftDetector:
 # Fábrica
 # ---------------------------------------------------------------------------
 
+class ConceptDriftDetector:
+    """Detecta deriva conceptual usando KS/CvM sobre predicciones del modelo."""
+
+    def detect(
+        self,
+        run: EvaluationRun,
+        baselines: Dict[Tuple[str, str, str, str], Baseline],
+        config: DriftConfig,
+    ) -> List[DriftSignal]:
+        signals: List[DriftSignal] = []
+        groups = _group_results_by_tool(run.results)
+
+        for tool, results in groups.items():
+            key = (run.agent_id, tool, run.environment, run.agent_version)
+            baseline = baselines.get(key)
+            if not baseline:
+                continue
+
+            current_scores: List[float] = []
+            for r in results:
+                scores = (r.evidence or {}).get("prediction_scores")
+                if scores:
+                    current_scores.extend(float(s) for s in scores)
+
+            if not current_scores:
+                continue
+
+            base_scores = (baseline.metrics.distribution or {}).get("concept_predictions")
+            if not base_scores:
+                base_scores = (baseline.metrics.behavior or {}).get("concept_predictions")
+            if not base_scores:
+                continue
+
+            base_scores = [float(s) for s in base_scores]
+            ks_stat = _ks_2sample_statistic(base_scores, current_scores)
+            cvm_stat = _cramer_von_mises_2sample(base_scores, current_scores)
+
+            # Umbralas: KS D > warning/degraded/critical
+            status = _status_from_thresholds(
+                ks_stat,
+                config.concept_drift_warning,
+                config.concept_drift_degraded,
+                config.concept_drift_critical,
+                higher_is_worse=True,
+            )
+            if status != DriftStatus.NORMAL:
+                n_base = len(base_scores)
+                n_current = len(current_scores)
+                base_mean = sum(base_scores) / n_base
+                current_mean = sum(current_scores) / n_current
+                signals.append(DriftSignal(
+                    run_id=run.run_id,
+                    drift_type=DriftType.CONCEPT,
+                    tool=tool,
+                    status=status,
+                    score=ks_stat,
+                    absolute_delta=current_mean - base_mean,
+                    relative_delta=_relative_delta(current_mean, base_mean),
+                    baseline_id=baseline.baseline_id,
+                    dimension="prediction_distribution",
+                    message=(
+                        f"Concept drift in {tool}: KS D={ks_stat:.3f}, "
+                        f"CvM T={cvm_stat:.3f} "
+                        f"(n_base={n_base}, n_current={n_current}, "
+                        f"mean {current_mean:.3f} vs {base_mean:.3f})"
+                    ),
+                    evidence={
+                        "ks_statistic": ks_stat,
+                        "cvm_statistic": cvm_stat,
+                        "base_count": n_base,
+                        "current_count": n_current,
+                        "base_mean": base_mean,
+                        "current_mean": current_mean,
+                        "tool": tool,
+                    },
+                ))
+        return signals
+
+
 ALL_DETECTORS = [
     QualityDriftDetector(),
     ToolOperationalDriftDetector(),
@@ -776,4 +885,5 @@ ALL_DETECTORS = [
     HTMLInterfaceDriftDetector(),
     DataDistributionDriftDetector(),
     BehavioralDriftDetector(),
+    ConceptDriftDetector(),
 ]
