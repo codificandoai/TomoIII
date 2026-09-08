@@ -42,3 +42,33 @@ groups:
         annotations:
           summary: "Incomplete telemetry detected"
           description: "Traces are missing start or end events. Check agent observer integration."
+
+      - alert: UC309LowSuccessRate
+        expr: uc309_success_rate_avg < 0.7
+        for: 5m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "Low agent success rate"
+          description: "Average success rate for agent {{ $labels.agent_id }} is below 70%."
+
+      - alert: UC309LowAlignmentRate
+        expr: uc309_alignment_rate_avg < 0.6
+        for: 5m
+        labels:
+          severity: critical
+          team: ai-operations
+        annotations:
+          summary: "Low agent alignment rate"
+          description: "Average alignment rate for agent {{ $labels.agent_id }} is below 60%; check blocks, escalations or overrides."
+
+      - alert: UC309SuccessAlignmentDivergence
+        expr: uc309_success_alignment_delta_avg > 0.3
+        for: 3m
+        labels:
+          severity: warning
+          team: ai-operations
+        annotations:
+          summary: "Success vs alignment divergence"
+          description: "Agent {{ $labels.agent_id }} succeeds but is frequently blocked/escalated/contained; possible misalignment or misspecified objectives."

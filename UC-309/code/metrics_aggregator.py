@@ -101,10 +101,46 @@ class MetricsAggregator:
                 self._observe("uc309_task_duration_seconds", agent_lbl, duration_ms / 1000.0, DURATION_BUCKETS)
 
             if ends:
-                outcome = ends[-1].final_outcome or Outcome.UNKNOWN
+                end = ends[-1]
+                agent_id = end.agent_id or "unknown"
+                agent_version = end.agent_version or "unknown"
+                agent_lbl = self._labels(agent_id=agent_id, agent_version=agent_version)
+                label_str = self._label_str(agent_lbl)
+
+                # Tasa de éxito: outcome explícito
+                outcome = end.final_outcome or Outcome.UNKNOWN
                 success = 1.0 if outcome == Outcome.SUCCESS else 0.0
-                agent_lbl = self._labels(agent_id=ends[-1].agent_id or "unknown", agent_version=ends[-1].agent_version or "unknown")
-                self.gauges["uc309_success_rate"][self._label_str(agent_lbl)] = success
+
+                # Tasa de alineación: éxito sin bloques, escalaciones, contención ni errores
+                aligned = success
+                if aligned:
+                    for ev in sorted_events:
+                        if ev.event_type in (
+                            EventType.UC300_BLOCK,
+                            EventType.UC300_TOCTOU,
+                            EventType.UC290_ESCALATION,
+                            EventType.UC324_CONTAINMENT,
+                            EventType.ERROR,
+                        ):
+                            aligned = 0.0
+                            break
+                        if ev.uc300 and ev.uc300.authorized is False:
+                            aligned = 0.0
+                            break
+                        if ev.uc290 and (ev.uc290.override or ev.uc290.escalation):
+                            aligned = 0.0
+                            break
+
+                self._inc("uc309_traces_total", agent_lbl)
+                if success:
+                    self._inc("uc309_success_total", agent_lbl)
+                if aligned:
+                    self._inc("uc309_alignment_total", agent_lbl)
+
+                # Mantener gauge por ventana actual (último valor) y acumulado
+                self.gauges["uc309_success_rate"][label_str] = success
+                self.gauges["uc309_alignment_rate"][label_str] = aligned
+                self.gauges["uc309_success_alignment_delta"][label_str] = round(success - aligned, 6)
 
             # Steps per task from max step number
             if sorted_events:
@@ -133,6 +169,20 @@ class MetricsAggregator:
             self.gauges["uc309_avg_steps"][""] = sum(self._steps) / len(self._steps)
         if self._latencies:
             self.gauges["uc309_avg_latency_ms"][""] = sum(self._latencies) / len(self._latencies)
+
+        # Tasas agregadas de éxito y alineación por agente
+        totals = dict(self.counters.get("uc309_traces_total", {}))
+        successes = dict(self.counters.get("uc309_success_total", {}))
+        alignments = dict(self.counters.get("uc309_alignment_total", {}))
+        for label_str, total in totals.items():
+            if total > 0:
+                self.gauges["uc309_success_rate_avg"][label_str] = successes.get(label_str, 0.0) / total
+                self.gauges["uc309_alignment_rate_avg"][label_str] = alignments.get(label_str, 0.0) / total
+                self.gauges["uc309_success_alignment_delta_avg"][label_str] = round(
+                    self.gauges["uc309_success_rate_avg"][label_str]
+                    - self.gauges["uc309_alignment_rate_avg"][label_str],
+                    6,
+                )
 
         self._last_update = time.time()
 

@@ -75,6 +75,54 @@
           }
         ],
         "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Success Rate vs Alignment Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(uc309_success_rate_avg) by (agent_id)",
+            "legendFormat": "success: {{agent_id}}"
+          },
+          {
+            "expr": "avg(uc309_alignment_rate_avg) by (agent_id)",
+            "legendFormat": "alignment: {{agent_id}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Success - Alignment Delta",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "avg(uc309_success_alignment_delta_avg) by (agent_id)",
+            "legendFormat": "delta: {{agent_id}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Multi-Agent Success/Alignment Table",
+        "type": "table",
+        "targets": [
+          {
+            "expr": "avg(uc309_success_rate_avg) by (agent_id, agent_version)",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          },
+          {
+            "expr": "avg(uc309_alignment_rate_avg) by (agent_id, agent_version)",
+            "format": "table",
+            "instant": true,
+            "refId": "B"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
       }
     ]
   },
