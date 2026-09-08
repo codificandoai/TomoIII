@@ -1,131 +1,5 @@
 [
   {
-    "version_id": "43f3eea1-5ec",
-    "timestamp": 1788822247.7687402,
-    "path": ".uc087_models/model_43f3eea1-5ec.json",
-    "metrics": {
-      "clean_acc": 0.9384615384615385,
-      "adv_acc": 0.9307692307692308,
-      "robustness_gap": 0.007692307692307665
-    },
-    "is_canary": true,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "f39ddb02-aed",
-    "timestamp": 1788822247.787661,
-    "path": ".uc087_models/model_f39ddb02-aed.json",
-    "metrics": {
-      "clean_acc": 1.0,
-      "adv_acc": 0.972972972972973,
-      "robustness_gap": 0.027027027027026973
-    },
-    "is_canary": true,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "b4f432ad-c91",
-    "timestamp": 1788822247.8450089,
-    "path": ".uc087_models/model_b4f432ad-c91.json",
-    "metrics": {
-      "clean_acc": 0.7307692307692307,
-      "adv_acc": 0.6987179487179487,
-      "robustness_gap": 0.03205128205128205
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
-    "version_id": "01f02017-ef5",
-    "timestamp": 1788822248.454339,
-    "path": ".uc087_models/model_01f02017-ef5.json",
-    "metrics": {
-      "clean_acc": 0.9864864864864865,
-      "adv_acc": 0.9324324324324325,
-      "robustness_gap": 0.05405405405405406
-    },
-    "is_canary": true,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "6a0a10a8-d7e",
-    "timestamp": 1788822248.503367,
-    "path": ".uc087_models/model_6a0a10a8-d7e.json",
-    "metrics": {
-      "clean_acc": 0.9769230769230769,
-      "adv_acc": 0.9538461538461539,
-      "robustness_gap": 0.023076923076922995
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
-    "version_id": "2117a34b-3d9",
-    "timestamp": 1788822248.521678,
-    "path": ".uc087_models/model_2117a34b-3d9.json",
-    "metrics": {
-      "clean_acc": 1.0,
-      "adv_acc": 0.972972972972973,
-      "robustness_gap": 0.027027027027026973
-    },
-    "is_canary": true,
-    "promoted": false,
-    "rejected": false,
-    "rejection_reason": ""
-  },
-  {
-    "version_id": "4027c17e-e17",
-    "timestamp": 1788822248.538762,
-    "path": ".uc087_models/model_4027c17e-e17.json",
-    "metrics": {
-      "clean_acc": 1.0,
-      "adv_acc": 0.9692307692307692,
-      "robustness_gap": 0.03076923076923077
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
-    "version_id": "51d37b6c-7cd",
-    "timestamp": 1788822248.5890079,
-    "path": ".uc087_models/model_51d37b6c-7cd.json",
-    "metrics": {
-      "clean_acc": 0.9846153846153847,
-      "adv_acc": 0.9615384615384616,
-      "robustness_gap": 0.023076923076923106
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
-    "version_id": "26896ab8-f26",
-    "timestamp": 1788822248.6439779,
-    "path": ".uc087_models/model_26896ab8-f26.json",
-    "metrics": {
-      "clean_acc": 0.9444444444444444,
-      "adv_acc": 0.9027777777777778,
-      "robustness_gap": 0.04166666666666663
-    },
-    "is_canary": false,
-    "promoted": false,
-    "rejected": true,
-    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
-  },
-  {
     "version_id": "49eeb252-09b",
     "timestamp": 1788822248.666492,
     "path": ".uc087_models/model_49eeb252-09b.json",
@@ -138,5 +12,117 @@
     "promoted": false,
     "rejected": true,
     "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "6cf49b5c-749",
+    "timestamp": 1788908580.169853,
+    "path": ".uc087_models/model_6cf49b5c-749.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "fea4d35e-286",
+    "timestamp": 1788908580.1710951,
+    "path": ".uc087_models/model_fea4d35e-286.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "f90dac4e-b98",
+    "timestamp": 1788908580.1718771,
+    "path": ".uc087_models/model_f90dac4e-b98.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "39a4d0a6-fbc",
+    "timestamp": 1788908580.1727092,
+    "path": ".uc087_models/model_39a4d0a6-fbc.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "627137e3-b23",
+    "timestamp": 1788908580.173559,
+    "path": ".uc087_models/model_627137e3-b23.json",
+    "metrics": {
+      "baseline": true
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "be722e63-69d",
+    "timestamp": 1788908580.1855948,
+    "path": ".uc087_models/model_be722e63-69d.json",
+    "metrics": {
+      "robustness_approved": null,
+      "slice_alerts": 0,
+      "suspicious_features": []
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "4430f777-c28",
+    "timestamp": 1788908580.197205,
+    "path": ".uc087_models/model_4430f777-c28.json",
+    "metrics": {
+      "robustness_approved": null,
+      "slice_alerts": 0,
+      "suspicious_features": []
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "d49c40e5-750",
+    "timestamp": 1788908580.2090108,
+    "path": ".uc087_models/model_d49c40e5-750.json",
+    "metrics": {
+      "robustness_approved": null,
+      "slice_alerts": 0,
+      "suspicious_features": []
+    },
+    "is_canary": false,
+    "promoted": true,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "39335d73-692",
+    "timestamp": 1788908580.209368,
+    "path": ".uc087_models/model_39335d73-692.json",
+    "metrics": {},
+    "is_canary": false,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
   }
 ]
