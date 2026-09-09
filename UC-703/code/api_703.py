@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from agent_runtime_orchestrator import AgentRuntimeOrchestrator
+from fine_tuning.controller import FineTuningController
+from fine_tuning.models_ft import FeedbackItem
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -20,6 +22,7 @@ except Exception as exc:  # pragma: no cover
 
 app = Flask(__name__)
 _orchestrator: Optional[AgentRuntimeOrchestrator] = None
+_ft_controller: Optional[FineTuningController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -116,6 +119,110 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
             "payload": {"type": "object", "required": False, "default": {}},
             "approval_ref": {"type": "string", "required": True},
         },
+    },
+    "POST /api/v1/ft/curate-and-register": {
+        "description": "Curación y versionado atómico de dataset.",
+        "parameters": {
+            "dataset_id": {"type": "string", "required": True},
+            "raw_samples": {"type": "array", "required": True},
+            "prompt_template": {"type": "string", "required": True},
+            "seed": {"type": "integer", "required": False, "default": 42},
+            "train_eval_samples": {"type": "object", "required": False},
+        },
+    },
+    "POST /api/v1/ft/plan-resources": {
+        "description": "Planificación de recursos GPU.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "model_size_b": {"type": "number", "required": True},
+            "budget_usd": {"type": "number", "required": True},
+            "deadline_hours": {"type": "number", "required": True},
+            "prefer_reliability": {"type": "boolean", "required": False, "default": False},
+        },
+    },
+    "POST /api/v1/ft/run-hp-search": {
+        "description": "Búsqueda de hiperparámetros.",
+        "parameters": {"pipeline_id": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/ft/create-training-config": {
+        "description": "Crea configuración de entrenamiento.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "base_model": {"type": "string", "required": True},
+            "hyperparams": {"type": "object", "required": False},
+        },
+    },
+    "POST /api/v1/ft/simulate-training-step": {
+        "description": "Envía métricas de entrenamiento y aplica política SRE.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "metrics": {"type": "object", "required": True},
+        },
+    },
+    "POST /api/v1/ft/evaluate": {
+        "description": "Evaluación multi-juez.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "domain_results": {"type": "array", "required": True},
+            "general_results": {"type": "array", "required": True},
+            "baseline_general_score": {"type": "number", "required": False, "default": 0.80},
+        },
+    },
+    "POST /api/v1/ft/alignment-recommendation": {
+        "description": "Recomendación de técnica de alineación.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "domain": {"type": "string", "required": True},
+            "risk_profile": {"type": "string", "required": True},
+            "has_human_preferences": {"type": "boolean", "required": True},
+        },
+    },
+    "POST /api/v1/ft/deploy-canary": {
+        "description": "Crea bundle y despliegue canary.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "adapter_uri": {"type": "string", "required": True},
+            "generation_params": {"type": "object", "required": False, "default": {}},
+            "traffic_percent": {"type": "number", "required": False, "default": 10},
+            "serving_mode": {"type": "string", "required": False, "default": "lora_fused"},
+        },
+    },
+    "POST /api/v1/ft/assess-canary": {
+        "description": "Decide promover o rollback del canary.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "canary_metrics": {"type": "object", "required": True},
+            "baseline_metrics": {"type": "object", "required": True},
+        },
+    },
+    "POST /api/v1/ft/detect-drift": {
+        "description": "Detecta drift y alucinaciones en despliegue.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "recent_inputs": {"type": "array", "required": True},
+            "recent_outputs": {"type": "array", "required": True},
+            "reference_contexts": {"type": "array", "required": True},
+        },
+    },
+    "POST /api/v1/ft/feedback": {
+        "description": "Ingesta feedback de producción.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "deployment_id": {"type": "string", "required": True},
+            "input_text": {"type": "string", "required": True},
+            "output_text": {"type": "string", "required": True},
+            "label": {"type": "string", "required": True},
+            "corrected_output": {"type": "string", "required": False, "default": ""},
+            "source": {"type": "string", "required": False, "default": "user"},
+        },
+    },
+    "GET /api/v1/ft/pipelines/<pipeline_id>": {
+        "description": "Estado de un pipeline.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/pipelines": {
+        "description": "Lista pipelines por status.",
+        "parameters": {"status": {"type": "string", "required": False}},
     },
 }
 
@@ -396,14 +503,199 @@ def prometheus_metrics():
 
 
 # ---------------------------------------------------------------------------
+# Fine-tuning lifecycle endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ft/curate-and-register")
+def ft_curate_and_register():
+    data = _body()
+    required = ["dataset_id", "raw_samples", "prompt_template"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    state = _ft_controller.curate_and_register(
+        dataset_id=data["dataset_id"],
+        raw_samples=data["raw_samples"],
+        prompt_template=data["prompt_template"],
+        seed=data.get("seed", 42),
+        train_eval_samples=data.get("train_eval_samples"),
+    )
+    return _ok(state.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/plan-resources")
+def ft_plan_resources():
+    data = _body()
+    required = ["pipeline_id", "model_size_b", "budget_usd", "deadline_hours"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    state = _ft_controller.plan_resources(
+        pipeline_id=data["pipeline_id"],
+        model_size_b=float(data["model_size_b"]),
+        budget_usd=float(data["budget_usd"]),
+        deadline_hours=float(data["deadline_hours"]),
+        prefer_reliability=bool(data.get("prefer_reliability", False)),
+    )
+    return _ok(state.to_dict())
+
+
+@app.post("/api/v1/ft/run-hp-search")
+def ft_run_hp_search():
+    data = _body()
+    if "pipeline_id" not in data:
+        return _err("pipeline_id requerido")
+    return _ok(_ft_controller.run_hp_search(data["pipeline_id"]))
+
+
+@app.post("/api/v1/ft/create-training-config")
+def ft_create_training_config():
+    data = _body()
+    required = ["pipeline_id", "base_model"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    state = _ft_controller.create_training_config(
+        pipeline_id=data["pipeline_id"],
+        base_model=data["base_model"],
+        hyperparams=data.get("hyperparams"),
+    )
+    return _ok(state.to_dict())
+
+
+@app.post("/api/v1/ft/simulate-training-step")
+def ft_simulate_training_step():
+    data = _body()
+    required = ["pipeline_id", "metrics"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_ft_controller.simulate_training_step(data["pipeline_id"], data["metrics"]))
+
+
+@app.post("/api/v1/ft/evaluate")
+def ft_evaluate():
+    data = _body()
+    required = ["pipeline_id", "domain_results", "general_results"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_ft_controller.evaluate(
+        pipeline_id=data["pipeline_id"],
+        domain_results=data["domain_results"],
+        general_results=data["general_results"],
+        baseline_general_score=float(data.get("baseline_general_score", 0.80)),
+    ))
+
+
+@app.post("/api/v1/ft/alignment-recommendation")
+def ft_alignment_recommendation():
+    data = _body()
+    required = ["pipeline_id", "domain", "risk_profile", "has_human_preferences"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_ft_controller.recommend_alignment(
+        pipeline_id=data["pipeline_id"],
+        domain=data["domain"],
+        risk_profile=data["risk_profile"],
+        has_human_preferences=bool(data["has_human_preferences"]),
+    ))
+
+
+@app.post("/api/v1/ft/deploy-canary")
+def ft_deploy_canary():
+    data = _body()
+    required = ["pipeline_id", "adapter_uri"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    state = _ft_controller.build_and_deploy_canary(
+        pipeline_id=data["pipeline_id"],
+        adapter_uri=data["adapter_uri"],
+        generation_params=data.get("generation_params", {}),
+        traffic_percent=float(data.get("traffic_percent", 10.0)),
+        serving_mode=data.get("serving_mode", "lora_fused"),
+    )
+    return _ok(state.to_dict())
+
+
+@app.post("/api/v1/ft/assess-canary")
+def ft_assess_canary():
+    data = _body()
+    required = ["pipeline_id", "canary_metrics", "baseline_metrics"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_ft_controller.assess_canary(
+        pipeline_id=data["pipeline_id"],
+        canary_metrics=data["canary_metrics"],
+        baseline_metrics=data["baseline_metrics"],
+    ))
+
+
+@app.post("/api/v1/ft/detect-drift")
+def ft_detect_drift():
+    data = _body()
+    required = ["pipeline_id", "recent_inputs", "recent_outputs", "reference_contexts"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_ft_controller.detect_drift(
+        pipeline_id=data["pipeline_id"],
+        recent_inputs=data["recent_inputs"],
+        recent_outputs=data["recent_outputs"],
+        reference_contexts=data["reference_contexts"],
+    ))
+
+
+@app.post("/api/v1/ft/feedback")
+def ft_feedback():
+    data = _body()
+    required = ["pipeline_id", "deployment_id", "input_text", "output_text", "label"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    item = FeedbackItem(
+        deployment_id=data["deployment_id"],
+        input_text=data["input_text"],
+        output_text=data["output_text"],
+        label=data["label"],
+        corrected_output=data.get("corrected_output", ""),
+        source=data.get("source", "user"),
+    )
+    return _ok(_ft_controller.ingest_feedback(data["pipeline_id"], item))
+
+
+@app.get("/api/v1/ft/pipelines/<pipeline_id>")
+def ft_get_pipeline(pipeline_id: str):
+    state = _ft_controller.get_pipeline(pipeline_id)
+    if not state:
+        return _err("pipeline no encontrado", 404)
+    return _ok(state.to_dict())
+
+
+@app.get("/api/v1/ft/pipelines")
+def ft_list_pipelines():
+    status = request.args.get("status")
+    return _ok([p.to_dict() for p in _ft_controller.list_pipelines(status=status)])
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
-def create_app(orchestrator: Optional[AgentRuntimeOrchestrator] = None) -> Flask:
-    global _orchestrator
+def create_app(
+    orchestrator: Optional[AgentRuntimeOrchestrator] = None,
+    ft_controller: Optional[FineTuningController] = None,
+) -> Flask:
+    global _orchestrator, _ft_controller
     if orchestrator is None:
         orchestrator = AgentRuntimeOrchestrator()
+    if ft_controller is None:
+        ft_controller = FineTuningController()
     _orchestrator = orchestrator
+    _ft_controller = ft_controller
     return app
 
 
