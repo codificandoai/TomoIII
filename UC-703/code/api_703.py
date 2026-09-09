@@ -13,6 +13,8 @@ from fine_tuning.controller import FineTuningController
 from fine_tuning.models_ft import FeedbackItem
 from fine_tuning.privacy.models_privacy import DataContract, DPTrainingConfig, NetworkPolicy
 from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsController
+from fine_tuning.quality_gate.models_quality import QualitativeReview
+from fine_tuning.quality_gate.quality_gate_controller import QualityGateController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -319,6 +321,34 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     "GET /api/v1/ft/privacy/pipelines/<pipeline_id>": {
         "description": "Estado de un privacy pipeline.",
         "parameters": {},
+    },
+    "POST /api/v1/ft/quality-gate/run": {
+        "description": "Ejecuta la puerta de calidad pre-producción completa.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "eval_records": {"type": "array", "required": True},
+            "baseline_metrics": {"type": "object", "required": True},
+            "previous_metrics": {"type": "object", "required": True},
+            "qualitative_reviews": {"type": "array", "required": False, "default": []},
+            "request_approval": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    "POST /api/v1/ft/quality-gate/approve": {
+        "description": "Firma de aprobación interdisciplinaria.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "team": {"type": "string", "required": True},
+            "signed_by": {"type": "string", "required": True},
+            "comment": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "GET /api/v1/ft/quality-gate/reports/<report_id>": {
+        "description": "Obtener reporte de quality gate.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/quality-gate/reports": {
+        "description": "Listar reportes de quality gate por status.",
+        "parameters": {"status": {"type": "string", "required": False}},
     },
 }
 
@@ -993,6 +1023,74 @@ def ft_privacy_get_pipeline(pipeline_id: str):
 
 
 # ---------------------------------------------------------------------------
+# PreProductionQualityGate endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ft/quality-gate/run")
+def ft_quality_gate_run():
+    data = _body()
+    required = ["pipeline_id", "eval_records", "baseline_metrics", "previous_metrics"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ft_controller.quality_gate is None:
+        return _err("quality gate controller no configurado", 503)
+    reviews = []
+    for r in data.get("qualitative_reviews", []):
+        reviews.append(QualitativeReview(
+            reviewer_role=r.get("reviewer_role", ""),
+            sample_id=r.get("sample_id", ""),
+            correctness=int(r.get("correctness", 0)),
+            helpfulness=int(r.get("helpfulness", 0)),
+            safety=int(r.get("safety", 0)),
+            comments=r.get("comments", ""),
+        ))
+    result = _ft_controller.run_quality_gate(
+        pipeline_id=data["pipeline_id"],
+        eval_records=data["eval_records"],
+        baseline_metrics=data["baseline_metrics"],
+        previous_metrics=data["previous_metrics"],
+        qualitative_reviews=reviews,
+        request_approval=bool(data.get("request_approval", True)),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/quality-gate/approve")
+def ft_quality_gate_approve():
+    data = _body()
+    required = ["pipeline_id", "team", "signed_by"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.submit_quality_gate_signature(
+        pipeline_id=data["pipeline_id"],
+        team=data["team"],
+        signed_by=data["signed_by"],
+        comment=data.get("comment", ""),
+    )
+    return _ok(result)
+
+
+@app.get("/api/v1/ft/quality-gate/reports/<report_id>")
+def ft_quality_gate_get_report(report_id: str):
+    if _ft_controller.quality_gate is None:
+        return _err("quality gate controller no configurado", 503)
+    report = _ft_controller.quality_gate.get_report(report_id)
+    if not report:
+        return _err("report no encontrado", 404)
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/ft/quality-gate/reports")
+def ft_quality_gate_list_reports():
+    if _ft_controller.quality_gate is None:
+        return _err("quality gate controller no configurado", 503)
+    status = request.args.get("status")
+    return _ok([r.to_dict() for r in _ft_controller.quality_gate.list_reports(status=status)])
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1005,7 +1103,8 @@ def create_app(
         orchestrator = AgentRuntimeOrchestrator()
     if ft_controller is None:
         ft_controller = FineTuningController(
-            privacy_controller=PrivacyPreservingLLMOpsController()
+            privacy_controller=PrivacyPreservingLLMOpsController(),
+            quality_gate_controller=QualityGateController(),
         )
     _orchestrator = orchestrator
     _ft_controller = ft_controller

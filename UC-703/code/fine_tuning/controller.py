@@ -39,6 +39,8 @@ from fine_tuning.serving_agents import (
 )
 from fine_tuning.privacy.models_privacy import PrivacyPipelineState as PrivacyState
 from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsController
+from fine_tuning.quality_gate.models_quality import QualityGateReport
+from fine_tuning.quality_gate.quality_gate_controller import QualityGateController
 from fine_tuning.training_agents import (
     HyperparameterSearchAgent,
     ResourcePlannerAgent,
@@ -60,6 +62,7 @@ class FineTuningPipelineState:
     drift: Optional[DriftReport] = None
     closed_loop: Optional[ClosedLoopCycle] = None
     privacy_state: Optional[PrivacyState] = None
+    quality_gate_report: Optional[QualityGateReport] = None
     status: str = "pending"
     logs: List[str] = field(default_factory=list)
 
@@ -77,6 +80,7 @@ class FineTuningPipelineState:
             "drift": self.drift.to_dict() if self.drift else None,
             "closed_loop": self.closed_loop.to_dict() if self.closed_loop else None,
             "privacy_state": self.privacy_state.to_dict() if self.privacy_state else None,
+            "quality_gate_report": self.quality_gate_report.to_dict() if self.quality_gate_report else None,
             "status": self.status,
             "logs": self.logs,
         }
@@ -106,6 +110,7 @@ class FineTuningController:
         drift_agent: Optional[DriftHallucinationAgent] = None,
         feedback_loop: Optional[FeedbackLoopAgent] = None,
         privacy_controller: Optional[PrivacyPreservingLLMOpsController] = None,
+        quality_gate_controller: Optional[QualityGateController] = None,
     ) -> None:
         self.curation = curation_agent or DataCurationAgent()
         self.leakage = leakage_agent or LeakageAuditAgent()
@@ -121,6 +126,7 @@ class FineTuningController:
         self.drift_agent = drift_agent or DriftHallucinationAgent()
         self.feedback_loop = feedback_loop or FeedbackLoopAgent()
         self.privacy = privacy_controller
+        self.quality_gate = quality_gate_controller
         self._pipelines: Dict[str, FineTuningPipelineState] = {}
 
     # ------------------------------------------------------------------
@@ -517,7 +523,62 @@ class FineTuningController:
         return assessment
 
     # ------------------------------------------------------------------
-    # 6. Observabilidad y cierre del ciclo
+    # 6. PreProductionQualityGate integration
+    # ------------------------------------------------------------------
+    def run_quality_gate(
+        self,
+        pipeline_id: str,
+        eval_records: List[Dict[str, Any]],
+        baseline_metrics: Dict[str, float],
+        previous_metrics: Dict[str, float],
+        qualitative_reviews: Optional[List[Any]] = None,
+        request_approval: bool = True,
+    ) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or not state.training_config:
+            raise ValueError("Pipeline or training config missing")
+        if self.quality_gate is None:
+            raise ValueError("quality gate controller not configured")
+        ds = self.quality_gate.load_dataset(
+            name=f"eval-{state.training_config.run_id}",
+            records=eval_records,
+            baseline_version="baseline-v1",
+            previous_version="previous-v1",
+        )
+        report = self.quality_gate.run_full_gate(
+            run_id=state.training_config.run_id,
+            model_version=state.training_config.base_model,
+            dataset=ds,
+            baseline_metrics=baseline_metrics,
+            previous_metrics=previous_metrics,
+            reviews=qualitative_reviews or [],
+            request_approval=request_approval,
+        )
+        state.quality_gate_report = report
+        state.logs.append(f"Quality gate status: {report.status}")
+        return report.to_dict()
+
+    def submit_quality_gate_signature(
+        self,
+        pipeline_id: str,
+        team: str,
+        signed_by: str,
+        comment: str = "",
+    ) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or not state.quality_gate_report:
+            raise ValueError("Pipeline or quality gate report missing")
+        approval = self.quality_gate.submit_approval_signature(
+            state.quality_gate_report.cross_team_approval.approval_id,
+            team,
+            signed_by,
+            comment,
+        )
+        state.quality_gate_report = self.quality_gate.get_report(state.quality_gate_report.report_id)
+        return approval.to_dict()
+
+    # ------------------------------------------------------------------
+    # 7. Observabilidad y cierre del ciclo
     # ------------------------------------------------------------------
     def detect_drift(
         self,
