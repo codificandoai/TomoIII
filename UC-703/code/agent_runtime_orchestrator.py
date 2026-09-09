@@ -33,6 +33,7 @@ from models_703 import (
     TaskStatus,
 )
 from observability_bridge import ObservabilityBridge
+from resilience.recovery_orchestrator import RecoveryOrchestrator
 
 
 class AgentRuntimeOrchestrator:
@@ -60,6 +61,7 @@ class AgentRuntimeOrchestrator:
         task_manager: Optional[LongTermTaskManager] = None,
         observability: Optional[ObservabilityBridge] = None,
         planner: Optional[Callable[[Objective, List[Dict[str, Any]]], Plan]] = None,
+        recovery_orchestrator: Optional[RecoveryOrchestrator] = None,
     ) -> None:
         self.temporal = temporal or TemporalAdapter()
         self.stackstorm = stackstorm or StackStormRuntimeAdapter()
@@ -70,6 +72,7 @@ class AgentRuntimeOrchestrator:
         self.task_manager = task_manager or LongTermTaskManager()
         self.observability = observability or ObservabilityBridge()
         self.planner = planner or self._default_planner
+        self.recovery = recovery_orchestrator
         self._tasks: Dict[str, RuntimeTask] = {}
 
     # ------------------------------------------------------------------
@@ -242,6 +245,26 @@ class AgentRuntimeOrchestrator:
                     step.step_id,
                     {"result": result.to_dict(), "completed_steps": task.completed_steps},
                 )
+            # Resilient recovery layer: try to recover from step failures
+            if result.status != "succeeded" and self.recovery is not None:
+                recovery_report = self.recovery.invoke(
+                    run_id=task.objective_id,
+                    step_id=step.step_id,
+                    tool_name=step.action,
+                    fn=lambda **kwargs: self._execute_step(step, decision),
+                    params=step.params,
+                    completed_steps=list(task.completed_steps),
+                    partial_state={sid: r.to_dict() for sid, r in task.results.items()},
+                )
+                if recovery_report.final_status in ("succeeded", "recovered"):
+                    result.status = "succeeded"
+                    result.output = recovery_report.final_output
+                    result.error = ""
+                    result.backend = "recovery"
+                elif recovery_report.final_status == "escalated":
+                    result.status = "escalated"
+                    result.error = f"escalated to HITL ({recovery_report.recovery_action})"
+                    result.backend = "recovery"
             task.results[step.step_id] = result
             if step.step_id in task.pending_steps:
                 task.pending_steps.remove(step.step_id)

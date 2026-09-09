@@ -19,6 +19,7 @@ from fine_tuning.quality_gate.quality_gate_controller import QualityGateControll
 from fine_tuning.extrinsic_metrics.extrinsic_metrics_controller import ExtrinsicMetricsController
 from fine_tuning.evaluation_matrix.evaluation_matrix_controller import EvaluationMatrixController
 from fine_tuning.evaluation_matrix.models_cem import HumanReview
+from resilience.recovery_orchestrator import RecoveryOrchestrator
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -33,6 +34,7 @@ _orchestrator: Optional[AgentRuntimeOrchestrator] = None
 _ft_controller: Optional[FineTuningController] = None
 _em_controller: Optional[ExtrinsicMetricsController] = None
 _cem_controller: Optional[EvaluationMatrixController] = None
+_recovery_controller: Optional[RecoveryOrchestrator] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -475,6 +477,48 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     "GET /api/v1/ft/evaluation-matrix/logs": {
         "description": "Logs estructurados de CEM.",
         "parameters": {},
+    },
+    "POST /api/v1/runtime/recovery/register-tool": {
+        "description": "Registra esquema de entrada/salida de una herramienta.",
+        "parameters": {
+            "tool_name": {"type": "string", "required": True},
+            "input_schema": {"type": "object", "required": False},
+            "output_schema": {"type": "object", "required": False},
+        },
+    },
+    "POST /api/v1/runtime/recovery/invoke": {
+        "description": "Invoca herramienta con recuperación ante fallos.",
+        "parameters": {
+            "run_id": {"type": "string", "required": True},
+            "step_id": {"type": "string", "required": True},
+            "tool_name": {"type": "string", "required": True},
+            "params": {"type": "object", "required": True},
+            "completed_steps": {"type": "array", "required": False, "default": []},
+            "partial_state": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "GET /api/v1/runtime/recovery/reports/<report_id>": {
+        "description": "Obtener reporte de recuperación.",
+        "parameters": {},
+    },
+    "GET /api/v1/runtime/recovery/reports": {
+        "description": "Listar reportes de recuperación.",
+        "parameters": {},
+    },
+    "GET /api/v1/runtime/recovery/prometheus": {
+        "description": "Métricas Prometheus de recuperación.",
+        "parameters": {},
+    },
+    "GET /api/v1/runtime/recovery/logs": {
+        "description": "Logs estructurados de recuperación.",
+        "parameters": {},
+    },
+    "POST /api/v1/runtime/recovery/hitl-decide": {
+        "description": "Decisión HITL sobre escalación.",
+        "parameters": {
+            "escalation_id": {"type": "string", "required": True},
+            "operator_decision": {"type": "string", "required": True},
+        },
     },
 }
 
@@ -1434,6 +1478,101 @@ def ft_cem_logs():
 
 
 # ---------------------------------------------------------------------------
+# Resilient Multi-Step Recovery endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/runtime/recovery/register-tool")
+def ft_recovery_register_tool():
+    data = _body()
+    required = ["tool_name"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    _recovery_controller.register_tool(
+        tool_name=data["tool_name"],
+        input_schema=data.get("input_schema"),
+        output_schema=data.get("output_schema"),
+    )
+    return _ok({"tool_name": data["tool_name"], "registered": True}, 201)
+
+
+@app.post("/api/v1/runtime/recovery/invoke")
+def ft_recovery_invoke():
+    data = _body()
+    required = ["run_id", "step_id", "tool_name", "params"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+
+    def _fn(**kwargs: Any) -> Any:
+        # Simulation hook: success if params contain 'expected_value'
+        if kwargs.get("expected_value"):
+            return {"result": kwargs["expected_value"]}
+        raise TimeoutError("simulated tool timeout")
+
+    report = _recovery_controller.invoke(
+        run_id=data["run_id"],
+        step_id=data["step_id"],
+        tool_name=data["tool_name"],
+        fn=_fn,
+        params=data["params"],
+        completed_steps=data.get("completed_steps", []),
+        partial_state=data.get("partial_state", {}),
+    )
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/runtime/recovery/reports/<report_id>")
+def ft_recovery_get_report(report_id: str):
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    report = _recovery_controller.get_report(report_id)
+    if not report:
+        return _err("report no encontrado", 404)
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/runtime/recovery/reports")
+def ft_recovery_list_reports():
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    return _ok([r.to_dict() for r in _recovery_controller.list_reports()])
+
+
+@app.get("/api/v1/runtime/recovery/prometheus")
+def ft_recovery_prometheus():
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    return _recovery_controller.render_prometheus()
+
+
+@app.get("/api/v1/runtime/recovery/logs")
+def ft_recovery_logs():
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    return _ok(_recovery_controller.get_logs())
+
+
+@app.post("/api/v1/runtime/recovery/hitl-decide")
+def ft_recovery_hitl_decide():
+    data = _body()
+    required = ["escalation_id", "operator_decision"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _recovery_controller is None:
+        return _err("recovery controller no configurado", 503)
+    record = _recovery_controller.decide_hitl(data["escalation_id"], data["operator_decision"])
+    if not record:
+        return _err("escalation no encontrada", 404)
+    return _ok(record.to_dict())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1455,6 +1594,9 @@ def create_app(
     global _cem_controller
     if _cem_controller is None:
         _cem_controller = EvaluationMatrixController()
+    global _recovery_controller
+    if _recovery_controller is None:
+        _recovery_controller = RecoveryOrchestrator()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
