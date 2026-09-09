@@ -27,6 +27,8 @@ from enterprise_qa.qa_driver import EnterpriseQADriver
 from incident_management.incident_management_controller import IncidentManagementController
 from aiops_self_healing.aiops_controller import AIOpsController
 from aiops_self_healing.models_aiops import RemediationPolicy, RemediationType
+from rbac_audit.rbac_audit_controller import RBACAuditController
+from production_serving.production_serving_controller import ProductionServingController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -47,6 +49,8 @@ _ci_controller: Optional[ContinuousImprovementController] = None
 _qa_driver: Optional[EnterpriseQADriver] = None
 _incident_controller: Optional[IncidentManagementController] = None
 _aiops_controller: Optional[AIOpsController] = None
+_rbac_audit_controller: Optional[RBACAuditController] = None
+_production_serving_controller: Optional[ProductionServingController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -868,6 +872,164 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     },
     "GET /api/v1/aiops/dashboard": {
         "description": "Dashboard de AIOps.",
+        "parameters": {},
+    },
+    "POST /api/v1/rbac/roles": {
+        "description": "Crea rol con permisos.",
+        "parameters": {
+            "role_id": {"type": "string", "required": True},
+            "name": {"type": "string", "required": True},
+            "description": {"type": "string", "required": False, "default": ""},
+            "permission_ids": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/rbac/permissions": {
+        "description": "Otorga permiso sobre recurso.",
+        "parameters": {
+            "permission_id": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "resource_type": {"type": "string", "required": True},
+            "resource_id": {"type": "string", "required": False, "default": ""},
+            "conditions": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "POST /api/v1/rbac/principals": {
+        "description": "Crea principal y asigna roles.",
+        "parameters": {
+            "principal_id": {"type": "string", "required": True},
+            "name": {"type": "string", "required": True},
+            "principal_type": {"type": "string", "required": True},
+            "role_ids": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/rbac/resources": {
+        "description": "Registra recurso con versión y sensibilidad.",
+        "parameters": {
+            "resource_id": {"type": "string", "required": True},
+            "resource_type": {"type": "string", "required": True},
+            "owner": {"type": "string", "required": False, "default": ""},
+            "version": {"type": "string", "required": False, "default": ""},
+            "sensitivity": {"type": "string", "required": False, "default": ""},
+            "environment": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/rbac/sod": {
+        "description": "Regla de segregación de funciones.",
+        "parameters": {
+            "conflicting_roles": {"type": "array", "required": True},
+        },
+    },
+    "POST /api/v1/rbac/access": {
+        "description": "Verifica acceso y deja registro de auditoría.",
+        "parameters": {
+            "principal_id": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "resource_id": {"type": "string", "required": True},
+            "resource_type": {"type": "string", "required": True},
+            "context": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "POST /api/v1/rbac/approvals": {
+        "description": "Solicita aprobación para operación crítica.",
+        "parameters": {
+            "principal_id": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "resource_id": {"type": "string", "required": True},
+            "resource_type": {"type": "string", "required": True},
+            "justification": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/rbac/approvals/<request_id>/approve": {
+        "description": "Aprueba solicitud.",
+        "parameters": {"approver": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/rbac/approvals/<request_id>/reject": {
+        "description": "Rechaza solicitud.",
+        "parameters": {"approver": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/audit/events": {
+        "description": "Registra evento de auditoría.",
+        "parameters": {
+            "event_type": {"type": "string", "required": True},
+            "principal_id": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "resource_id": {"type": "string", "required": True},
+            "resource_type": {"type": "string", "required": True},
+            "outcome": {"type": "string", "required": True},
+            "origin": {"type": "string", "required": False, "default": "api"},
+            "details": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "GET /api/v1/audit/query": {
+        "description": "Consulta registros de auditoría.",
+        "parameters": {
+            "principal_id": {"type": "string", "required": False},
+            "resource_id": {"type": "string", "required": False},
+            "action": {"type": "string", "required": False},
+            "outcome": {"type": "string", "required": False},
+            "event_type": {"type": "string", "required": False},
+        },
+    },
+    "GET /api/v1/audit/verify": {
+        "description": "Verifica integridad del ledger de auditoría.",
+        "parameters": {},
+    },
+    "GET /api/v1/rbac/dashboard": {
+        "description": "Dashboard de RBAC y auditoría.",
+        "parameters": {},
+    },
+    "POST /api/v1/serving/sessions": {
+        "description": "Crea sesión de serving.",
+        "parameters": {
+            "principal_id": {"type": "string", "required": True},
+            "model_id": {"type": "string", "required": True},
+            "channel": {"type": "string", "required": False, "default": "api"},
+        },
+    },
+    "POST /api/v1/serving/chat": {
+        "description": "Inferencia chat con RBAC, rate limiting, guardrails y observabilidad.",
+        "parameters": {
+            "token": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+            "model_id": {"type": "string", "required": False, "default": ""},
+            "session_id": {"type": "string", "required": False, "default": ""},
+            "params": {"type": "object", "required": False, "default": {}},
+            "origin": {"type": "string", "required": False, "default": "api"},
+        },
+    },
+    "POST /api/v1/serving/chat/enterprise": {
+        "description": "Inferencia desde chat empresarial.",
+        "parameters": {
+            "token": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/serving/tokens": {
+        "description": "Registra token con roles/scopes para RBAC de serving.",
+        "parameters": {
+            "token": {"type": "string", "required": True},
+            "principal_id": {"type": "string", "required": True},
+            "roles": {"type": "array", "required": False, "default": []},
+            "scopes": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/serving/feedback": {
+        "description": "Envía feedback de usuario para re-evaluación.",
+        "parameters": {
+            "request_id": {"type": "string", "required": True},
+            "session_id": {"type": "string", "required": True},
+            "principal_id": {"type": "string", "required": True},
+            "signal_type": {"type": "string", "required": True},
+            "value": {"type": "any", "required": True},
+            "comment": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/serving/re-evaluate/<request_id>": {
+        "description": "Re-evalúa una inferencia con LLM-as-judge determinista.",
+        "parameters": {},
+    },
+    "GET /api/v1/serving/dashboard": {
+        "description": "Dashboard de serving.",
         "parameters": {},
     },
 }
@@ -2581,6 +2743,327 @@ def ft_aiops_dashboard():
 
 
 # ---------------------------------------------------------------------------
+# RBAC and Immutable Audit endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/rbac/roles")
+def ft_rbac_create_role():
+    data = _body()
+    required = ["role_id", "name"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    role = _rbac_audit_controller.create_role(
+        role_id=data["role_id"],
+        name=data["name"],
+        description=data.get("description", ""),
+        permission_ids=data.get("permission_ids", []),
+    )
+    return _ok(role.to_dict(), 201)
+
+
+@app.post("/api/v1/rbac/permissions")
+def ft_rbac_grant_permission():
+    data = _body()
+    required = ["permission_id", "action", "resource_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    perm = _rbac_audit_controller.grant_permission(
+        permission_id=data["permission_id"],
+        action=data["action"],
+        resource_type=data["resource_type"],
+        resource_id=data.get("resource_id", ""),
+        conditions=data.get("conditions", {}),
+    )
+    return _ok(perm.to_dict(), 201)
+
+
+@app.post("/api/v1/rbac/principals")
+def ft_rbac_create_principal():
+    data = _body()
+    required = ["principal_id", "name", "principal_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    principal = _rbac_audit_controller.create_principal(
+        principal_id=data["principal_id"],
+        name=data["name"],
+        principal_type=data["principal_type"],
+        role_ids=data.get("role_ids", []),
+    )
+    return _ok(principal.to_dict(), 201)
+
+
+@app.post("/api/v1/rbac/resources")
+def ft_rbac_register_resource():
+    data = _body()
+    required = ["resource_id", "resource_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    resource = _rbac_audit_controller.register_resource(
+        resource_id=data["resource_id"],
+        resource_type=data["resource_type"],
+        owner=data.get("owner", ""),
+        version=data.get("version", ""),
+        sensitivity=data.get("sensitivity", ""),
+        environment=data.get("environment", ""),
+        metadata=data.get("metadata", {}),
+    )
+    return _ok(resource.to_dict(), 201)
+
+
+@app.post("/api/v1/rbac/sod")
+def ft_rbac_sod():
+    data = _body()
+    if "conflicting_roles" not in data or not isinstance(data["conflicting_roles"], list):
+        return _err("conflicting_roles array required")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    _rbac_audit_controller.add_sod_rule(data["conflicting_roles"])
+    return _ok({"registered": True}, 201)
+
+
+@app.post("/api/v1/rbac/access")
+def ft_rbac_check_access():
+    data = _body()
+    required = ["principal_id", "action", "resource_id", "resource_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    decision = _rbac_audit_controller.check_access(
+        principal_id=data["principal_id"],
+        action=data["action"],
+        resource_id=data["resource_id"],
+        resource_type=data["resource_type"],
+        context=data.get("context", {}),
+        approved=bool(data.get("approved", False)),
+    )
+    return _ok(decision.to_dict())
+
+
+@app.post("/api/v1/rbac/approvals")
+def ft_rbac_request_approval():
+    data = _body()
+    required = ["principal_id", "action", "resource_id", "resource_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    req = _rbac_audit_controller.request_approval(
+        principal_id=data["principal_id"],
+        action=data["action"],
+        resource_id=data["resource_id"],
+        resource_type=data["resource_type"],
+        justification=data.get("justification", ""),
+    )
+    return _ok(req.to_dict(), 201)
+
+
+@app.post("/api/v1/rbac/approvals/<request_id>/approve")
+def ft_rbac_approve(request_id: str):
+    data = _body()
+    if "approver" not in data:
+        return _err("approver required")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    req = _rbac_audit_controller.approve(request_id, data["approver"])
+    if not req:
+        return _err("solicitud no encontrada o ya resuelta", 404)
+    return _ok(req.to_dict())
+
+
+@app.post("/api/v1/rbac/approvals/<request_id>/reject")
+def ft_rbac_reject(request_id: str):
+    data = _body()
+    if "approver" not in data:
+        return _err("approver required")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    req = _rbac_audit_controller.reject(request_id, data["approver"], data.get("reason", ""))
+    if not req:
+        return _err("solicitud no encontrada o ya resuelta", 404)
+    return _ok(req.to_dict())
+
+
+@app.post("/api/v1/audit/events")
+def ft_audit_event():
+    data = _body()
+    required = ["event_type", "principal_id", "action", "resource_id", "resource_type", "outcome"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    record = _rbac_audit_controller.audit_event(
+        event_type=data["event_type"],
+        principal_id=data["principal_id"],
+        action=data["action"],
+        resource_id=data["resource_id"],
+        resource_type=data["resource_type"],
+        outcome=data["outcome"],
+        origin=data.get("origin", "api"),
+        details=data.get("details", {}),
+        resource_version=data.get("resource_version", ""),
+    )
+    return _ok(record.to_dict(), 201)
+
+
+@app.get("/api/v1/audit/query")
+def ft_audit_query():
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    params = request.args
+    records = _rbac_audit_controller.query_audit(
+        principal_id=params.get("principal_id", ""),
+        resource_id=params.get("resource_id", ""),
+        action=params.get("action", ""),
+        outcome=params.get("outcome", ""),
+        event_type=params.get("event_type", ""),
+    )
+    return _ok([r.to_dict() for r in records])
+
+
+@app.get("/api/v1/audit/verify")
+def ft_audit_verify():
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    return _ok({"valid": _rbac_audit_controller.verify_ledger()})
+
+
+@app.get("/api/v1/rbac/dashboard")
+def ft_rbac_dashboard():
+    if _rbac_audit_controller is None:
+        return _err("rbac audit controller no configurado", 503)
+    return _ok(_rbac_audit_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
+# Production Serving endpoints (vLLM / enterprise LLM)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/serving/sessions")
+def ft_serving_create_session():
+    data = _body()
+    required = ["principal_id", "model_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    session = _production_serving_controller.create_session(
+        data["principal_id"], data["model_id"], data.get("channel", "api")
+    )
+    return _ok(session.to_dict(), 201)
+
+
+@app.post("/api/v1/serving/chat")
+def ft_serving_chat():
+    data = _body()
+    required = ["token", "prompt"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    result = _production_serving_controller.chat(
+        token=data["token"],
+        prompt=data["prompt"],
+        model_id=data.get("model_id", ""),
+        session_id=data.get("session_id", ""),
+        params=data.get("params", {}),
+        origin=data.get("origin", "api"),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/serving/chat/enterprise")
+def ft_serving_enterprise_chat():
+    data = _body()
+    required = ["token", "prompt"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    result = _production_serving_controller.enterprise_chat(
+        token=data["token"],
+        prompt=data["prompt"],
+        model_id=data.get("model_id", ""),
+        session_id=data.get("session_id", ""),
+        params=data.get("params", {}),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/serving/tokens")
+def ft_serving_register_token():
+    data = _body()
+    required = ["token", "principal_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    entry = _production_serving_controller.rbac.register_token(
+        token=data["token"],
+        principal_id=data["principal_id"],
+        roles=data.get("roles", []),
+        scopes=data.get("scopes", []),
+    )
+    return _ok(entry, 201)
+
+
+@app.post("/api/v1/serving/feedback")
+def ft_serving_feedback():
+    data = _body()
+    required = ["request_id", "session_id", "principal_id", "signal_type", "value"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    fb = _production_serving_controller.submit_feedback(
+        request_id=data["request_id"],
+        session_id=data["session_id"],
+        principal_id=data["principal_id"],
+        signal_type=data["signal_type"],
+        value=data["value"],
+        comment=data.get("comment", ""),
+    )
+    return _ok(fb, 201)
+
+
+@app.post("/api/v1/serving/re-evaluate/<request_id>")
+def ft_serving_re_evaluate(request_id: str):
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    result = _production_serving_controller.re_evaluate_request(request_id)
+    if not result:
+        return _err("request_id no encontrado", 404)
+    return _ok(result)
+
+
+@app.get("/api/v1/serving/dashboard")
+def ft_serving_dashboard():
+    if _production_serving_controller is None:
+        return _err("production serving controller no configurado", 503)
+    return _ok(_production_serving_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -2620,6 +3103,12 @@ def create_app(
     global _aiops_controller
     if _aiops_controller is None:
         _aiops_controller = AIOpsController()
+    global _rbac_audit_controller
+    if _rbac_audit_controller is None:
+        _rbac_audit_controller = RBACAuditController()
+    global _production_serving_controller
+    if _production_serving_controller is None:
+        _production_serving_controller = ProductionServingController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
