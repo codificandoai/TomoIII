@@ -37,6 +37,8 @@ from fine_tuning.serving_agents import (
     DriftHallucinationAgent,
     FeedbackLoopAgent,
 )
+from fine_tuning.privacy.models_privacy import PrivacyPipelineState as PrivacyState
+from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsController
 from fine_tuning.training_agents import (
     HyperparameterSearchAgent,
     ResourcePlannerAgent,
@@ -57,6 +59,7 @@ class FineTuningPipelineState:
     deployment: Optional[Deployment] = None
     drift: Optional[DriftReport] = None
     closed_loop: Optional[ClosedLoopCycle] = None
+    privacy_state: Optional[PrivacyState] = None
     status: str = "pending"
     logs: List[str] = field(default_factory=list)
 
@@ -73,6 +76,7 @@ class FineTuningPipelineState:
             "deployment": self.deployment.to_dict() if self.deployment else None,
             "drift": self.drift.to_dict() if self.drift else None,
             "closed_loop": self.closed_loop.to_dict() if self.closed_loop else None,
+            "privacy_state": self.privacy_state.to_dict() if self.privacy_state else None,
             "status": self.status,
             "logs": self.logs,
         }
@@ -101,6 +105,7 @@ class FineTuningController:
         canary: Optional[CanaryMonitor] = None,
         drift_agent: Optional[DriftHallucinationAgent] = None,
         feedback_loop: Optional[FeedbackLoopAgent] = None,
+        privacy_controller: Optional[PrivacyPreservingLLMOpsController] = None,
     ) -> None:
         self.curation = curation_agent or DataCurationAgent()
         self.leakage = leakage_agent or LeakageAuditAgent()
@@ -115,6 +120,7 @@ class FineTuningController:
         self.canary = canary or CanaryMonitor()
         self.drift_agent = drift_agent or DriftHallucinationAgent()
         self.feedback_loop = feedback_loop or FeedbackLoopAgent()
+        self.privacy = privacy_controller
         self._pipelines: Dict[str, FineTuningPipelineState] = {}
 
     # ------------------------------------------------------------------
@@ -127,12 +133,39 @@ class FineTuningController:
         prompt_template: str,
         seed: int = 42,
         train_eval_samples: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+        privacy_contract: Optional[Any] = None,
+        apply_deidentification: bool = False,
+        deid_text_fields: Optional[List[str]] = None,
     ) -> FineTuningPipelineState:
         state = FineTuningPipelineState(status="curating")
         self._pipelines[state.pipeline_id] = state
 
+        # Privacy by Design: si se provee un privacy controller, se ejecuta primero.
+        if self.privacy is not None and privacy_contract is not None:
+            pstate = self.privacy.apply_data_contract(raw_samples, privacy_contract)
+            if pstate.status == "contract_violation":
+                state.privacy_state = pstate
+                state.status = "blocked_privacy_contract"
+                state.logs.append(f"Privacy contract violation: {pstate.contract.contract_id}")
+                return state
+            if apply_deidentification:
+                deid_result = self.privacy.deidentify_samples(
+                    pstate.pipeline_id, raw_samples, text_fields=deid_text_fields
+                )
+                state.logs.append(
+                    f"De-identified {deid_result['samples_count'] if 'samples_count' in deid_result else len(raw_samples)} "
+                    f"samples, findings={deid_result.get('findings_count', 0)}"
+                )
+            state.privacy_state = pstate
+
         # Curación
-        curation = self.curation.curate(raw_samples, dataset_id=dataset_id)
+        samples_to_curate = raw_samples
+        if self.privacy is not None and apply_deidentification and state.privacy_state:
+            deid_result = self.privacy.deidentify_samples(
+                state.privacy_state.pipeline_id, raw_samples, text_fields=deid_text_fields
+            )
+            samples_to_curate = deid_result.get("samples", raw_samples)
+        curation = self.curation.curate(samples_to_curate, dataset_id=dataset_id)
         state.curation = curation
         state.logs.append(f"Curated {curation.cleaned_samples} samples, removed {curation.duplicates_removed} duplicates")
 
@@ -214,6 +247,7 @@ class FineTuningController:
         pipeline_id: str,
         base_model: str,
         hyperparams: Optional[Dict[str, Any]] = None,
+        dp_config: Optional[Any] = None,
     ) -> FineTuningPipelineState:
         state = self._pipelines.get(pipeline_id)
         if not state or not state.resource_plan:
@@ -226,6 +260,16 @@ class FineTuningController:
         )
         state.training_config = config
         self.training_sre.register_job(config)
+
+        if self.privacy is not None and dp_config is not None:
+            pstate = self.privacy.configure_dp_training(
+                state.privacy_state.pipeline_id if state.privacy_state else self.privacy._new_state().pipeline_id,
+                dp_config,
+            )
+            if not state.privacy_state:
+                state.privacy_state = pstate
+            state.logs.append(f"DP training configured: eps={dp_config.epsilon}, delta={dp_config.delta}")
+
         state.logs.append(f"Training config created: {config.run_id}")
         return state
 
@@ -299,10 +343,21 @@ class FineTuningController:
         generation_params: Dict[str, Any],
         traffic_percent: float = 10.0,
         serving_mode: str = "lora_fused",
+        enforce_network_policy: bool = False,
     ) -> FineTuningPipelineState:
         state = self._pipelines.get(pipeline_id)
         if not state or not state.training_config or not state.dataset_version:
             raise ValueError("Pipeline missing training or dataset")
+
+        if self.privacy is not None and enforce_network_policy:
+            if state.privacy_state is None:
+                state.privacy_state = self.privacy.create_pipeline()
+            policy_result = self.privacy.enforce_network_policy(state.privacy_state.pipeline_id)
+            if not policy_result["passed"]:
+                state.status = "blocked_network_policy"
+                state.logs.append(f"Network policy failed: {policy_result['findings']}")
+                return state
+
         bundle = self.deployer.build_bundle(
             base_model=state.training_config.base_model,
             adapter_uri=adapter_uri,
@@ -321,6 +376,131 @@ class FineTuningController:
         state.status = "canary"
         state.logs.append(f"Deployed canary {deployment.deployment_id} with {traffic_percent}% traffic")
         return state
+
+    # ------------------------------------------------------------------
+    # 5.1 Privacy-preserving controls
+    # ------------------------------------------------------------------
+    def configure_privacy_dp(self, pipeline_id: str, dp_config: Any) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None:
+            raise ValueError("pipeline or privacy controller missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        pstate = self.privacy.configure_dp_training(state.privacy_state.pipeline_id, dp_config)
+        state.privacy_state = pstate
+        state.logs.append(f"DP configured: eps={dp_config.epsilon}, delta={dp_config.delta}")
+        return pstate.dp_config.to_dict() if pstate.dp_config else {}
+
+    def apply_dp_to_training(self, pipeline_id: str, dataset_size: int, steps: int) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None or not state.training_config:
+            raise ValueError("pipeline, privacy controller or training config missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        result = self.privacy.apply_dp_to_training(
+            state.privacy_state.pipeline_id,
+            state.training_config.run_id,
+            dataset_size,
+            steps,
+        )
+        if state.privacy_state.dp_result and state.privacy_state.dp_result.privacy_budget_exceeded:
+            state.status = "blocked_dp_budget"
+        state.logs.append(f"DP result: epsilon_spent={result.get('epsilon_spent')}")
+        return result
+
+    def validate_membership_inference_privacy(
+        self,
+        pipeline_id: str,
+        members: List[Dict[str, Any]],
+        non_members: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None or not state.training_config:
+            raise ValueError("pipeline, privacy controller or training config missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        report = self.privacy.validate_membership_inference(
+            state.privacy_state.pipeline_id,
+            state.training_config.run_id,
+            members,
+            non_members,
+        )
+        if state.privacy_state.mi_report and not state.privacy_state.mi_report.passed:
+            state.status = "blocked_membership_inference"
+        state.logs.append(f"MI validation: risk={report.get('exposure_risk')}, passed={report.get('passed')}")
+        return report
+
+    def enforce_network_policy_privacy(self, pipeline_id: str, policy: Optional[Any] = None) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None:
+            raise ValueError("pipeline or privacy controller missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        result = self.privacy.enforce_network_policy(state.privacy_state.pipeline_id, policy)
+        if not result["passed"]:
+            state.status = "blocked_network_policy"
+        state.logs.append(f"Network policy: passed={result['passed']}")
+        return result
+
+    def preflight_inference_privacy(self, pipeline_id: str, request_id: str, prompt: str) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None:
+            raise ValueError("pipeline or privacy controller missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        return self.privacy.preflight_inference(state.privacy_state.pipeline_id, request_id, prompt)
+
+    def postflight_inference_privacy(
+        self,
+        pipeline_id: str,
+        request_id: str,
+        prompt: str,
+        output: str,
+    ) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None:
+            raise ValueError("pipeline or privacy controller missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        return self.privacy.postflight_inference(state.privacy_state.pipeline_id, request_id, prompt, output)
+
+    def generate_privacy_artifacts(
+        self,
+        pipeline_id: str,
+        model_name: str,
+        intended_use: str,
+        privacy_controls: List[str],
+        limitations: List[str],
+        compliance_frameworks: List[str],
+        data_source: str,
+        sensitive_attributes: List[str],
+        anonymization_method: str,
+        retention_hours: float,
+        purpose: str,
+    ) -> Dict[str, Any]:
+        state = self._pipelines.get(pipeline_id)
+        if not state or self.privacy is None:
+            raise ValueError("pipeline or privacy controller missing")
+        if state.privacy_state is None:
+            state.privacy_state = self.privacy.create_pipeline()
+        model_card = self.privacy.generate_model_card(
+            state.privacy_state.pipeline_id,
+            model_name,
+            intended_use,
+            privacy_controls,
+            limitations,
+            compliance_frameworks,
+        )
+        data_sheet = self.privacy.generate_data_sheet(
+            state.privacy_state.pipeline_id,
+            state.dataset_version.dataset_id if state.dataset_version else "",
+            data_source,
+            sensitive_attributes,
+            anonymization_method,
+            retention_hours,
+            purpose,
+        )
+        return {"model_card": model_card, "data_sheet": data_sheet}
 
     def assess_canary(self, pipeline_id: str, canary_metrics: Dict[str, float], baseline_metrics: Dict[str, float]) -> Dict[str, Any]:
         state = self._pipelines.get(pipeline_id)

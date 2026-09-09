@@ -11,6 +11,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from agent_runtime_orchestrator import AgentRuntimeOrchestrator
 from fine_tuning.controller import FineTuningController
 from fine_tuning.models_ft import FeedbackItem
+from fine_tuning.privacy.models_privacy import DataContract, DPTrainingConfig, NetworkPolicy
+from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -223,6 +225,100 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     "GET /api/v1/ft/pipelines": {
         "description": "Lista pipelines por status.",
         "parameters": {"status": {"type": "string", "required": False}},
+    },
+    "POST /api/v1/ft/privacy/apply-contract": {
+        "description": "Aplica contrato de datos y minimización.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "samples": {"type": "array", "required": True},
+            "contract": {"type": "object", "required": True},
+        },
+    },
+    "POST /api/v1/ft/privacy/deidentify": {
+        "description": "Desidentifica muestras de entrenamiento.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "samples": {"type": "array", "required": True},
+            "text_fields": {"type": "array", "required": False, "default": ["instruction", "output"]},
+        },
+    },
+    "POST /api/v1/ft/privacy/dp-config": {
+        "description": "Configura privacidad diferencial para entrenamiento.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "epsilon": {"type": "number", "required": False, "default": 1.0},
+            "delta": {"type": "number", "required": False, "default": 1e-5},
+            "noise_multiplier": {"type": "number", "required": False, "default": 1.0},
+            "max_grad_norm": {"type": "number", "required": False, "default": 1.0},
+        },
+    },
+    "POST /api/v1/ft/privacy/apply-dp": {
+        "description": "Aplica DP y calcula presupuesto gastado.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "dataset_size": {"type": "integer", "required": True},
+            "steps": {"type": "integer", "required": True},
+        },
+    },
+    "POST /api/v1/ft/privacy/membership-inference": {
+        "description": "Ataque de membership inference post-entrenamiento.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "members": {"type": "array", "required": True},
+            "non_members": {"type": "array", "required": True},
+        },
+    },
+    "POST /api/v1/ft/privacy/network-policy": {
+        "description": "Valida política de red Zero Trust.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "policy": {"type": "object", "required": False},
+        },
+    },
+    "POST /api/v1/ft/privacy/encryption-lease": {
+        "description": "Emite lease de cifrado vía KMS/Vault.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "resource": {"type": "string", "required": True},
+            "ttl_seconds": {"type": "number", "required": False, "default": 3600},
+        },
+    },
+    "POST /api/v1/ft/privacy/inference-preflight": {
+        "description": "Guardrail pre-vuelo de privacidad en inferencia.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "request_id": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/ft/privacy/inference-postflight": {
+        "description": "Guardrail post-vuelo de privacidad en inferencia.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "request_id": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+            "output": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/ft/privacy/artifacts": {
+        "description": "Genera Model Card y Data Sheet.",
+        "parameters": {
+            "pipeline_id": {"type": "string", "required": True},
+            "model_name": {"type": "string", "required": True},
+            "intended_use": {"type": "string", "required": True},
+            "privacy_controls": {"type": "array", "required": True},
+            "limitations": {"type": "array", "required": True},
+            "compliance_frameworks": {"type": "array", "required": True},
+            "data_source": {"type": "string", "required": True},
+            "sensitive_attributes": {"type": "array", "required": True},
+            "anonymization_method": {"type": "string", "required": True},
+            "retention_hours": {"type": "number", "required": True},
+            "purpose": {"type": "string", "required": True},
+        },
+    },
+    "GET /api/v1/ft/privacy/pipelines/<pipeline_id>": {
+        "description": "Estado de un privacy pipeline.",
+        "parameters": {},
     },
 }
 
@@ -682,6 +778,221 @@ def ft_list_pipelines():
 
 
 # ---------------------------------------------------------------------------
+# Privacy-Preserving LLMOps endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ft/privacy/apply-contract")
+def ft_privacy_apply_contract():
+    data = _body()
+    required = ["pipeline_id", "samples", "contract"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ft_controller.privacy is None:
+        return _err("privacy controller no configurado", 503)
+    contract = DataContract(
+        required_fields=data["contract"].get("required_fields", []),
+        forbidden_fields=data["contract"].get("forbidden_fields", []),
+        purpose=data["contract"].get("purpose", ""),
+        max_retention_hours=float(data["contract"].get("max_retention_hours", 168.0)),
+        allowed_regions=data["contract"].get("allowed_regions", ["private"]),
+    )
+    state = _ft_controller._pipelines.get(data["pipeline_id"])
+    if state is None:
+        return _err("pipeline no encontrado", 404)
+    if state.privacy_state is None:
+        state.privacy_state = _ft_controller.privacy.create_pipeline()
+    pstate = _ft_controller.privacy.apply_data_contract(data["samples"], contract)
+    state.privacy_state = pstate
+    return _ok(pstate.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/privacy/deidentify")
+def ft_privacy_deidentify():
+    data = _body()
+    required = ["pipeline_id", "samples"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ft_controller.privacy is None:
+        return _err("privacy controller no configurado", 503)
+    state = _ft_controller._pipelines.get(data["pipeline_id"])
+    if state is None or state.privacy_state is None:
+        return _err("pipeline o privacy_state no encontrado", 404)
+    result = _ft_controller.privacy.deidentify_samples(
+        state.privacy_state.pipeline_id,
+        data["samples"],
+        text_fields=data.get("text_fields", ["instruction", "output"]),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/dp-config")
+def ft_privacy_dp_config():
+    data = _body()
+    required = ["pipeline_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ft_controller.privacy is None:
+        return _err("privacy controller no configurado", 503)
+    dp = DPTrainingConfig(
+        enabled=bool(data.get("enabled", True)),
+        epsilon=float(data.get("epsilon", 1.0)),
+        delta=float(data.get("delta", 1e-5)),
+        max_grad_norm=float(data.get("max_grad_norm", 1.0)),
+        noise_multiplier=float(data.get("noise_multiplier", 1.0)),
+        method=data.get("method", "dp-sgd"),
+    )
+    state = _ft_controller._pipelines.get(data["pipeline_id"])
+    if state is None:
+        return _err("pipeline no encontrado", 404)
+    result = _ft_controller.configure_privacy_dp(data["pipeline_id"], dp)
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/apply-dp")
+def ft_privacy_apply_dp():
+    data = _body()
+    required = ["pipeline_id", "dataset_size", "steps"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.apply_dp_to_training(
+        data["pipeline_id"],
+        int(data["dataset_size"]),
+        int(data["steps"]),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/membership-inference")
+def ft_privacy_membership_inference():
+    data = _body()
+    required = ["pipeline_id", "members", "non_members"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.validate_membership_inference_privacy(
+        data["pipeline_id"],
+        data["members"],
+        data["non_members"],
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/network-policy")
+def ft_privacy_network_policy():
+    data = _body()
+    required = ["pipeline_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if data["pipeline_id"] not in _ft_controller._pipelines:
+        return _err("pipeline no encontrado", 404)
+    policy = None
+    if "policy" in data:
+        policy = NetworkPolicy(
+            vpc_only=bool(data["policy"].get("vpc_only", True)),
+            public_exposure=bool(data["policy"].get("public_exposure", False)),
+            mtls_required=bool(data["policy"].get("mtls_required", True)),
+            tls_version=data["policy"].get("tls_version", "1.3"),
+            allowed_endpoints=data["policy"].get("allowed_endpoints", []),
+            private_link=bool(data["policy"].get("private_link", True)),
+        )
+    result = _ft_controller.enforce_network_policy_privacy(data["pipeline_id"], policy)
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/encryption-lease")
+def ft_privacy_encryption_lease():
+    data = _body()
+    required = ["pipeline_id", "resource"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ft_controller.privacy is None:
+        return _err("privacy controller no configurado", 503)
+    state = _ft_controller._pipelines.get(data["pipeline_id"])
+    if state is None or state.privacy_state is None:
+        return _err("pipeline o privacy_state no encontrado", 404)
+    result = _ft_controller.privacy.issue_encryption_lease(
+        state.privacy_state.pipeline_id,
+        data["resource"],
+        ttl_seconds=float(data.get("ttl_seconds", 3600)),
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/inference-preflight")
+def ft_privacy_inference_preflight():
+    data = _body()
+    required = ["pipeline_id", "request_id", "prompt"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.preflight_inference_privacy(
+        data["pipeline_id"],
+        data["request_id"],
+        data["prompt"],
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/inference-postflight")
+def ft_privacy_inference_postflight():
+    data = _body()
+    required = ["pipeline_id", "request_id", "prompt", "output"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.postflight_inference_privacy(
+        data["pipeline_id"],
+        data["request_id"],
+        data["prompt"],
+        data["output"],
+    )
+    return _ok(result)
+
+
+@app.post("/api/v1/ft/privacy/artifacts")
+def ft_privacy_artifacts():
+    data = _body()
+    required = [
+        "pipeline_id", "model_name", "intended_use", "privacy_controls",
+        "limitations", "compliance_frameworks", "data_source",
+        "sensitive_attributes", "anonymization_method", "retention_hours", "purpose",
+    ]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    result = _ft_controller.generate_privacy_artifacts(
+        data["pipeline_id"],
+        data["model_name"],
+        data["intended_use"],
+        data["privacy_controls"],
+        data["limitations"],
+        data["compliance_frameworks"],
+        data["data_source"],
+        data["sensitive_attributes"],
+        data["anonymization_method"],
+        float(data["retention_hours"]),
+        data["purpose"],
+    )
+    return _ok(result)
+
+
+@app.get("/api/v1/ft/privacy/pipelines/<pipeline_id>")
+def ft_privacy_get_pipeline(pipeline_id: str):
+    if _ft_controller.privacy is None:
+        return _err("privacy controller no configurado", 503)
+    state = _ft_controller.privacy.get_pipeline(pipeline_id)
+    if not state:
+        return _err("privacy pipeline no encontrado", 404)
+    return _ok(state.to_dict())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -693,7 +1004,9 @@ def create_app(
     if orchestrator is None:
         orchestrator = AgentRuntimeOrchestrator()
     if ft_controller is None:
-        ft_controller = FineTuningController()
+        ft_controller = FineTuningController(
+            privacy_controller=PrivacyPreservingLLMOpsController()
+        )
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
