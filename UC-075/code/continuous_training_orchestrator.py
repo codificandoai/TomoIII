@@ -68,6 +68,32 @@ from regulated_model_governance import (
     StakeholderRequirement,
     StakeholderRequirements,
 )
+from global_mlops_governance import (
+    ArtifactLifecycleManager,
+    ArtifactMetadata,
+    ArtifactType,
+    BackupSnapshot,
+    DisasterRecoveryPlan,
+    GlobalMetadataStore,
+    JurisdictionPolicy,
+    Region,
+    RetentionPolicy,
+)
+from risk_management_framework import (
+    ProactiveRiskPlan,
+    Risk,
+    RiskCategory,
+    RiskGate,
+    RiskPolicy,
+    RiskRegister,
+    RiskStatus,
+    RunbookCatalog,
+    risk_from_agent_tool_abuse,
+    risk_from_drift,
+    risk_from_gate_failure,
+    risk_from_online_quarantine,
+    risk_from_supply_chain,
+)
 
 # --- Funciones inyectables del ecosistema ----------------------------------
 
@@ -154,6 +180,13 @@ class ContinuousTrainingOrchestrator:
         regulatory_policy: Optional[RegulatoryPolicy] = None,
         explainability_provider: Optional[ExplainabilityProviderFn] = None,
         stakeholder_requirements: Optional[StakeholderRequirements] = None,
+        global_metadata_store: Optional[GlobalMetadataStore] = None,
+        lifecycle_manager: Optional[ArtifactLifecycleManager] = None,
+        disaster_recovery: Optional[DisasterRecoveryPlan] = None,
+        risk_register: Optional[RiskRegister] = None,
+        risk_policy: Optional[RiskPolicy] = None,
+        proactive_risk_plan: Optional[ProactiveRiskPlan] = None,
+        runbook_catalog: Optional[RunbookCatalog] = None,
         event_sink: Optional[EventSinkFn] = None,          # UC-309
         mlflow_tracking_uri: Optional[str] = None,
         mlflow_enabled: bool = True,
@@ -183,12 +216,59 @@ class ContinuousTrainingOrchestrator:
         )
         self.freeze_registry = VersionFreezeRegistry()
         self.champions = ChampionRegistry()
+        self.global_metadata = global_metadata_store or GlobalMetadataStore(
+            regions=[Region.GLOBAL],
+            jurisdiction_policy=JurisdictionPolicy(),
+        )
+        self.lifecycle_manager = lifecycle_manager or ArtifactLifecycleManager(
+            policies=[RetentionPolicy(artifact_type=ArtifactType.MODEL, delete_after_days=365)]
+        )
+        self.disaster_recovery = disaster_recovery or DisasterRecoveryPlan(
+            primary_region=Region.GLOBAL,
+            failover_region=Region.US_EAST,
+        )
+        self.risk_register = risk_register or RiskRegister()
+        self.risk_policy = risk_policy or RiskPolicy()
+        self.proactive_risk_plan = proactive_risk_plan or ProactiveRiskPlan(self.risk_policy)
+        self.runbook_catalog = runbook_catalog or RunbookCatalog()
+        self.risk_gate = RiskGate(
+            register=self.risk_register,
+            policy=self.risk_policy,
+            proactive_plan=self.proactive_risk_plan,
+        )
         self.mlflow = MLflowAdapter(tracking_uri=mlflow_tracking_uri, enabled=mlflow_enabled)
         self.observability = Observability075()
         self.audit = AuditLog()
         self.event_sink = event_sink
         self._runs: Dict[str, PipelineRun] = {}
         self._online_learners: Dict[str, OnlineIncrementalLearner] = {}
+
+    # ------------------------------------------------------------------
+    def _record_gate_risk(self, run: PipelineRun, gate_result: Any) -> None:
+        category = RiskCategory.MODEL
+        if gate_result.gate in (GateName.DRIFT, GateName.CHAMPION_CHALLENGER):
+            category = RiskCategory.DATA
+        elif gate_result.gate == GateName.SECURITY_FAIRNESS:
+            category = RiskCategory.MODEL
+        elif gate_result.gate == GateName.HITL:
+            category = RiskCategory.ORGANIZATIONAL
+        elif gate_result.gate == GateName.CANARY:
+            category = RiskCategory.INFRASTRUCTURE
+        elif gate_result.gate == GateName.EXPLAINABILITY:
+            category = RiskCategory.REGULATORY
+        risk = risk_from_gate_failure(
+            category=category,
+            subcategory=f"{gate_result.gate.value}_failure",
+            description=gate_result.reason,
+            gate_name=gate_result.gate.value,
+            reason=gate_result.reason,
+            run_id=run.run_id,
+            artifact_ids=[run.freeze.dataset_version] if run.freeze else [],
+            probability=0.7,
+            impact=0.7,
+            control_effectiveness=0.0,
+        )
+        self.risk_register.register(risk)
 
     # ------------------------------------------------------------------
     def _emit(self, event_type: str, payload: Dict[str, Any]) -> None:
@@ -287,7 +367,16 @@ class ContinuousTrainingOrchestrator:
     ) -> Dict[str, Any]:
         """Aplica un micro-lote a través del OnlineIncrementalLearner."""
         learner = self.get_online_learner(learner_id, model, policy=policy)
-        return learner.fit_micro_batch(X, y, metadata=metadata).to_dict()
+        result = learner.fit_micro_batch(X, y, metadata=metadata).to_dict()
+        if result.get("quarantined"):
+            risk = risk_from_online_quarantine(
+                learner_id=learner_id,
+                reason=result.get("quarantine_reason", ""),
+                batch_id=result.get("batch_id", ""),
+                artifact_ids=[result.get("model_checkpoint_id", "")],
+            )
+            self.risk_register.register(risk)
+        return result
 
     # ------------------------------------------------------------------
     # Gobernanza regulada
@@ -368,6 +457,110 @@ class ContinuousTrainingOrchestrator:
         return decision.to_dict()
 
     # ------------------------------------------------------------------
+    # Global MLOps governance helpers
+    # ------------------------------------------------------------------
+    def register_global_artifact(
+        self,
+        name: str,
+        artifact_type: ArtifactType,
+        region: Region,
+        content: bytes,
+        jurisdictions: Optional[List[str]] = None,
+        replicate_to: Optional[List[str]] = None,
+        parent_artifact_ids: Optional[List[str]] = None,
+        run_id: str = "",
+    ) -> Dict[str, Any]:
+        from global_mlops_governance import Jurisdiction
+        jurs = {Jurisdiction(j) for j in (jurisdictions or [])}
+        targets = [Region(r) for r in (replicate_to or [])]
+        artifact = ArtifactMetadata(
+            name=name,
+            artifact_type=artifact_type,
+            region=region,
+            run_id=run_id,
+            jurisdictions=jurs,
+            parent_artifact_ids=parent_artifact_ids or [],
+        )
+        artifact, conflicts = self.global_metadata.register_artifact(
+            artifact, content=content, replicate_to=targets,
+        )
+        return {
+            "artifact": artifact.to_dict(),
+            "conflicts": [c.to_dict() for c in conflicts],
+        }
+
+    def replicate_artifact(self, artifact_id: str, source_region: str, target_region: str) -> Dict[str, Any]:
+        from global_mlops_governance import Jurisdiction
+        artifact = self.global_metadata.get_artifact(artifact_id, Region(source_region))
+        if artifact is None:
+            return {"error": "artifact not found", "artifact_id": artifact_id}
+        blocked = []
+        for j in artifact.jurisdictions:
+            if not self.global_metadata.jurisdiction_policy.can_replicate(
+                Region(source_region), Region(target_region), j
+            ):
+                blocked.append(j.value)
+        if blocked:
+            return {"error": "replication blocked by jurisdiction", "blocked_jurisdictions": blocked}
+        self.global_metadata._replicate_artifact(artifact, Region(target_region))
+        return {"status": "replicated", "artifact_id": artifact_id, "target": target_region}
+
+    def detect_global_conflicts(self) -> List[Dict[str, Any]]:
+        return [c.to_dict() for c in self.global_metadata.detect_conflicts()]
+
+    def resolve_global_conflict(
+        self,
+        artifact_id: str,
+        strategy: str = "quorum",
+    ) -> Dict[str, Any]:
+        return self.global_metadata.resolve_conflict(artifact_id, strategy).to_dict()
+
+    def run_lifecycle_gc(self) -> Dict[str, Any]:
+        total_transitioned = 0
+        total_deleted = 0
+        for store in self.global_metadata._regions.values():
+            t, d = self.lifecycle_manager.run_gc(store)
+            total_transitioned += t
+            total_deleted += d
+        return {"transitioned": total_transitioned, "deleted": total_deleted}
+
+    def backup_global_metadata(self) -> Dict[str, Any]:
+        snap = self.disaster_recovery.backup(self.global_metadata)
+        return snap.to_dict()
+
+    def failover_global_metadata(self) -> Dict[str, Any]:
+        return self.disaster_recovery.failover()
+
+    def dr_status(self) -> Dict[str, Any]:
+        return self.disaster_recovery.status()
+
+    def global_mlops_status(self) -> Dict[str, Any]:
+        return self.global_metadata.global_stats()
+
+    # ------------------------------------------------------------------
+    def _register_run_artifact(
+        self,
+        run: PipelineRun,
+        artifact_type: ArtifactType,
+        content: bytes,
+    ) -> None:
+        """Registra un artefacto del run en el GlobalMetadataStore si está activo."""
+        if not self.global_metadata._regions:
+            return
+        try:
+            self.register_global_artifact(
+                name=f"{run.agent_id}-{artifact_type.value}-{run.run_id}",
+                artifact_type=artifact_type,
+                region=Region.GLOBAL,
+                content=content,
+                run_id=run.run_id,
+                parent_artifact_ids=[run.freeze.dataset_version] if run.freeze else [],
+            )
+        except Exception:
+            # No debe romper el pipeline; se registra como advertencia
+            pass
+
+    # ------------------------------------------------------------------
     # Pipeline
     # ------------------------------------------------------------------
     def _execute(self, agent_id: str, trigger: RetrainTrigger) -> PipelineRun:
@@ -398,6 +591,9 @@ class ContinuousTrainingOrchestrator:
                 },
             )
 
+            # 2b. Registro global del dataset (si hay metadatos globales configurados)
+            self._register_run_artifact(run, ArtifactType.DATASET, run.freeze.dataset_hash.encode())
+
             # 3. Campeón actual + entrenamiento candidato
             champion = self.champions.current_champion(agent_id)
             trained = self.trainer(run.freeze.records)
@@ -427,6 +623,9 @@ class ContinuousTrainingOrchestrator:
                 self._emit("uc075_gate", {
                     "run_id": run.run_id, **g.to_dict(),
                 })
+                # Registrar riesgo derivado de fallo de gate
+                if g.verdict == GateVerdict.FAIL:
+                    self._record_gate_risk(run, g)
 
             last = run.gates[-1]
             if last.verdict == GateVerdict.REQUIRES_HITL:
@@ -454,6 +653,26 @@ class ContinuousTrainingOrchestrator:
                 self._close_run(run)
                 return run
 
+            # 5b. Evaluación de riesgo residual antes de promoción
+            risk_result = self.risk_gate.evaluate(
+                artifact_ids=[run.freeze.dataset_version] if run.freeze else [],
+                run_id=run.run_id,
+            )
+            if not risk_result.passed:
+                run.decision = DecisionAction.ESCALATE
+                run.decision_reason = (
+                    f"Risk gate blocked promotion: {risk_result.reason}"
+                )
+                run.finish(
+                    PipelineStatus.PENDING_HITL
+                    if risk_result.requires_hitl
+                    else PipelineStatus.REJECTED
+                )
+                if risk_result.requires_hitl:
+                    self.observability.record_pending_hitl(+1)
+                self._close_run(run)
+                return run
+
             # 6. Todos los gates pasaron → promoción
             run.approval = run.approval or HITLApproval(
                 approved=True, approver="auto-policy",
@@ -462,6 +681,10 @@ class ContinuousTrainingOrchestrator:
             run.decision = DecisionAction.PROMOTE
             run.decision_reason = "All gates passed; candidate promoted."
             run.finish(PipelineStatus.PROMOTED)
+            # Registrar modelo campeón como artefacto global
+            self._register_run_artifact(
+                run, ArtifactType.MODEL, candidate_version.encode(),
+            )
             self._close_run(run)
             return run
 
@@ -574,7 +797,87 @@ class ContinuousTrainingOrchestrator:
                 lid: learner.status()
                 for lid, learner in self._online_learners.items()
             },
+            "risk_summary": self.risk_register.summary(),
+            "proactive_risk_next_steps": self.proactive_risk_plan.next_steps(self.risk_register),
         }
 
     def get_online_learner(self, learner_id: str) -> Optional[OnlineIncrementalLearner]:
         return self._online_learners.get(learner_id)
+
+    # ------------------------------------------------------------------
+    # Risk management
+    # ------------------------------------------------------------------
+    def register_risk(
+        self,
+        category: str,
+        subcategory: str,
+        description: str,
+        probability: float,
+        impact: float,
+        exposure: float = 1.0,
+        control_effectiveness: float = 0.0,
+        owner: str = "",
+        linked_run_ids: Optional[List[str]] = None,
+        linked_artifact_ids: Optional[List[str]] = None,
+        linked_agent_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        risk = Risk(
+            category=RiskCategory(category),
+            subcategory=subcategory,
+            description=description,
+            probability=probability,
+            impact=impact,
+            exposure=exposure,
+            control_effectiveness=control_effectiveness,
+            owner=owner,
+            linked_run_ids=linked_run_ids or [],
+            linked_artifact_ids=linked_artifact_ids or [],
+            linked_agent_ids=linked_agent_ids or [],
+        )
+        self.risk_register.register(risk)
+        return risk.to_dict()
+
+    def get_risk(self, risk_id: str) -> Optional[Dict[str, Any]]:
+        risk = self.risk_register.get(risk_id)
+        return risk.to_dict() if risk else None
+
+    def list_risks(
+        self,
+        category: Optional[str] = None,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        from risk_management_framework import RiskCategory as RC, RiskSeverity as RS, RiskStatus as RSt
+        cat = RC(category) if category else None
+        stat = RSt(status) if status else None
+        sev = RS(severity) if severity else None
+        return [r.to_dict() for r in self.risk_register.list(cat, stat, sev)]
+
+    def update_risk(
+        self,
+        risk_id: str,
+        mitigations: Optional[List[str]] = None,
+        control_effectiveness: Optional[float] = None,
+        status: Optional[str] = None,
+        notes: str = "",
+    ) -> Optional[Dict[str, Any]]:
+        from risk_management_framework import RiskStatus
+        st = RiskStatus(status) if status else None
+        risk = self.risk_register.update(
+            risk_id,
+            mitigations=mitigations,
+            control_effectiveness=control_effectiveness,
+            status=st,
+            notes=notes,
+        )
+        return risk.to_dict() if risk else None
+
+    def risk_summary(self) -> Dict[str, Any]:
+        return self.risk_register.summary()
+
+    def proactive_risk_actions(self) -> List[Dict[str, Any]]:
+        return self.proactive_risk_plan.next_steps(self.risk_register)
+
+    def risk_runbook(self, category: str) -> Dict[str, Any]:
+        from risk_management_framework import RiskCategory
+        return self.runbook_catalog.get(RiskCategory(category))

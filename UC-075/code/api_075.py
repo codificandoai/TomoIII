@@ -199,6 +199,114 @@ INPUT_CARDS: Dict[str, Any] = {
         "description": "Lista requisitos de stakeholders.",
         "parameters": {},
     },
+    "POST /api/v1/ct/global/register-artifact": {
+        "description": "Registra un artefacto en el GlobalMetadataStore.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "artifact_type": {"type": "string", "required": True, "description": "model|dataset|checkpoint|metrics|config"},
+            "region": {"type": "string", "required": True},
+            "content": {"type": "string", "required": True, "description": "bytes en base64"},
+            "jurisdictions": {"type": "array", "required": False},
+            "replicate_to": {"type": "array", "required": False},
+            "parent_artifact_ids": {"type": "array", "required": False},
+        },
+    },
+    "GET /api/v1/ct/global/artifacts": {
+        "description": "Lista artefactos globales; filtra por ?region= &type=.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/global/replicate": {
+        "description": "Replica un artefacto entre regiones.",
+        "parameters": {
+            "artifact_id": {"type": "string", "required": True},
+            "source_region": {"type": "string", "required": True},
+            "target_region": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/ct/global/detect-conflicts": {
+        "description": "Detecta conflictos entre réplicas regionales.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/global/resolve-conflict": {
+        "description": "Resuelve un conflicto de réplica.",
+        "parameters": {
+            "artifact_id": {"type": "string", "required": True},
+            "strategy": {"type": "string", "required": False, "default": "quorum"},
+        },
+    },
+    "POST /api/v1/ct/global/lifecycle/gc": {
+        "description": "Ejecuta garbage collection y tiering de artefactos.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/global/lifecycle/legal-hold": {
+        "description": "Aplica o libera legal hold sobre un artefacto.",
+        "parameters": {
+            "artifact_id": {"type": "string", "required": True},
+            "region": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True, "description": "apply|release"},
+        },
+    },
+    "POST /api/v1/ct/global/dr/backup": {
+        "description": "Crea snapshot de backup del metadata store primario.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/global/dr/failover": {
+        "description": "Ejecuta failover al region secundaria.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/global/dr/status": {
+        "description": "Estado de recuperación ante desastres (RPO/RTO).",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/global/status": {
+        "description": "Estadísticas del GlobalMetadataStore.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/risk/register": {
+        "description": "Registra un riesgo en el RiskRegister.",
+        "parameters": {
+            "category": {"type": "string", "required": True, "description": "data|model|agent|infrastructure|organizational|regulatory|security|business"},
+            "subcategory": {"type": "string", "required": True},
+            "description": {"type": "string", "required": True},
+            "probability": {"type": "number", "required": True},
+            "impact": {"type": "number", "required": True},
+            "exposure": {"type": "number", "required": False, "default": 1.0},
+            "control_effectiveness": {"type": "number", "required": False, "default": 0.0},
+            "owner": {"type": "string", "required": False},
+            "linked_run_ids": {"type": "array", "required": False},
+            "linked_artifact_ids": {"type": "array", "required": False},
+            "linked_agent_ids": {"type": "array", "required": False},
+        },
+    },
+    "GET /api/v1/ct/risks": {
+        "description": "Lista riesgos; filtros ?category= &status= &severity=.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/risks/<risk_id>": {
+        "description": "Detalle de un riesgo.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/risks/<risk_id>/update": {
+        "description": "Actualiza mitigaciones, efectividad y estado de un riesgo.",
+        "parameters": {
+            "mitigations": {"type": "array", "required": False},
+            "control_effectiveness": {"type": "number", "required": False},
+            "status": {"type": "string", "required": False, "description": "open|mitigated|accepted|transferred|closed|escalated"},
+            "notes": {"type": "string", "required": False},
+        },
+    },
+    "GET /api/v1/ct/risks/summary": {
+        "description": "Resumen de riesgos por severidad y HITL requerido.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/risks/proactive": {
+        "description": "Próximos pasos proactivos y revisiones pendientes.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/risks/runbook/<category>": {
+        "description": "Runbook de respuesta para una categoría de riesgo.",
+        "parameters": {},
+    },
 }
 
 # ==========================================================================
@@ -282,6 +390,116 @@ OUTPUT_CARDS: Dict[str, Any] = {
         "reverted": "boolean",
         "quarantined": "boolean",
         "quarantine_reason": "string",
+    },
+    "regulated_model_selection": {
+        "selected_model_id": "string",
+        "selected_model_type": "interpretable|black_box|hybrid",
+        "baseline_model_id": "string",
+        "reason": "string",
+        "regulatory_controls": "array<string>",
+        "hitl_required": "boolean",
+        "shadow_deployment_required": "boolean",
+        "stakeholder_violations": "array<string>",
+    },
+    "explainability_report": {
+        "passed": "boolean",
+        "method": "lime|shap|permutation_surrogate|built-in",
+        "requires_explanation": "boolean",
+        "stability_score": "number",
+        "coverage": "number",
+        "faithfulness_score": "number",
+        "top_features": "array",
+        "violations": "array<string>",
+    },
+    "regulated_policy": {
+        "domain": "string",
+        "required_controls": "array<string>",
+        "min_auc": "number",
+        "max_fpr": "number",
+        "max_latency_ms": "number",
+        "min_availability": "number",
+    },
+    "global_artifact": {
+        "artifact_id": "string",
+        "artifact_type": "model|dataset|checkpoint|metrics|config",
+        "name": "string",
+        "version": "string",
+        "region": "string",
+        "checksum": "string",
+        "status": "active|archived|deleted|legal_hold",
+        "tier": "hot|warm|cold|glacier",
+        "replication_regions": "array<string>",
+        "lineage": "object",
+    },
+    "conflict_resolution": {
+        "strategy": "string",
+        "winner_region": "string|null",
+        "winner_artifact": "global_artifact|null",
+        "reason": "string",
+        "requires_hitl": "boolean",
+    },
+    "dr_status": {
+        "primary_region": "string",
+        "failover_region": "string",
+        "rpo_seconds": "number",
+        "rto_seconds": "number",
+        "rpo_ok": "boolean",
+        "rpo_lag_seconds": "number",
+        "failed_over": "boolean",
+        "snapshots": "integer",
+    },
+    "risk": {
+        "risk_id": "string",
+        "category": "data|model|agent|infrastructure|organizational|regulatory|security|business",
+        "subcategory": "string",
+        "description": "string",
+        "probability": "number",
+        "impact": "number",
+        "exposure": "number",
+        "control_effectiveness": "number",
+        "inherent_risk": "number",
+        "residual_risk": "number",
+        "severity": "critical|high|medium|low|negligible",
+        "status": "open|mitigated|accepted|transferred|closed|escalated",
+        "trend": "increasing|decreasing|stable",
+        "owner": "string",
+        "detected_at": "number",
+        "review_due_at": "number",
+        "linked_artifact_ids": "array<string>",
+        "linked_run_ids": "array<string>",
+        "linked_agent_ids": "array<string>",
+        "trigger_event": "string",
+        "trigger_details": "object",
+        "mitigations": "array<string>",
+        "auto_controls": "array<string>",
+        "requires_hitl": "boolean",
+        "requires_freeze": "boolean",
+        "notes": "string",
+    },
+    "risk_summary": {
+        "total_risks": "integer",
+        "classification": {
+            "total_risks": "integer",
+            "by_severity": "object",
+            "aggregate_residual_risk": "number",
+            "max_residual_risk": "number",
+        },
+        "open_high_critical": "integer",
+        "requires_hitl": "array<string>",
+    },
+    "proactive_risk_action": {
+        "risk_id": "string",
+        "category": "string",
+        "severity": "string",
+        "residual_risk": "number",
+        "recommendation": "string",
+        "review_due": "boolean",
+        "owner": "string",
+    },
+    "runbook": {
+        "name": "string",
+        "steps": "array<string>",
+        "auto_controls": "array<string>",
     },
 }
 
@@ -595,6 +813,195 @@ def ct_explainability():
 @app.get("/api/v1/ct/regulatory/requirements")
 def ct_regulatory_requirements():
     return _ok({"requirements": _orchestrator.stakeholder_requirements.list()})
+
+
+# ---------------------------------------------------------------------------
+# Global MLOps governance endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/global/register-artifact")
+def ct_global_register_artifact():
+    data = _body()
+    name = data.get("name")
+    atype = data.get("artifact_type")
+    region = data.get("region")
+    content_b64 = data.get("content")
+    if not name or not atype or not region or content_b64 is None:
+        return _err("name, artifact_type, region y content requeridos")
+    import base64
+    try:
+        content = base64.b64decode(content_b64)
+    except Exception:
+        return _err("content debe ser base64 válido")
+    from global_mlops_governance import ArtifactType
+    try:
+        artifact_type = ArtifactType(atype)
+        reg = Region(region)
+    except ValueError as exc:
+        return _err(str(exc))
+    result = _orchestrator.register_global_artifact(
+        name=name,
+        artifact_type=artifact_type,
+        region=reg,
+        content=content,
+        jurisdictions=data.get("jurisdictions") or [],
+        replicate_to=data.get("replicate_to") or [],
+        parent_artifact_ids=data.get("parent_artifact_ids") or [],
+    )
+    return _ok(result)
+
+
+@app.get("/api/v1/ct/global/artifacts")
+def ct_global_artifacts():
+    from global_mlops_governance import ArtifactType
+    region = request.args.get("region")
+    atype = request.args.get("type")
+    region_obj = Region(region) if region else None
+    atype_obj = ArtifactType(atype) if atype else None
+    return _ok({"artifacts": _orchestrator.global_metadata.list_artifacts(region_obj, atype_obj)})
+
+
+@app.post("/api/v1/ct/global/replicate")
+def ct_global_replicate():
+    data = _body()
+    aid = data.get("artifact_id")
+    src = data.get("source_region")
+    tgt = data.get("target_region")
+    if not aid or not src or not tgt:
+        return _err("artifact_id, source_region y target_region requeridos")
+    return _ok(_orchestrator.replicate_artifact(aid, src, tgt))
+
+
+@app.post("/api/v1/ct/global/detect-conflicts")
+def ct_global_detect_conflicts():
+    return _ok({"conflicts": _orchestrator.detect_global_conflicts()})
+
+
+@app.post("/api/v1/ct/global/resolve-conflict")
+def ct_global_resolve_conflict():
+    data = _body()
+    aid = data.get("artifact_id")
+    strategy = data.get("strategy", "quorum")
+    if not aid:
+        return _err("artifact_id requerido")
+    return _ok(_orchestrator.resolve_global_conflict(aid, strategy))
+
+
+@app.post("/api/v1/ct/global/lifecycle/gc")
+def ct_global_lifecycle_gc():
+    return _ok(_orchestrator.run_lifecycle_gc())
+
+
+@app.post("/api/v1/ct/global/lifecycle/legal-hold")
+def ct_global_legal_hold():
+    data = _body()
+    aid = data.get("artifact_id")
+    region = data.get("region")
+    action = data.get("action")
+    if not aid or not region or action not in ("apply", "release"):
+        return _err("artifact_id, region y action (apply|release) requeridos")
+    store = _orchestrator.global_metadata._regions.get(Region(region))
+    if store is None:
+        return _err("region no encontrada", 404)
+    ok = (
+        _orchestrator.lifecycle_manager.apply_legal_hold(store, aid)
+        if action == "apply"
+        else _orchestrator.lifecycle_manager.release_legal_hold(store, aid)
+    )
+    return _ok({"applied": ok})
+
+
+@app.post("/api/v1/ct/global/dr/backup")
+def ct_global_dr_backup():
+    return _ok(_orchestrator.backup_global_metadata())
+
+
+@app.post("/api/v1/ct/global/dr/failover")
+def ct_global_dr_failover():
+    return _ok(_orchestrator.failover_global_metadata())
+
+
+@app.get("/api/v1/ct/global/dr/status")
+def ct_global_dr_status():
+    return _ok(_orchestrator.dr_status())
+
+
+@app.get("/api/v1/ct/global/status")
+def ct_global_status():
+    return _ok(_orchestrator.global_mlops_status())
+
+
+# ---------------------------------------------------------------------------
+# Risk management endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/risk/register")
+def ct_risk_register():
+    data = _body()
+    required = ["category", "subcategory", "description", "probability", "impact"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.register_risk(
+        category=data["category"],
+        subcategory=data["subcategory"],
+        description=data["description"],
+        probability=float(data["probability"]),
+        impact=float(data["impact"]),
+        exposure=float(data.get("exposure", 1.0)),
+        control_effectiveness=float(data.get("control_effectiveness", 0.0)),
+        owner=data.get("owner", ""),
+        linked_run_ids=data.get("linked_run_ids"),
+        linked_artifact_ids=data.get("linked_artifact_ids"),
+        linked_agent_ids=data.get("linked_agent_ids"),
+    ))
+
+
+@app.get("/api/v1/ct/risks")
+def ct_risks():
+    return _ok({"risks": _orchestrator.list_risks(
+        category=request.args.get("category"),
+        status=request.args.get("status"),
+        severity=request.args.get("severity"),
+    )})
+
+
+@app.get("/api/v1/ct/risks/<risk_id>")
+def ct_risk_detail(risk_id: str):
+    risk = _orchestrator.get_risk(risk_id)
+    if risk is None:
+        return _err("riesgo no encontrado", 404)
+    return _ok(risk)
+
+
+@app.post("/api/v1/ct/risks/<risk_id>/update")
+def ct_risk_update(risk_id: str):
+    data = _body()
+    risk = _orchestrator.update_risk(
+        risk_id=risk_id,
+        mitigations=data.get("mitigations"),
+        control_effectiveness=data.get("control_effectiveness"),
+        status=data.get("status"),
+        notes=data.get("notes", ""),
+    )
+    if risk is None:
+        return _err("riesgo no encontrado", 404)
+    return _ok(risk)
+
+
+@app.get("/api/v1/ct/risks/summary")
+def ct_risk_summary():
+    return _ok(_orchestrator.risk_summary())
+
+
+@app.get("/api/v1/ct/risks/proactive")
+def ct_risk_proactive():
+    return _ok({"actions": _orchestrator.proactive_risk_actions()})
+
+
+@app.get("/api/v1/ct/risks/runbook/<category>")
+def ct_risk_runbook(category: str):
+    return _ok(_orchestrator.risk_runbook(category))
 
 
 def main() -> None:
