@@ -28,6 +28,11 @@ from models_075 import (
     RetrainStrategy,
     SecurityFairnessReport,
 )
+from regulated_model_governance import (
+    ExplainabilityGate,
+    RegulatoryControl,
+    RegulatoryPolicy,
+)
 
 # --- Tipos inyectables -----------------------------------------------------
 
@@ -89,6 +94,8 @@ class GatePipeline:
         security_fairness: Optional[SecurityFairnessFn] = None,
         hitl_approver: Optional[HITLApproverFn] = None,
         canary_monitor: Optional[CanaryMonitorFn] = None,
+        regulatory_policy: Optional[RegulatoryPolicy] = None,
+        explainability_gate: Optional[ExplainabilityGate] = None,
     ) -> None:
         self.policy = policy or OrchestratorPolicy()
         self.drift_detector = drift_detector or default_drift_detector
@@ -96,6 +103,57 @@ class GatePipeline:
         self.security_fairness = security_fairness or default_security_fairness
         self.hitl_approver = hitl_approver or default_hitl_approver
         self.canary_monitor = canary_monitor or default_canary_monitor
+        self.regulatory_policy = regulatory_policy
+        self.explainability_gate = explainability_gate
+
+    # ------------------------------------------------------------------
+    # Gate 3b — explainability / regulatory (insertado tras security)
+    # ------------------------------------------------------------------
+    def regulatory_explainability_gate(self, run: PipelineRun) -> GateResult:
+        if self.explainability_gate is None or self.regulatory_policy is None:
+            return GateResult(
+                gate=GateName.EXPLAINABILITY,
+                verdict=GateVerdict.PASS,
+                reason="No regulatory policy configured; explainability gate skipped.",
+            )
+        if not self.regulatory_policy.requires(RegulatoryControl.INTERPRETABILITY_REQUIRED):
+            return GateResult(
+                gate=GateName.EXPLAINABILITY,
+                verdict=GateVerdict.PASS,
+                reason="Sector does not mandate model interpretability; gate skipped.",
+            )
+        if run.matchup is None:
+            return GateResult(
+                gate=GateName.EXPLAINABILITY,
+                verdict=GateVerdict.FAIL,
+                reason="No candidate available for explainability review.",
+            )
+        # Construimos un ModelCard mínimo a partir de la metadata del run/candidato
+        from regulated_model_governance import ModelCard, ModelType
+        model_type = ModelType.INTERPRETABLE if run.matchup.candidate_version.startswith("linear") else ModelType.BLACK_BOX
+        card = ModelCard(
+            model_id=run.matchup.candidate_version,
+            model_type=model_type,
+            algorithm="candidate",
+            complexity_score=0.0 if model_type == ModelType.INTERPRETABLE else 0.9,
+            metrics=run.matchup.candidate_metrics,
+        )
+        report = self.explainability_gate.evaluate(card, run.freeze.records if run.freeze else [])
+        if not report.passed:
+            return GateResult(
+                gate=GateName.EXPLAINABILITY,
+                verdict=GateVerdict.FAIL,
+                score=report.stability_score,
+                reason="; ".join(report.violations) or "Explainability requirements not met.",
+                evidence=report.to_dict(),
+            )
+        return GateResult(
+            gate=GateName.EXPLAINABILITY,
+            verdict=GateVerdict.PASS,
+            score=report.stability_score,
+            reason=f"Explainability check passed ({report.method}).",
+            evidence=report.to_dict(),
+        )
 
     # ------------------------------------------------------------------
     # Gate 1 — drift
@@ -208,10 +266,18 @@ class GatePipeline:
     # Gate 4 — HITL (UC-290)
     # ------------------------------------------------------------------
     def hitl_gate(self, run: PipelineRun) -> GateResult:
+        # Considerar dominios regulatorios críticos además de la política base
+        critical_domains = {
+            "medical", "legal", "financial", "military",
+            "critical_infrastructure_energy", "critical_infrastructure_water",
+            "critical_infrastructure_telecom", "critical_infrastructure_transport",
+            "critical_infrastructure_nuclear", "critical_infrastructure_industrial",
+        }
+        is_critical = run.trigger.domain in critical_domains
         high_impact = (
             self.policy.require_hitl_high_impact
             and run.trigger.domain in self.policy.high_impact_domains
-        )
+        ) or is_critical
         if not high_impact and run.drift_score <= self.policy.auto_approve_max_risk:
             return GateResult(
                 gate=GateName.HITL,
@@ -283,6 +349,7 @@ class GatePipeline:
             self.drift_gate,
             self.champion_challenger_gate,
             self.security_fairness_gate,
+            self.regulatory_explainability_gate,
             self.hitl_gate,
             self.canary_gate,
         )

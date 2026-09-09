@@ -59,6 +59,15 @@ from online_incremental_learner import (
     OnlineIncrementalLearner,
     OnlineLearnerPolicy,
 )
+from regulated_model_governance import (
+    ExplainabilityGate,
+    ExplainabilityProviderFn,
+    RegulatoryDomain,
+    RegulatoryPolicy,
+    RegulatedModelSelector,
+    StakeholderRequirement,
+    StakeholderRequirements,
+)
 
 # --- Funciones inyectables del ecosistema ----------------------------------
 
@@ -142,6 +151,9 @@ class ContinuousTrainingOrchestrator:
         security_fairness: Optional[SecurityFairnessFn] = None,
         hitl_approver: Optional[HITLApproverFn] = None,
         canary_monitor: Optional[CanaryMonitorFn] = None,
+        regulatory_policy: Optional[RegulatoryPolicy] = None,
+        explainability_provider: Optional[ExplainabilityProviderFn] = None,
+        stakeholder_requirements: Optional[StakeholderRequirements] = None,
         event_sink: Optional[EventSinkFn] = None,          # UC-309
         mlflow_tracking_uri: Optional[str] = None,
         mlflow_enabled: bool = True,
@@ -150,6 +162,12 @@ class ContinuousTrainingOrchestrator:
         self.trainer = trainer or default_trainer
         self.evaluator = evaluator or default_evaluator
         self.trigger_engine = TriggerEngine(self.policy)
+        self.regulatory_policy = regulatory_policy
+        self.stakeholder_requirements = stakeholder_requirements or StakeholderRequirements()
+        self.model_selector = RegulatedModelSelector(
+            policy=self.regulatory_policy,
+            stakeholder_requirements=self.stakeholder_requirements,
+        )
         self.gates = GatePipeline(
             self.policy,
             drift_detector=drift_detector,
@@ -157,6 +175,11 @@ class ContinuousTrainingOrchestrator:
             security_fairness=security_fairness,
             hitl_approver=hitl_approver,
             canary_monitor=canary_monitor,
+            regulatory_policy=self.regulatory_policy,
+            explainability_gate=ExplainabilityGate(
+                policy=self.regulatory_policy,
+                provider=explainability_provider,
+            ) if self.regulatory_policy else None,
         )
         self.freeze_registry = VersionFreezeRegistry()
         self.champions = ChampionRegistry()
@@ -265,6 +288,84 @@ class ContinuousTrainingOrchestrator:
         """Aplica un micro-lote a través del OnlineIncrementalLearner."""
         learner = self.get_online_learner(learner_id, model, policy=policy)
         return learner.fit_micro_batch(X, y, metadata=metadata).to_dict()
+
+    # ------------------------------------------------------------------
+    # Gobernanza regulada
+    # ------------------------------------------------------------------
+    def set_regulatory_domain(
+        self,
+        domain: RegulatoryDomain,
+        custom_controls: Optional[List[str]] = None,
+    ) -> RegulatoryPolicy:
+        """Configura el dominio regulatorio activo del orquestador."""
+        self.regulatory_policy = RegulatoryPolicy(
+            domain=domain,
+            required_controls=custom_controls or [],
+        )
+        self.model_selector = RegulatedModelSelector(
+            policy=self.regulatory_policy,
+            stakeholder_requirements=self.stakeholder_requirements,
+        )
+        self.gates = GatePipeline(
+            self.policy,
+            regulatory_policy=self.regulatory_policy,
+            explainability_gate=ExplainabilityGate(
+                policy=self.regulatory_policy,
+            ),
+            hitl_approver=self.gates.hitl_approver,
+            canary_monitor=self.gates.canary_monitor,
+            drift_detector=self.gates.drift_detector,
+            champion_challenger=self.gates.champion_challenger,
+            security_fairness=self.gates.security_fairness,
+        )
+        return self.regulatory_policy
+
+    def add_stakeholder_requirement(
+        self,
+        stakeholder: str,
+        description: str,
+        domain: str = "general",
+        category: str = "explainability",
+        constraints: Optional[Dict[str, Any]] = None,
+    ) -> StakeholderRequirement:
+        req = StakeholderRequirement(
+            stakeholder=stakeholder,
+            description=description,
+            domain=RegulatoryDomain(domain),
+            category=category,
+            constraints=constraints or {},
+        )
+        self.stakeholder_requirements.add(req)
+        return req
+
+    def select_regulated_model(
+        self,
+        candidates: List[Dict[str, Any]],
+        baseline: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Wrapper para selección regulada a partir de diccionarios (API)."""
+        from regulated_model_governance import ModelCard, ModelType
+
+        def _to_card(d: Dict[str, Any]) -> ModelCard:
+            return ModelCard(
+                model_id=d["model_id"],
+                model_type=ModelType(d.get("model_type", "black_box")),
+                algorithm=d.get("algorithm", "unknown"),
+                features=d.get("features", []),
+                hyperparameters=d.get("hyperparameters", {}),
+                complexity_score=d.get("complexity_score", 0.9),
+                metrics=d.get("metrics", {}),
+                provenance=d.get("provenance", {}),
+                risk_tier=d.get("risk_tier", "high"),
+                explanation_method=d.get("explanation_method", ""),
+                explanation_report=d.get("explanation_report", {}),
+            )
+
+        decision = self.model_selector.select(
+            candidates=[_to_card(c) for c in candidates],
+            baseline=_to_card(baseline),
+        )
+        return decision.to_dict()
 
     # ------------------------------------------------------------------
     # Pipeline

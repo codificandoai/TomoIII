@@ -53,6 +53,7 @@ class GateName(str, Enum):
     DRIFT = "drift_gate"
     CHAMPION_CHALLENGER = "champion_challenger_gate"
     SECURITY_FAIRNESS = "security_fairness_gate"
+    EXPLAINABILITY = "explainability_gate"
     HITL = "hitl_gate"
     CANARY = "canary_gate"
 

@@ -127,6 +127,78 @@ INPUT_CARDS: Dict[str, Any] = {
         "description": "Detalle y cuarentena de un OnlineIncrementalLearner.",
         "parameters": {},
     },
+    "regulated_model_selection": {
+        "selected_model_id": "string",
+        "selected_model_type": "interpretable|black_box|hybrid",
+        "baseline_model_id": "string",
+        "reason": "string",
+        "regulatory_controls": "array<string>",
+        "hitl_required": "boolean",
+        "shadow_deployment_required": "boolean",
+        "stakeholder_violations": "array<string>",
+    },
+    "explainability_report": {
+        "passed": "boolean",
+        "method": "lime|shap|permutation_surrogate|built-in",
+        "requires_explanation": "boolean",
+        "stability_score": "number",
+        "coverage": "number",
+        "faithfulness_score": "number",
+        "top_features": "array",
+        "violations": "array<string>",
+    },
+    "regulatory_policy": {
+        "domain": "string",
+        "required_controls": "array<string>",
+        "min_auc": "number",
+        "max_fpr": "number",
+        "max_latency_ms": "number",
+        "min_availability": "number",
+    },
+    "POST /api/v1/ct/regulatory/domain": {
+        "description": "Configura dominio regulatorio (sector) y controles automáticos.",
+        "parameters": {
+            "domain": {"type": "string", "required": True,
+                       "description": "healthcare|finance|insurance|critical_infrastructure_*|nuclear|industrial|general"},
+            "custom_controls": {"type": "array", "required": False,
+                                "description": "lista de RegulatoryControl opcional"},
+        },
+    },
+    "POST /api/v1/ct/regulatory/stakeholder-requirement": {
+        "description": "Registra un requisito innegociable de stakeholder.",
+        "parameters": {
+            "stakeholder": {"type": "string", "required": True},
+            "description": {"type": "string", "required": True},
+            "domain": {"type": "string", "required": False, "default": "general"},
+            "category": {"type": "string", "required": False, "default": "explainability"},
+            "constraints": {"type": "object", "required": False},
+        },
+    },
+    "POST /api/v1/ct/regulatory/sign-off": {
+        "description": "Firma un requisito de stakeholder.",
+        "parameters": {
+            "requirement_id": {"type": "string", "required": True},
+            "signed_by": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/ct/regulatory/select-model": {
+        "description": "Selecciona el modelo regulado adecuado (baseline interpretable first).",
+        "parameters": {
+            "candidates": {"type": "array", "required": True, "description": "lista de ModelCard"},
+            "baseline": {"type": "object", "required": True, "description": "ModelCard baseline"},
+        },
+    },
+    "POST /api/v1/ct/regulatory/explainability": {
+        "description": "Evalúa explicabilidad de un ModelCard.",
+        "parameters": {
+            "model_card": {"type": "object", "required": True},
+            "X_sample": {"type": "array", "required": False},
+        },
+    },
+    "GET /api/v1/ct/regulatory/requirements": {
+        "description": "Lista requisitos de stakeholders.",
+        "parameters": {},
+    },
 }
 
 # ==========================================================================
@@ -149,7 +221,7 @@ OUTPUT_CARDS: Dict[str, Any] = {
         },
         "gates": [
             {
-                "gate": "drift_gate|champion_challenger_gate|security_fairness_gate|hitl_gate|canary_gate",
+                "gate": "drift_gate|champion_challenger_gate|security_fairness_gate|explainability_gate|hitl_gate|canary_gate",
                 "verdict": "pass|fail|requires_hitl",
                 "score": "number", "reason": "string", "evidence": "object",
             }
@@ -432,6 +504,97 @@ def ct_online_learner_detail(learner_id: str):
         "history": learner.get_history(),
         "quarantine": learner.get_quarantine(),
     })
+
+
+# ---------------------------------------------------------------------------
+# Regulatory governance endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/regulatory/domain")
+def ct_regulatory_domain():
+    data = _body()
+    domain = data.get("domain")
+    if not domain:
+        return _err("domain requerido")
+    try:
+        from regulated_model_governance import RegulatoryDomain
+        reg_domain = RegulatoryDomain(domain)
+    except ValueError:
+        return _err(f"dominio no válido: {domain}")
+    custom = data.get("custom_controls") or []
+    policy = _orchestrator.set_regulatory_domain(reg_domain, custom_controls=custom)
+    return _ok(policy.to_dict())
+
+
+@app.post("/api/v1/ct/regulatory/stakeholder-requirement")
+def ct_stakeholder_requirement():
+    data = _body()
+    stakeholder = data.get("stakeholder")
+    description = data.get("description")
+    if not stakeholder or not description:
+        return _err("stakeholder y description requeridos")
+    req = _orchestrator.add_stakeholder_requirement(
+        stakeholder=stakeholder,
+        description=description,
+        domain=data.get("domain", "general"),
+        category=data.get("category", "explainability"),
+        constraints=data.get("constraints") or {},
+    )
+    return _ok(req.to_dict())
+
+
+@app.post("/api/v1/ct/regulatory/sign-off")
+def ct_sign_off():
+    data = _body()
+    req_id = data.get("requirement_id")
+    signed_by = data.get("signed_by")
+    if not req_id or not signed_by:
+        return _err("requirement_id y signed_by requeridos")
+    for req in _orchestrator.stakeholder_requirements._reqs:
+        if req.requirement_id == req_id:
+            req.sign_off(signed_by)
+            return _ok(req.to_dict())
+    return _err("requirement_id no encontrado", 404)
+
+
+@app.post("/api/v1/ct/regulatory/select-model")
+def ct_select_model():
+    data = _body()
+    candidates = data.get("candidates") or []
+    baseline = data.get("baseline")
+    if not candidates or not baseline:
+        return _err("candidates y baseline requeridos")
+    return _ok(_orchestrator.select_regulated_model(candidates, baseline))
+
+
+@app.post("/api/v1/ct/regulatory/explainability")
+def ct_explainability():
+    data = _body()
+    card = data.get("model_card")
+    X_sample = data.get("X_sample", [])
+    if not card:
+        return _err("model_card requerido")
+    if _orchestrator.regulatory_policy is None:
+        return _err("regulatory_domain no configurado")
+    from regulated_model_governance import ExplainabilityGate, ModelCard, ModelType
+    gate = ExplainabilityGate(policy=_orchestrator.regulatory_policy)
+    model_card = ModelCard(
+        model_id=card.get("model_id", "unknown"),
+        model_type=ModelType(card.get("model_type", "black_box")),
+        algorithm=card.get("algorithm", "unknown"),
+        features=card.get("features", []),
+        complexity_score=card.get("complexity_score", 0.9),
+        metrics=card.get("metrics", {}),
+        explanation_method=card.get("explanation_method", ""),
+        explanation_report=card.get("explanation_report", {}),
+    )
+    report = gate.evaluate(model_card, X_sample)
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/ct/regulatory/requirements")
+def ct_regulatory_requirements():
+    return _ok({"requirements": _orchestrator.stakeholder_requirements.list()})
 
 
 def main() -> None:
