@@ -20,6 +20,7 @@ from fine_tuning.extrinsic_metrics.extrinsic_metrics_controller import Extrinsic
 from fine_tuning.evaluation_matrix.evaluation_matrix_controller import EvaluationMatrixController
 from fine_tuning.evaluation_matrix.models_cem import HumanReview
 from resilience.recovery_orchestrator import RecoveryOrchestrator
+from compliance_as_code.compliance_controller import ComplianceController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -35,6 +36,7 @@ _ft_controller: Optional[FineTuningController] = None
 _em_controller: Optional[ExtrinsicMetricsController] = None
 _cem_controller: Optional[EvaluationMatrixController] = None
 _recovery_controller: Optional[RecoveryOrchestrator] = None
+_cac_controller: Optional[ComplianceController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -519,6 +521,126 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
             "escalation_id": {"type": "string", "required": True},
             "operator_decision": {"type": "string", "required": True},
         },
+    },
+    "POST /api/v1/compliance/prompt/commit": {
+        "description": "Commit de versión de prompt con trazabilidad regulatoria.",
+        "parameters": {
+            "prompt_name": {"type": "string", "required": True},
+            "content": {"type": "string", "required": True},
+            "author": {"type": "string", "required": True},
+            "regulatory_change": {"type": "boolean", "required": False, "default": False},
+            "approved_by": {"type": "array", "required": False, "default": []},
+            "commit_message": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/compliance/prompt/approve": {
+        "description": "Aprueba una versión de prompt.",
+        "parameters": {
+            "prompt_name": {"type": "string", "required": True},
+            "version_id": {"type": "string", "required": True},
+            "approver": {"type": "string", "required": True},
+        },
+    },
+    "GET /api/v1/compliance/prompt/history/<prompt_name>": {
+        "description": "Historial de versiones de un prompt.",
+        "parameters": {},
+    },
+    "POST /api/v1/compliance/dataset/register": {
+        "description": "Registra linaje de dataset.",
+        "parameters": {
+            "dataset_id": {"type": "string", "required": True},
+            "source": {"type": "string", "required": True},
+            "transformations": {"type": "array", "required": False, "default": []},
+            "consent_tags": {"type": "array", "required": False, "default": []},
+            "retention_hours": {"type": "number", "required": False, "default": 168},
+            "purpose": {"type": "string", "required": False, "default": ""},
+            "privacy_controls": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/compliance/dataset/transformation": {
+        "description": "Añade transformación a un dataset.",
+        "parameters": {
+            "dataset_id": {"type": "string", "required": True},
+            "name": {"type": "string", "required": True},
+            "description": {"type": "string", "required": True},
+            "tool": {"type": "string", "required": False, "default": ""},
+            "params": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "GET /api/v1/compliance/dataset/<dataset_id>": {
+        "description": "Obtiene linaje de dataset.",
+        "parameters": {},
+    },
+    "POST /api/v1/compliance/access/grant": {
+        "description": "Concede permiso RBAC/ABAC.",
+        "parameters": {
+            "role": {"type": "string", "required": True},
+            "resource": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "environments": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/compliance/access/evaluate": {
+        "description": "Evalúa decisión de acceso.",
+        "parameters": {
+            "requester_id": {"type": "string", "required": True},
+            "roles": {"type": "array", "required": True},
+            "resource": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "environment": {"type": "string", "required": True},
+            "oidc_claims": {"type": "object", "required": False, "default": {}},
+            "tenant": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/compliance/inference/record": {
+        "description": "Registra inferencia en ledger WORM.",
+        "parameters": {
+            "request_id": {"type": "string", "required": True},
+            "session_id": {"type": "string", "required": True},
+            "requester_id": {"type": "string", "required": True},
+            "requester_roles": {"type": "array", "required": True},
+            "artifact_bundle": {"type": "object", "required": True},
+            "input_text": {"type": "string", "required": True},
+            "output_text": {"type": "string", "required": True},
+            "access_decision": {"type": "string", "required": True},
+            "policies_applied": {"type": "array", "required": True},
+            "pii_detected": {"type": "boolean", "required": False, "default": False},
+            "guardrail_violations": {"type": "array", "required": False, "default": []},
+            "e_discovery_tag": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "GET /api/v1/compliance/inference/query": {
+        "description": "Consulta ledger de inferencia.",
+        "parameters": {},
+    },
+    "GET /api/v1/compliance/ledger/verify": {
+        "description": "Verifica integridad de hash chain.",
+        "parameters": {},
+    },
+    "POST /api/v1/compliance/metrics/ingest": {
+        "description": "Ingesta métrica técnica para evaluación regulatoria.",
+        "parameters": {
+            "metric_name": {"type": "string", "required": True},
+            "value": {"type": "number", "required": True},
+        },
+    },
+    "POST /api/v1/compliance/alerts/acknowledge": {
+        "description": "Acknowledge de alerta de cumplimiento.",
+        "parameters": {
+            "alert_id": {"type": "string", "required": True},
+        },
+    },
+    "GET /api/v1/compliance/report": {
+        "description": "Reporte de cumplimiento.",
+        "parameters": {},
+    },
+    "GET /api/v1/compliance/dashboard": {
+        "description": "Dashboard de cumplimiento.",
+        "parameters": {},
+    },
+    "GET /api/v1/compliance/rules": {
+        "description": "Reglas de mapeo regulatorio.",
+        "parameters": {},
     },
 }
 
@@ -1573,6 +1695,245 @@ def ft_recovery_hitl_decide():
 
 
 # ---------------------------------------------------------------------------
+# Compliance as Code endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/compliance/prompt/commit")
+def ft_cac_prompt_commit():
+    data = _body()
+    required = ["prompt_name", "content", "author"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    pv = _cac_controller.commit_prompt(
+        prompt_name=data["prompt_name"],
+        content=data["content"],
+        author=data["author"],
+        regulatory_change=bool(data.get("regulatory_change", False)),
+        approved_by=data.get("approved_by"),
+        commit_message=data.get("commit_message", ""),
+    )
+    return _ok(pv.to_dict(), 201)
+
+
+@app.post("/api/v1/compliance/prompt/approve")
+def ft_cac_prompt_approve():
+    data = _body()
+    required = ["prompt_name", "version_id", "approver"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    pv = _cac_controller.approve_prompt(data["prompt_name"], data["version_id"], data["approver"])
+    if not pv:
+        return _err("version no encontrada", 404)
+    return _ok(pv.to_dict())
+
+
+@app.get("/api/v1/compliance/prompt/history/<prompt_name>")
+def ft_cac_prompt_history(prompt_name: str):
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    return _ok([v.to_dict() for v in _cac_controller.prompt_history(prompt_name)])
+
+
+@app.post("/api/v1/compliance/dataset/register")
+def ft_cac_dataset_register():
+    data = _body()
+    required = ["dataset_id", "source"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    lineage = _cac_controller.register_dataset(
+        dataset_id=data["dataset_id"],
+        source=data["source"],
+        transformations=data.get("transformations"),
+        consent_tags=data.get("consent_tags"),
+        retention_hours=float(data.get("retention_hours", 168.0)),
+        purpose=data.get("purpose", ""),
+        privacy_controls=data.get("privacy_controls"),
+    )
+    return _ok(lineage.to_dict(), 201)
+
+
+@app.post("/api/v1/compliance/dataset/transformation")
+def ft_cac_dataset_transformation():
+    data = _body()
+    required = ["dataset_id", "name", "description"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    lineage = _cac_controller.add_dataset_transformation(
+        dataset_id=data["dataset_id"],
+        name=data["name"],
+        description=data["description"],
+        tool=data.get("tool", ""),
+        params=data.get("params"),
+    )
+    if not lineage:
+        return _err("dataset no encontrado", 404)
+    return _ok(lineage.to_dict())
+
+
+@app.get("/api/v1/compliance/dataset/<dataset_id>")
+def ft_cac_dataset_get(dataset_id: str):
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    lineage = _cac_controller.get_dataset_lineage(dataset_id)
+    if not lineage:
+        return _err("dataset no encontrado", 404)
+    return _ok(lineage.to_dict())
+
+
+@app.post("/api/v1/compliance/access/grant")
+def ft_cac_access_grant():
+    data = _body()
+    required = ["role", "resource", "action"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    _cac_controller.grant_role(
+        role=data["role"],
+        resource=data["resource"],
+        action=data["action"],
+        environments=data.get("environments"),
+    )
+    return _ok({"granted": True}, 201)
+
+
+@app.post("/api/v1/compliance/access/evaluate")
+def ft_cac_access_evaluate():
+    data = _body()
+    required = ["requester_id", "roles", "resource", "action", "environment"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    decision = _cac_controller.evaluate_access(
+        requester_id=data["requester_id"],
+        roles=data["roles"],
+        resource=data["resource"],
+        action=data["action"],
+        environment=data["environment"],
+        oidc_claims=data.get("oidc_claims"),
+        tenant=data.get("tenant", ""),
+    )
+    return _ok(decision.to_dict())
+
+
+@app.post("/api/v1/compliance/inference/record")
+def ft_cac_inference_record():
+    data = _body()
+    required = [
+        "request_id", "session_id", "requester_id", "requester_roles",
+        "artifact_bundle", "input_text", "output_text",
+        "access_decision", "policies_applied",
+    ]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    from compliance_as_code.models_compliance import ArtifactBundle
+    bundle = ArtifactBundle(**data["artifact_bundle"])
+    rec = _cac_controller.record_inference(
+        request_id=data["request_id"],
+        session_id=data["session_id"],
+        requester_id=data["requester_id"],
+        requester_roles=data["requester_roles"],
+        artifact_bundle=bundle,
+        input_text=data["input_text"],
+        output_text=data["output_text"],
+        access_decision=data["access_decision"],
+        policies_applied=data["policies_applied"],
+        pii_detected=bool(data.get("pii_detected", False)),
+        guardrail_violations=data.get("guardrail_violations"),
+        e_discovery_tag=data.get("e_discovery_tag", ""),
+    )
+    return _ok(rec.to_dict(), 201)
+
+
+@app.get("/api/v1/compliance/inference/query")
+def ft_cac_inference_query():
+    args = __import__("flask").request.args
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    records = _cac_controller.query_inference_audit(
+        request_id=args.get("request_id", ""),
+        session_id=args.get("session_id", ""),
+        requester_id=args.get("requester_id", ""),
+        tag=args.get("tag", ""),
+    )
+    return _ok([r.to_dict() for r in records])
+
+
+@app.get("/api/v1/compliance/ledger/verify")
+def ft_cac_ledger_verify():
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    return _ok({"valid": _cac_controller.verify_ledger()})
+
+
+@app.post("/api/v1/compliance/metrics/ingest")
+def ft_cac_metrics_ingest():
+    data = _body()
+    required = ["metric_name", "value"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    alerts = _cac_controller.ingest_metric(data["metric_name"], float(data["value"]))
+    return _ok({"alerts": [a.to_dict() for a in alerts]})
+
+
+@app.post("/api/v1/compliance/alerts/acknowledge")
+def ft_cac_alert_ack():
+    data = _body()
+    required = ["alert_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    alert = _cac_controller.acknowledge_alert(data["alert_id"])
+    if not alert:
+        return _err("alerta no encontrada", 404)
+    return _ok(alert.to_dict())
+
+
+@app.get("/api/v1/compliance/report")
+def ft_cac_report():
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    return _ok(_cac_controller.compliance_report())
+
+
+@app.get("/api/v1/compliance/dashboard")
+def ft_cac_dashboard():
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    return _ok(_cac_controller.dashboard())
+
+
+@app.get("/api/v1/compliance/rules")
+def ft_cac_rules():
+    if _cac_controller is None:
+        return _err("compliance controller no configurado", 503)
+    return _ok([r.to_dict() for r in _cac_controller.list_rules()])
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1597,6 +1958,9 @@ def create_app(
     global _recovery_controller
     if _recovery_controller is None:
         _recovery_controller = RecoveryOrchestrator()
+    global _cac_controller
+    if _cac_controller is None:
+        _cac_controller = ComplianceController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
