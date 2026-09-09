@@ -24,6 +24,7 @@ from compliance_as_code.compliance_controller import ComplianceController
 from continuous_improvement.continuous_improvement_controller import ContinuousImprovementController
 from enterprise_qa.models_qa import TestCase
 from enterprise_qa.qa_driver import EnterpriseQADriver
+from incident_management.incident_management_controller import IncidentManagementController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -42,6 +43,7 @@ _recovery_controller: Optional[RecoveryOrchestrator] = None
 _cac_controller: Optional[ComplianceController] = None
 _ci_controller: Optional[ContinuousImprovementController] = None
 _qa_driver: Optional[EnterpriseQADriver] = None
+_incident_controller: Optional[IncidentManagementController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -723,6 +725,108 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
                 "llm_response": "string",
             }},
         },
+    },
+    "POST /api/v1/incidents": {
+        "description": "Crea un incidente LLMOps.",
+        "parameters": {
+            "title": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "description": {"type": "string", "required": False, "default": ""},
+            "urgency": {"type": "string", "required": False, "default": "normal"},
+            "affected_users": {"type": "integer", "required": False, "default": 0},
+            "regulatory_criticality": {"type": "string", "required": False, "default": "none"},
+            "tags": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "GET /api/v1/incidents": {
+        "description": "Lista incidentes.",
+        "parameters": {},
+    },
+    "GET /api/v1/incidents/<incident_id>": {
+        "description": "Obtener incidente.",
+        "parameters": {},
+    },
+    "POST /api/v1/incidents/<incident_id>/triage": {
+        "description": "Triaje: clasifica severidad y asigna equipo/commander.",
+        "parameters": {},
+    },
+    "POST /api/v1/incidents/<incident_id>/contain": {
+        "description": "Aplica acciones de contención.",
+        "parameters": {
+            "actions": {"type": "array", "required": True},
+        },
+    },
+    "POST /api/v1/incidents/<incident_id>/resolve": {
+        "description": "Resuelve incidente.",
+        "parameters": {},
+    },
+    "POST /api/v1/incidents/<incident_id>/alerts": {
+        "description": "Crea alerta asociada a incidente.",
+        "parameters": {
+            "metric": {"type": "string", "required": True},
+            "value": {"type": "number", "required": True},
+            "threshold": {"type": "number", "required": True},
+        },
+    },
+    "POST /api/v1/incidents/oncall": {
+        "description": "Registra persona de guardia.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "team": {"type": "string", "required": True},
+            "phone": {"type": "string", "required": False, "default": ""},
+            "email": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/incidents/<incident_id>/communicate": {
+        "description": "Envía comunicación automatizada.",
+        "parameters": {
+            "channel": {"type": "string", "required": True},
+            "recipient_team": {"type": "string", "required": True},
+            "template_name": {"type": "string", "required": True},
+            "content": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/incidents/<incident_id>/runbook": {
+        "description": "Ejecuta runbook del incidente.",
+        "parameters": {},
+    },
+    "POST /api/v1/incidents/<incident_id>/post-mortem": {
+        "description": "Genera post-mortem.",
+        "parameters": {
+            "root_cause": {"type": "string", "required": True},
+            "failed_controls": {"type": "array", "required": True},
+            "action_items": {"type": "array", "required": True},
+            "lessons_learned": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/incidents/sli/register": {
+        "description": "Registra SLI.",
+        "parameters": {
+            "sli_id": {"type": "string", "required": True},
+            "name": {"type": "string", "required": True},
+            "metric": {"type": "string", "required": True},
+            "unit": {"type": "string", "required": True},
+            "description": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/incidents/slos": {
+        "description": "Define SLO y presupuesto de error.",
+        "parameters": {
+            "sli_id": {"type": "string", "required": True},
+            "target": {"type": "number", "required": True},
+            "window_seconds": {"type": "number", "required": True},
+            "description": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/incidents/slos/<slo_id>/sample": {
+        "description": "Registra muestra de SLO y devuelve error budget.",
+        "parameters": {
+            "good": {"type": "boolean", "required": True},
+        },
+    },
+    "GET /api/v1/incidents/dashboard": {
+        "description": "Dashboard de incidentes.",
+        "parameters": {},
     },
 }
 
@@ -2145,6 +2249,217 @@ def ft_qa_run():
 
 
 # ---------------------------------------------------------------------------
+# Incident Management endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/incidents")
+def ft_incident_create():
+    data = _body()
+    required = ["title", "category"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    inc = _incident_controller.create_incident(data)
+    return _ok(inc.to_dict(), 201)
+
+
+@app.get("/api/v1/incidents")
+def ft_incident_list():
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    return _ok([i.to_dict() for i in _incident_controller.list_incidents()])
+
+
+@app.get("/api/v1/incidents/<incident_id>")
+def ft_incident_get(incident_id: str):
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    inc = _incident_controller.get_incident(incident_id)
+    if not inc:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc.to_dict())
+
+
+@app.post("/api/v1/incidents/<incident_id>/triage")
+def ft_incident_triage(incident_id: str):
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    inc = _incident_controller.triage(incident_id)
+    if not inc:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc.to_dict())
+
+
+@app.post("/api/v1/incidents/<incident_id>/contain")
+def ft_incident_contain(incident_id: str):
+    data = _body()
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    inc = _incident_controller.contain(incident_id, data.get("actions", []))
+    if not inc:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc.to_dict())
+
+
+@app.post("/api/v1/incidents/<incident_id>/resolve")
+def ft_incident_resolve(incident_id: str):
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    inc = _incident_controller.resolve(incident_id)
+    if not inc:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc.to_dict())
+
+
+@app.post("/api/v1/incidents/<incident_id>/alerts")
+def ft_incident_alert(incident_id: str):
+    data = _body()
+    required = ["metric", "value", "threshold"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    alert = _incident_controller.create_alert(
+        incident_id, data["metric"], float(data["value"]), float(data["threshold"])
+    )
+    if not alert:
+        return _err("incidente no encontrado", 404)
+    return _ok(alert.to_dict(), 201)
+
+
+@app.post("/api/v1/incidents/oncall")
+def ft_incident_oncall():
+    data = _body()
+    required = ["name", "team"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    _incident_controller.add_oncall(
+        name=data["name"],
+        team=data["team"],
+        phone=data.get("phone", ""),
+        email=data.get("email", ""),
+        active=data.get("active", True),
+    )
+    return _ok({"registered": True}, 201)
+
+
+@app.post("/api/v1/incidents/<incident_id>/communicate")
+def ft_incident_communicate(incident_id: str):
+    data = _body()
+    required = ["channel", "recipient_team", "template_name", "content"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    rec = _incident_controller.communicate(
+        incident_id=incident_id,
+        channel=data["channel"],
+        recipient_team=data["recipient_team"],
+        template_name=data["template_name"],
+        content=data["content"],
+    )
+    return _ok(rec.to_dict(), 201)
+
+
+@app.post("/api/v1/incidents/<incident_id>/runbook")
+def ft_incident_runbook(incident_id: str):
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    result = _incident_controller.execute_runbook(incident_id)
+    if not result:
+        return _err("incidente no encontrado", 404)
+    return _ok(result)
+
+
+@app.post("/api/v1/incidents/<incident_id>/post-mortem")
+def ft_incident_post_mortem(incident_id: str):
+    data = _body()
+    required = ["root_cause", "failed_controls", "action_items"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    pm = _incident_controller.generate_post_mortem(
+        incident_id=incident_id,
+        root_cause=data["root_cause"],
+        failed_controls=data["failed_controls"],
+        action_items=data["action_items"],
+        lessons_learned=data.get("lessons_learned", ""),
+        mitigation_time_minutes=float(data.get("mitigation_time_minutes", 0)),
+        recovery_time_minutes=float(data.get("recovery_time_minutes", 0)),
+    )
+    if not pm:
+        return _err("incidente no encontrado", 404)
+    return _ok(pm.to_dict(), 201)
+
+
+@app.post("/api/v1/incidents/slos")
+def ft_incident_define_slo():
+    data = _body()
+    required = ["sli_id", "target", "window_seconds"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    slo = _incident_controller.define_slo(
+        sli_id=data["sli_id"],
+        target=float(data["target"]),
+        window_seconds=float(data["window_seconds"]),
+        description=data.get("description", ""),
+    )
+    if not slo:
+        return _err("SLI no registrado", 400)
+    return _ok(slo.to_dict(), 201)
+
+
+@app.post("/api/v1/incidents/sli/register")
+def ft_incident_register_sli():
+    data = _body()
+    required = ["sli_id", "name", "metric", "unit"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    sli = _incident_controller.register_sli(
+        sli_id=data["sli_id"],
+        name=data["name"],
+        metric=data["metric"],
+        unit=data["unit"],
+        description=data.get("description", ""),
+    )
+    return _ok(sli.to_dict(), 201)
+
+
+@app.post("/api/v1/incidents/slos/<slo_id>/sample")
+def ft_incident_slo_sample(slo_id: str):
+    data = _body()
+    if "good" not in data:
+        return _err("good boolean required")
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    _incident_controller.record_slo_sample(slo_id, bool(data["good"]))
+    budget = _incident_controller.get_error_budget(slo_id)
+    return _ok(budget if budget else {})
+
+
+@app.get("/api/v1/incidents/dashboard")
+def ft_incident_dashboard():
+    if _incident_controller is None:
+        return _err("incident controller no configurado", 503)
+    return _ok(_incident_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -2178,6 +2493,9 @@ def create_app(
     global _qa_driver
     if _qa_driver is None:
         _qa_driver = EnterpriseQADriver()
+    global _incident_controller
+    if _incident_controller is None:
+        _incident_controller = IncidentManagementController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
