@@ -164,9 +164,113 @@ class Observability075:
                 ["target"],
                 registry=self.registry,
             )
+            # adaptive incident response
+            self.c_threat_intel_sync = Counter(
+                "uc075_threat_intel_sync_total",
+                "Sincronizaciones de inteligencia de amenazas",
+                registry=self.registry,
+            )
+            self.g_threat_vectors = Gauge(
+                "uc075_threat_vectors_total",
+                "Vectores de amenaza conocidos",
+                registry=self.registry,
+            )
+            self.c_golden_dataset_entries = Counter(
+                "uc075_golden_dataset_entries_total",
+                "Ejemplos añadidos al golden dataset",
+                ["category"],
+                registry=self.registry,
+            )
+            self.c_playbook_updates = Counter(
+                "uc075_playbook_updates_total",
+                "Actualizaciones de playbooks",
+                ["playbook_id"],
+                registry=self.registry,
+            )
+            self.h_playbook_update_latency = Histogram(
+                "uc075_playbook_update_latency_seconds",
+                "Latencia desde propuesta hasta merge de playbook",
+                registry=self.registry,
+            )
+            self.c_chaos_runs = Counter(
+                "uc075_chaos_runs_total",
+                "Ejecuciones de caos",
+                ["scenario_filter", "dry_run"],
+                registry=self.registry,
+            )
+            self.g_chaos_pass_rate = Gauge(
+                "uc075_chaos_pass_rate",
+                "Tasa de éxito del último caos",
+                registry=self.registry,
+            )
+            self.c_release_validations = Counter(
+                "uc075_release_validations_total",
+                "Validaciones de release gate",
+                ["model_version", "passed"],
+                registry=self.registry,
+            )
+            self.g_release_pass_rate = Gauge(
+                "uc075_release_pass_rate",
+                "Tasa de éxito del último release gate",
+                registry=self.registry,
+            )
+            self.c_false_negatives = Counter(
+                "uc075_false_negatives_total",
+                "Falsos negativos post-regla",
+                ["category", "rule_id"],
+                registry=self.registry,
+            )
+            self.g_challenge_coverage = Gauge(
+                "uc075_challenge_coverage_percent",
+                "Cobertura del dataset de desafío",
+                registry=self.registry,
+            )
+            # Incident Command Center (StackStorm + Wiki.js)
+            self.c_icc_incidents_reported = Counter(
+                "uc075_icc_incidents_reported_total",
+                "Incidentes reportados al ICC",
+                ["category", "severity"],
+                registry=self.registry,
+            )
+            self.c_icc_actions_submitted = Counter(
+                "uc075_icc_actions_submitted_total",
+                "Acciones enviadas a StackStorm",
+                ["action", "scope"],
+                registry=self.registry,
+            )
+            self.c_icc_actions_executed = Counter(
+                "uc075_icc_actions_executed_total",
+                "Acciones ejecutadas por StackStorm",
+                ["action", "status"],
+                registry=self.registry,
+            )
+            self.c_icc_actions_rejected = Counter(
+                "uc075_icc_actions_rejected_total",
+                "Acciones rechazadas por falta de autorización",
+                ["action", "reason"],
+                registry=self.registry,
+            )
+            self.c_icc_postmortems = Counter(
+                "uc075_icc_postmortems_total",
+                "Postmortems creados en Wiki.js",
+                ["incident_id"],
+                registry=self.registry,
+            )
+            self.c_icc_runbook_syncs = Counter(
+                "uc075_icc_runbook_syncs_total",
+                "Sincronizaciones de runbooks a Wiki.js",
+                ["category", "version"],
+                registry=self.registry,
+            )
+            self.g_icc_open_incidents = Gauge(
+                "uc075_icc_open_incidents",
+                "Incidentes abiertos en ICC",
+                registry=self.registry,
+            )
 
         self._pending_hitl_count = 0
         self._pending_incidents_count = 0
+        self._icc_open_incidents = 0
 
     # ------------------------------------------------------------------
     # Registro de eventos
@@ -323,6 +427,117 @@ class Observability075:
         self._log_event("uc075_policy_learning", target=target)
 
     # ------------------------------------------------------------------
+    # Adaptive incident response
+    # ------------------------------------------------------------------
+    def record_threat_intel_sync(self, new_vectors: int) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_threat_intel_sync.inc()
+            self.g_threat_vectors.set(new_vectors)
+        self._log_event("uc075_threat_intel_sync", new_vectors=new_vectors)
+
+    def record_golden_dataset_entry(self, category: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_golden_dataset_entries.labels(category=category).inc()
+        self._log_event("uc075_golden_dataset_entry", category=category)
+
+    def record_playbook_update(
+        self,
+        playbook_id: str,
+        version: str,
+        latency_seconds: float,
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_playbook_updates.labels(playbook_id=playbook_id).inc()
+            self.h_playbook_update_latency.observe(max(latency_seconds, 0.0))
+        self._log_event(
+            "uc075_playbook_update",
+            playbook_id=playbook_id,
+            version=version,
+            latency_seconds=latency_seconds,
+        )
+
+    def record_chaos_run(
+        self,
+        scenario_filter: str,
+        pass_rate: float,
+        dry_run: bool,
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_chaos_runs.labels(
+                scenario_filter=scenario_filter or "all",
+                dry_run="true" if dry_run else "false",
+            ).inc()
+            self.g_chaos_pass_rate.set(pass_rate)
+        self._log_event(
+            "uc075_chaos_run",
+            scenario_filter=scenario_filter,
+            pass_rate=pass_rate,
+            dry_run=dry_run,
+        )
+
+    def record_release_validation(
+        self,
+        model_version: str,
+        passed: bool,
+        pass_rate: float,
+        coverage: float,
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_release_validations.labels(
+                model_version=model_version,
+                passed="true" if passed else "false",
+            ).inc()
+            self.g_release_pass_rate.set(pass_rate)
+            self.g_challenge_coverage.set(coverage)
+        self._log_event(
+            "uc075_release_validation",
+            model_version=model_version,
+            passed=passed,
+            pass_rate=pass_rate,
+            coverage=coverage,
+        )
+
+    def record_false_negative(self, category: str, rule_id: str = "") -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_false_negatives.labels(category=category, rule_id=rule_id or "unknown").inc()
+        self._log_event("uc075_false_negative", category=category, rule_id=rule_id)
+
+    # ------------------------------------------------------------------
+    # Incident Command Center (StackStorm + Wiki.js)
+    # ------------------------------------------------------------------
+    def record_icc_incident_reported(self, category: str, severity: str) -> None:
+        self._icc_open_incidents += 1
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_incidents_reported.labels(category=category, severity=severity).inc()
+            self.g_icc_open_incidents.set(self._icc_open_incidents)
+        self._log_event("uc075_icc_incident_reported", category=category, severity=severity)
+
+    def record_icc_action_submitted(self, action: str, scope: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_actions_submitted.labels(action=action, scope=scope).inc()
+        self._log_event("uc075_icc_action_submitted", action=action, scope=scope)
+
+    def record_icc_action_executed(self, action: str, status: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_actions_executed.labels(action=action, status=status).inc()
+        self._log_event("uc075_icc_action_executed", action=action, status=status)
+
+    def record_icc_action_rejected(self, action: str, reason: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_actions_rejected.labels(action=action, reason=reason).inc()
+        self._log_event("uc075_icc_action_rejected", action=action, reason=reason)
+
+    def record_icc_postmortem_created(self, incident_id: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_postmortems.labels(incident_id=incident_id).inc()
+        self._log_event("uc075_icc_postmortem_created", incident_id=incident_id)
+
+    def record_icc_runbook_sync(self, category: str, version: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_icc_runbook_syncs.labels(category=category, version=version).inc()
+        self._log_event("uc075_icc_runbook_sync", category=category, version=version)
+
+    # ------------------------------------------------------------------
     # Exporters
     # ------------------------------------------------------------------
     def export_prometheus(self) -> str:
@@ -420,5 +635,32 @@ class Observability075:
                 panel(14, "Aprendizajes de política",
                       "sum by (target) (rate(uc075_policy_learnings_total[5m]))",
                       {"x": 18, "y": 32, "w": 6, "h": 8}),
+                panel(15, "Latencia de actualización de playbooks",
+                      "histogram_quantile(0.95, sum(rate(uc075_playbook_update_latency_seconds_bucket[5m])) by (le))",
+                      {"x": 0, "y": 40, "w": 8, "h": 8}),
+                panel(16, "Tasa de éxito en caos",
+                      "uc075_chaos_pass_rate",
+                      {"x": 8, "y": 40, "w": 8, "h": 8}),
+                panel(17, "Pass rate release gate",
+                      "uc075_release_pass_rate",
+                      {"x": 16, "y": 40, "w": 8, "h": 8}),
+                panel(18, "Cobertura dataset de desafío",
+                      "uc075_challenge_coverage_percent",
+                      {"x": 0, "y": 48, "w": 8, "h": 8}),
+                panel(19, "Vectores de amenaza conocidos",
+                      "uc075_threat_vectors_total",
+                      {"x": 8, "y": 48, "w": 8, "h": 8}),
+                panel(20, "Acciones ICC ejecutadas",
+                      "sum by (action, status) (rate(uc075_icc_actions_executed_total[5m]))",
+                      {"x": 16, "y": 48, "w": 8, "h": 8}),
+                panel(21, "Acciones ICC rechazadas",
+                      "sum by (action, reason) (rate(uc075_icc_actions_rejected_total[5m]))",
+                      {"x": 0, "y": 56, "w": 8, "h": 8}),
+                panel(22, "Postmortems y syncs de runbook",
+                      "sum(rate(uc075_icc_postmortems_total[5m])) + sum(rate(uc075_icc_runbook_syncs_total[5m]))",
+                      {"x": 8, "y": 56, "w": 8, "h": 8}),
+                panel(23, "Incidentes abiertos en ICC",
+                      "uc075_icc_open_incidents",
+                      {"x": 16, "y": 56, "w": 8, "h": 8}),
             ],
         }

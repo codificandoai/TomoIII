@@ -104,6 +104,18 @@ from llmops_incident_automation import (
     LLMOpsIncidentManager,
     PlaybookRegistry,
 )
+from adaptive_incident_response import (
+    AdaptiveIncidentEngine,
+    ChallengeScenario,
+    GoldenExample,
+    ThreatVector,
+)
+from incident_command_center import (
+    ApprovalScope,
+    IncidentCommandCenter,
+    StackStormAdapter,
+    WikiJsAdapter,
+)
 
 # --- Funciones inyectables del ecosistema ----------------------------------
 
@@ -198,6 +210,8 @@ class ContinuousTrainingOrchestrator:
         proactive_risk_plan: Optional[ProactiveRiskPlan] = None,
         runbook_catalog: Optional[RunbookCatalog] = None,
         incident_manager: Optional[LLMOpsIncidentManager] = None,
+        adaptive_engine: Optional[AdaptiveIncidentEngine] = None,
+        incident_command_center: Optional[IncidentCommandCenter] = None,
         event_sink: Optional[EventSinkFn] = None,          # UC-309
         mlflow_tracking_uri: Optional[str] = None,
         mlflow_enabled: bool = True,
@@ -250,6 +264,14 @@ class ContinuousTrainingOrchestrator:
         self.observability = Observability075()
         self.incident_manager = incident_manager or LLMOpsIncidentManager(
             risk_register=self.risk_register,
+            observability=self.observability,
+        )
+        self.adaptive_engine = adaptive_engine or AdaptiveIncidentEngine(
+            observability=self.observability,
+        )
+        self.incident_command_center = incident_command_center or IncidentCommandCenter(
+            stackstorm=StackStormAdapter(),
+            wikijs=WikiJsAdapter(),
             observability=self.observability,
         )
         self.mlflow = MLflowAdapter(tracking_uri=mlflow_tracking_uri, enabled=mlflow_enabled)
@@ -815,10 +837,169 @@ class ContinuousTrainingOrchestrator:
             "risk_summary": self.risk_register.summary(),
             "proactive_risk_next_steps": self.proactive_risk_plan.next_steps(self.risk_register),
             "incident_summary": self.incident_manager.summary(),
+            "adaptive_metrics": self.adaptive_engine.metrics(),
+            "icc_status_board": self.incident_command_center.status_board(),
         }
 
     def get_online_learner(self, learner_id: str) -> Optional[OnlineIncrementalLearner]:
         return self._online_learners.get(learner_id)
+
+    # ------------------------------------------------------------------
+    # Adaptive incident response (Sistema inmunológico)
+    # ------------------------------------------------------------------
+    def sync_threat_intelligence(self, external: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        return self.adaptive_engine.sync_threat_intelligence(external)
+
+    def mine_incident_patterns(self, incidents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [p.to_dict() for p in self.adaptive_engine.mine_patterns(incidents)]
+
+    def record_feedback(
+        self,
+        prompt: str,
+        corrected_label: str,
+        category: str,
+        source_incident_id: str = "",
+        human_reviewer: str = "",
+    ) -> Dict[str, Any]:
+        return self.adaptive_engine.record_human_feedback(
+            prompt, corrected_label, category, source_incident_id, human_reviewer
+        ).to_dict()
+
+    def propose_playbook_update(
+        self,
+        playbook_id: str,
+        category: str,
+        actions: List[str],
+        thresholds: Dict[str, Any],
+        changelog: str,
+    ) -> Dict[str, Any]:
+        return self.adaptive_engine.propose_playbook_update(playbook_id, category, actions, thresholds, changelog)
+
+    def merge_playbook_pr(self, pr_id: str) -> Optional[Dict[str, Any]]:
+        pb = self.adaptive_engine.merge_playbook_pr(pr_id)
+        return pb.to_dict() if pb else None
+
+    def playbook_history(self, playbook_id: str) -> List[Dict[str, Any]]:
+        return [p.to_dict() for p in self.adaptive_engine.playbook_gitops.history(playbook_id)]
+
+    def run_chaos_drill(
+        self,
+        detector: Any,
+        scenario_filter: Optional[str] = None,
+        dry_run: bool = True,
+    ) -> Dict[str, Any]:
+        return self.adaptive_engine.run_chaos(detector, scenario_filter, dry_run)
+
+    def validate_release_with_challenge(
+        self,
+        model_version: str,
+        detector: Any,
+        false_negative_rate: float = 0.0,
+    ) -> Dict[str, Any]:
+        return self.adaptive_engine.validate_release(model_version, detector, false_negative_rate)
+
+    def adaptive_metrics(self) -> Dict[str, Any]:
+        return self.adaptive_engine.metrics()
+
+    def add_challenge_scenario(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
+        cs = ChallengeScenario(**scenario)
+        self.adaptive_engine.dataset.add_scenario(cs)
+        return cs.to_dict()
+
+    def add_threat_vector(self, vector: Dict[str, Any]) -> Dict[str, Any]:
+        tv = ThreatVector(**vector)
+        self.adaptive_engine.threat_feed.add_vector(**tv.to_dict())
+        return tv.to_dict()
+
+    # ------------------------------------------------------------------
+    # Incident Command Center (StackStorm + Wiki.js)
+    # ------------------------------------------------------------------
+    def icc_report_incident(
+        self,
+        incident_id: str,
+        title: str,
+        description: str,
+        category: str,
+        severity: str,
+        owner: str = "",
+        stakeholders: Optional[List[str]] = None,
+        related_risk_ids: Optional[List[str]] = None,
+        related_run_ids: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        inc = self.incident_command_center.report_incident(
+            incident_id=incident_id,
+            title=title,
+            description=description,
+            category=category,
+            severity=severity,
+            owner=owner,
+            stakeholders=stakeholders or [],
+            related_risk_ids=related_risk_ids or [],
+            related_run_ids=related_run_ids or [],
+        )
+        return inc.to_dict()
+
+    def icc_update_status(self, icc_id: str, status: str) -> Optional[Dict[str, Any]]:
+        inc = self.incident_command_center.update_status(icc_id, status)
+        return inc.to_dict() if inc else None
+
+    def icc_submit_action(
+        self,
+        incident_id: str,
+        action: str,
+        params: Dict[str, Any],
+        approval_ref: str,
+        scope: str = ApprovalScope.AUTO.value,
+        requested_by: str = "uc075-icc",
+    ) -> Dict[str, Any]:
+        a = self.incident_command_center.submit_action(
+            incident_id=incident_id,
+            action=action,
+            params=params,
+            approval_ref=approval_ref,
+            scope=scope,
+            requested_by=requested_by,
+        )
+        return a.to_dict()
+
+    def icc_execute_action(self, action_id: str) -> Dict[str, Any]:
+        a = self.incident_command_center.execute_approved_action(action_id)
+        return a.to_dict()
+
+    def icc_rollback_action(self, action_id: str) -> Dict[str, Any]:
+        a = self.incident_command_center.rollback_action(action_id)
+        return a.to_dict()
+
+    def icc_create_postmortem(
+        self,
+        incident_id: str,
+        title: str,
+        findings: List[str],
+        action_items: List[str],
+        participants: List[str],
+    ) -> Dict[str, Any]:
+        page = self.incident_command_center.create_postmortem(
+            incident_id, title, findings, action_items, participants
+        )
+        return page.to_dict()
+
+    def icc_sync_runbook(
+        self,
+        category: str,
+        actions: List[str],
+        version: str,
+        source_git_commit: str = "",
+    ) -> Dict[str, Any]:
+        page = self.incident_command_center.sync_runbook(
+            category, actions, version, source_git_commit
+        )
+        return page.to_dict()
+
+    def icc_unified_view(self, incident_id: str) -> Dict[str, Any]:
+        return self.incident_command_center.unified_view(incident_id)
+
+    def icc_status_board(self) -> Dict[str, Any]:
+        return self.incident_command_center.status_board()
 
     # ------------------------------------------------------------------
     # LLMOps incident automation

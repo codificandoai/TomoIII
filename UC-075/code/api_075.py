@@ -363,6 +363,152 @@ INPUT_CARDS: Dict[str, Any] = {
         "description": "Playbook de respuesta para una categoría.",
         "parameters": {},
     },
+    "POST /api/v1/ct/adaptive/threat-intel/sync": {
+        "description": "Sincroniza inteligencia de amenazas y actualiza dataset de desafío.",
+        "parameters": {"vectors": {"type": "array", "required": False}},
+    },
+    "POST /api/v1/ct/adaptive/mine-patterns": {
+        "description": "Mina patrones emergentes desde incidentes históricos.",
+        "parameters": {"incidents": {"type": "array", "required": True}},
+    },
+    "POST /api/v1/ct/adaptive/feedback": {
+        "description": "Registra feedback humano en golden dataset.",
+        "parameters": {
+            "prompt": {"type": "string", "required": True},
+            "corrected_label": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "source_incident_id": {"type": "string", "required": False},
+            "human_reviewer": {"type": "string", "required": False},
+        },
+    },
+    "POST /api/v1/ct/adaptive/playbook/pr": {
+        "description": "Propone actualización de playbook (GitOps).",
+        "parameters": {
+            "playbook_id": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "actions": {"type": "array", "required": True},
+            "thresholds": {"type": "object", "required": False},
+            "changelog": {"type": "string", "required": True},
+        },
+    },
+    "POST /api/v1/ct/adaptive/playbook/merge": {
+        "description": "Mergea PR de playbook.",
+        "parameters": {"pr_id": {"type": "string", "required": True}},
+    },
+    "GET /api/v1/ct/adaptive/playbook/history/<playbook_id>": {
+        "description": "Historial de versiones de un playbook.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/adaptive/chaos": {
+        "description": "Ejecuta simulacro de caos dirigido por amenazas.",
+        "parameters": {
+            "scenario_filter": {"type": "string", "required": False},
+            "detector_results": {"type": "object", "required": True, "description": "scenario_id -> bool"},
+            "dry_run": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    "GET /api/v1/ct/adaptive/chaos/<run_id>": {
+        "description": "Detalle de una ejecución de caos.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/adaptive/release-gate": {
+        "description": "Valida un release de LLM contra dataset de desafío.",
+        "parameters": {
+            "model_version": {"type": "string", "required": True},
+            "detector_results": {"type": "object", "required": True},
+            "false_negative_rate": {"type": "number", "required": False, "default": 0.0},
+        },
+    },
+    "GET /api/v1/ct/adaptive/metrics": {
+        "description": "Métricas de adaptación y madurez del sistema.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/adaptive/challenge-scenario": {
+        "description": "Añade escenario al dataset de desafío.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "source": {"type": "string", "required": False},
+            "payload": {"type": "string", "required": True},
+            "expected_outcome": {"type": "string", "required": False},
+            "detection_criteria": {"type": "string", "required": False},
+            "difficulty": {"type": "string", "required": False},
+        },
+    },
+    "POST /api/v1/ct/adaptive/threat-vector": {
+        "description": "Añade vector de amenaza manualmente.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "severity": {"type": "string", "required": True},
+            "sample_prompts": {"type": "array", "required": False},
+            "mitre_atlas_technique": {"type": "string", "required": False},
+        },
+    },
+    "POST /api/v1/ct/icc/incident": {
+        "description": "Reporta un incidente al Incident Command Center.",
+        "parameters": {
+            "incident_id": {"type": "string", "required": True},
+            "title": {"type": "string", "required": True},
+            "description": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "severity": {"type": "string", "required": True},
+            "owner": {"type": "string", "required": False},
+            "stakeholders": {"type": "array", "required": False},
+            "related_risk_ids": {"type": "array", "required": False},
+            "related_run_ids": {"type": "array", "required": False},
+        },
+    },
+    "POST /api/v1/ct/icc/incident/<icc_id>/status": {
+        "description": "Actualiza estado de un incidente en ICC.",
+        "parameters": {"status": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/ct/icc/action": {
+        "description": "Envía una acción a StackStorm (requiere approval_ref).",
+        "parameters": {
+            "incident_id": {"type": "string", "required": True},
+            "action": {"type": "string", "required": True},
+            "params": {"type": "object", "required": False, "default": {}},
+            "approval_ref": {"type": "string", "required": True},
+            "scope": {"type": "string", "required": False, "default": "auto", "description": "auto|hitl|denied"},
+            "requested_by": {"type": "string", "required": False},
+        },
+    },
+    "POST /api/v1/ct/icc/action/<action_id>/execute": {
+        "description": "Ejecuta una acción previamente aprobada en StackStorm.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/icc/action/<action_id>/rollback": {
+        "description": "Marca una acción de StackStorm como rolled_back.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/icc/postmortem": {
+        "description": "Crea postmortem en Wiki.js.",
+        "parameters": {
+            "incident_id": {"type": "string", "required": True},
+            "title": {"type": "string", "required": True},
+            "findings": {"type": "array", "required": True},
+            "action_items": {"type": "array", "required": True},
+            "participants": {"type": "array", "required": True},
+        },
+    },
+    "POST /api/v1/ct/icc/runbook/sync": {
+        "description": "Sincroniza un runbook a Wiki.js.",
+        "parameters": {
+            "category": {"type": "string", "required": True},
+            "actions": {"type": "array", "required": True},
+            "version": {"type": "string", "required": True},
+            "source_git_commit": {"type": "string", "required": False},
+        },
+    },
+    "GET /api/v1/ct/icc/unified-view/<incident_id>": {
+        "description": "Vista unificada: incidente + acciones StackStorm + páginas Wiki.js.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/icc/status-board": {
+        "description": "Estado global del ICC.",
+        "parameters": {},
+    },
 }
 
 # ==========================================================================
@@ -593,6 +739,110 @@ OUTPUT_CARDS: Dict[str, Any] = {
         "escalated": "integer",
         "mean_time_to_triage_seconds": "number",
         "findings": "array<string>",
+    },
+    "threat_vector": {
+        "vector_id": "string",
+        "name": "string",
+        "category": "string",
+        "description": "string",
+        "source": "string",
+        "mitre_atlas_technique": "string",
+        "severity": "string",
+        "sample_prompts": "array<string>",
+    },
+    "incident_pattern": {
+        "pattern_id": "string",
+        "signature": "string",
+        "keywords": "array<string>",
+        "category": "string",
+        "frequency": "integer",
+        "growth_rate": "number",
+        "confidence": "number",
+        "status": "string",
+    },
+    "playbook_version": {
+        "playbook_id": "string",
+        "version": "string",
+        "category": "string",
+        "actions": "array<string>",
+        "thresholds": "object",
+        "parent_version": "string|null",
+        "changelog": "string",
+        "validated": "boolean",
+    },
+    "chaos_run": {
+        "run_id": "string",
+        "scenario_filter": "string|null",
+        "results": "array<object>",
+        "pass_rate": "number",
+        "findings": "array<string>",
+        "dry_run": "boolean",
+    },
+    "release_validation_report": {
+        "model_version": "string",
+        "passed": "boolean",
+        "challenge_pass_rate": "number",
+        "false_negative_rate": "number",
+        "coverage_percent": "number",
+        "blocked_categories": "array<string>",
+        "findings": "array<string>",
+    },
+    "adaptive_metrics": {
+        "playbook_update_latency_avg_seconds": "number",
+        "chaos_pass_rate_avg": "number",
+        "false_negative_rate": "number",
+        "challenge_coverage_percent": "number",
+        "threat_vectors_count": "integer",
+        "emerging_patterns_count": "integer",
+    },
+    "icc_incident": {
+        "icc_id": "string",
+        "incident_id": "string",
+        "title": "string",
+        "description": "string",
+        "category": "string",
+        "severity": "string",
+        "status": "string",
+        "owner": "string",
+        "stakeholders": "array<string>",
+        "related_risk_ids": "array<string>",
+        "related_run_ids": "array<string>",
+    },
+    "stackstorm_action": {
+        "action_id": "string",
+        "action": "string",
+        "params": "object",
+        "incident_id": "string",
+        "approval_ref": "string",
+        "scope": "auto|hitl|denied",
+        "status": "pending|approved|rejected|executed|failed|rolled_back",
+        "result": "object",
+        "created_at": "number",
+        "executed_at": "number|null",
+    },
+    "wiki_page": {
+        "page_id": "string",
+        "page_type": "incident|runbook|postmortem|status_board",
+        "title": "string",
+        "content": "string",
+        "tags": "array<string>",
+        "version": "integer",
+        "source_git_commit": "string",
+    },
+    "icc_unified_view": {
+        "incident": "icc_incident|null",
+        "actions": "array<stackstorm_action>",
+        "wiki_pages": "array<wiki_page>",
+        "source": "string",
+        "generated_at": "number",
+    },
+    "icc_status_board": {
+        "total_incidents": "integer",
+        "by_status": "object",
+        "by_severity": "object",
+        "pending_actions": "integer",
+        "executed_actions": "integer",
+        "wiki_pages": "integer",
     },
 }
 
@@ -1197,6 +1447,240 @@ def ct_incident_learnings():
 @app.get("/api/v1/ct/incidents/playbook/<category>")
 def ct_incident_playbook(category: str):
     return _ok(_orchestrator.playbook_runbook(category))
+
+
+# ---------------------------------------------------------------------------
+# Adaptive incident response endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/adaptive/threat-intel/sync")
+def ct_adaptive_threat_intel_sync():
+    external = _body().get("vectors")
+    return _ok(_orchestrator.sync_threat_intelligence(external))
+
+
+@app.post("/api/v1/ct/adaptive/mine-patterns")
+def ct_adaptive_mine_patterns():
+    incidents = _body().get("incidents")
+    if not incidents:
+        return _err("incidents requerido")
+    return _ok({"patterns": _orchestrator.mine_incident_patterns(incidents)})
+
+
+@app.post("/api/v1/ct/adaptive/feedback")
+def ct_adaptive_feedback():
+    data = _body()
+    required = ["prompt", "corrected_label", "category"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.record_feedback(
+        prompt=data["prompt"],
+        corrected_label=data["corrected_label"],
+        category=data["category"],
+        source_incident_id=data.get("source_incident_id", ""),
+        human_reviewer=data.get("human_reviewer", ""),
+    ))
+
+
+@app.post("/api/v1/ct/adaptive/playbook/pr")
+def ct_adaptive_playbook_pr():
+    data = _body()
+    required = ["playbook_id", "category", "actions", "changelog"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.propose_playbook_update(
+        playbook_id=data["playbook_id"],
+        category=data["category"],
+        actions=data["actions"],
+        thresholds=data.get("thresholds", {}),
+        changelog=data["changelog"],
+    ))
+
+
+@app.post("/api/v1/ct/adaptive/playbook/merge")
+def ct_adaptive_playbook_merge():
+    pr_id = _body().get("pr_id")
+    if not pr_id:
+        return _err("pr_id requerido")
+    pb = _orchestrator.merge_playbook_pr(pr_id)
+    if pb is None:
+        return _err("PR no encontrado", 404)
+    return _ok(pb)
+
+
+@app.get("/api/v1/ct/adaptive/playbook/history/<playbook_id>")
+def ct_adaptive_playbook_history(playbook_id: str):
+    return _ok({"history": _orchestrator.playbook_history(playbook_id)})
+
+
+@app.post("/api/v1/ct/adaptive/chaos")
+def ct_adaptive_chaos():
+    data = _body()
+    detector_results = data.get("detector_results", {})
+    scenario_filter = data.get("scenario_filter")
+    dry_run = data.get("dry_run", True)
+
+    def detector(scenario):
+        return detector_results.get(scenario.scenario_id, True)
+
+    return _ok(_orchestrator.run_chaos_drill(detector, scenario_filter, dry_run))
+
+
+@app.get("/api/v1/ct/adaptive/chaos/<run_id>")
+def ct_adaptive_chaos_detail(run_id: str):
+    run = _orchestrator.adaptive_engine.chaos_engine.get(run_id)
+    if run is None:
+        return _err("ejecución de caos no encontrada", 404)
+    return _ok(run.to_dict())
+
+
+@app.post("/api/v1/ct/adaptive/release-gate")
+def ct_adaptive_release_gate():
+    data = _body()
+    model_version = data.get("model_version")
+    detector_results = data.get("detector_results", {})
+    false_negative_rate = float(data.get("false_negative_rate", 0.0))
+    if not model_version:
+        return _err("model_version requerido")
+
+    def detector(scenario):
+        return detector_results.get(scenario.scenario_id, True)
+
+    return _ok(_orchestrator.validate_release_with_challenge(
+        model_version=model_version,
+        detector=detector,
+        false_negative_rate=false_negative_rate,
+    ))
+
+
+@app.get("/api/v1/ct/adaptive/metrics")
+def ct_adaptive_metrics():
+    return _ok(_orchestrator.adaptive_metrics())
+
+
+@app.post("/api/v1/ct/adaptive/challenge-scenario")
+def ct_adaptive_challenge_scenario():
+    data = _body()
+    required = ["name", "category", "payload"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.add_challenge_scenario(data))
+
+
+@app.post("/api/v1/ct/adaptive/threat-vector")
+def ct_adaptive_threat_vector():
+    data = _body()
+    required = ["name", "category", "severity"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.add_threat_vector(data))
+
+
+# ---------------------------------------------------------------------------
+# Incident Command Center endpoints (StackStorm + Wiki.js)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/icc/incident")
+def ct_icc_report_incident():
+    data = _body()
+    required = ["incident_id", "title", "description", "category", "severity"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.icc_report_incident(
+        incident_id=data["incident_id"],
+        title=data["title"],
+        description=data["description"],
+        category=data["category"],
+        severity=data["severity"],
+        owner=data.get("owner", ""),
+        stakeholders=data.get("stakeholders"),
+        related_risk_ids=data.get("related_risk_ids"),
+        related_run_ids=data.get("related_run_ids"),
+    ))
+
+
+@app.post("/api/v1/ct/icc/incident/<icc_id>/status")
+def ct_icc_update_status(icc_id: str):
+    status = _body().get("status")
+    if not status:
+        return _err("status requerido")
+    inc = _orchestrator.icc_update_status(icc_id, status)
+    if inc is None:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc)
+
+
+@app.post("/api/v1/ct/icc/action")
+def ct_icc_submit_action():
+    data = _body()
+    required = ["incident_id", "action", "approval_ref"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.icc_submit_action(
+        incident_id=data["incident_id"],
+        action=data["action"],
+        params=data.get("params", {}),
+        approval_ref=data["approval_ref"],
+        scope=data.get("scope", "auto"),
+        requested_by=data.get("requested_by", "api"),
+    ))
+
+
+@app.post("/api/v1/ct/icc/action/<action_id>/execute")
+def ct_icc_execute_action(action_id: str):
+    return _ok(_orchestrator.icc_execute_action(action_id))
+
+
+@app.post("/api/v1/ct/icc/action/<action_id>/rollback")
+def ct_icc_rollback_action(action_id: str):
+    return _ok(_orchestrator.icc_rollback_action(action_id))
+
+
+@app.post("/api/v1/ct/icc/postmortem")
+def ct_icc_postmortem():
+    data = _body()
+    required = ["incident_id", "title", "findings", "action_items", "participants"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.icc_create_postmortem(
+        incident_id=data["incident_id"],
+        title=data["title"],
+        findings=data["findings"],
+        action_items=data["action_items"],
+        participants=data["participants"],
+    ))
+
+
+@app.post("/api/v1/ct/icc/runbook/sync")
+def ct_icc_sync_runbook():
+    data = _body()
+    required = ["category", "actions", "version"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.icc_sync_runbook(
+        category=data["category"],
+        actions=data["actions"],
+        version=data["version"],
+        source_git_commit=data.get("source_git_commit", ""),
+    ))
+
+
+@app.get("/api/v1/ct/icc/unified-view/<incident_id>")
+def ct_icc_unified_view(incident_id: str):
+    return _ok(_orchestrator.icc_unified_view(incident_id))
+
+
+@app.get("/api/v1/ct/icc/status-board")
+def ct_icc_status_board():
+    return _ok(_orchestrator.icc_status_board())
 
 
 def main() -> None:
