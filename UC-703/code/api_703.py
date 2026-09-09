@@ -22,6 +22,8 @@ from fine_tuning.evaluation_matrix.models_cem import HumanReview
 from resilience.recovery_orchestrator import RecoveryOrchestrator
 from compliance_as_code.compliance_controller import ComplianceController
 from continuous_improvement.continuous_improvement_controller import ContinuousImprovementController
+from enterprise_qa.models_qa import TestCase
+from enterprise_qa.qa_driver import EnterpriseQADriver
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -39,6 +41,7 @@ _cem_controller: Optional[EvaluationMatrixController] = None
 _recovery_controller: Optional[RecoveryOrchestrator] = None
 _cac_controller: Optional[ComplianceController] = None
 _ci_controller: Optional[ContinuousImprovementController] = None
+_qa_driver: Optional[EnterpriseQADriver] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -706,6 +709,20 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     "GET /api/v1/ci/dashboard": {
         "description": "Dashboard de mejora continua.",
         "parameters": {},
+    },
+    "POST /api/v1/qa/run": {
+        "description": "Ejecuta el Enterprise QA Driver sobre un batch de casos de prueba.",
+        "parameters": {
+            "test_cases": {"type": "array", "required": True, "items": {
+                "id": "string",
+                "pillar": "string",
+                "prompt": "string",
+                "expected_keywords": "array",
+                "forbidden_keywords": "array",
+                "required_sequence": "array",
+                "llm_response": "string",
+            }},
+        },
     },
 }
 
@@ -2111,6 +2128,23 @@ def ft_ci_dashboard():
 
 
 # ---------------------------------------------------------------------------
+# Enterprise QA Driver endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/qa/run")
+def ft_qa_run():
+    data = _body()
+    if "test_cases" not in data or not isinstance(data["test_cases"], list):
+        return _err("test_cases array required")
+    if _qa_driver is None:
+        return _err("qa driver no configurado", 503)
+    _qa_driver.reset()
+    cases = [TestCase(**item) for item in data["test_cases"]]
+    report = _qa_driver.run_batch(cases)
+    return _ok(report.to_dict())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -2141,6 +2175,9 @@ def create_app(
     global _ci_controller
     if _ci_controller is None:
         _ci_controller = ContinuousImprovementController()
+    global _qa_driver
+    if _qa_driver is None:
+        _qa_driver = EnterpriseQADriver()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
