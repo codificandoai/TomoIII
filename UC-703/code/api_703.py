@@ -21,6 +21,7 @@ from fine_tuning.evaluation_matrix.evaluation_matrix_controller import Evaluatio
 from fine_tuning.evaluation_matrix.models_cem import HumanReview
 from resilience.recovery_orchestrator import RecoveryOrchestrator
 from compliance_as_code.compliance_controller import ComplianceController
+from continuous_improvement.continuous_improvement_controller import ContinuousImprovementController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -37,6 +38,7 @@ _em_controller: Optional[ExtrinsicMetricsController] = None
 _cem_controller: Optional[EvaluationMatrixController] = None
 _recovery_controller: Optional[RecoveryOrchestrator] = None
 _cac_controller: Optional[ComplianceController] = None
+_ci_controller: Optional[ContinuousImprovementController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -640,6 +642,69 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     },
     "GET /api/v1/compliance/rules": {
         "description": "Reglas de mapeo regulatorio.",
+        "parameters": {},
+    },
+    "POST /api/v1/ci/feedback": {
+        "description": "Ingesta feedback explícito o implícito.",
+        "parameters": {
+            "source": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "severity": {"type": "string", "required": False, "default": "medium"},
+            "message": {"type": "string", "required": False, "default": ""},
+            "model_version": {"type": "string", "required": False, "default": ""},
+            "prompt_version_id": {"type": "string", "required": False, "default": ""},
+            "session_id": {"type": "string", "required": False, "default": ""},
+            "trace_id": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/ci/analyze": {
+        "description": "Analiza clusters y genera recomendaciones.",
+        "parameters": {
+            "log_refs": {"type": "array", "required": False, "default": []},
+            "incident_refs": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/ci/recommendations/approve": {
+        "description": "Aprueba recomendación de mejora continua.",
+        "parameters": {
+            "queue_item_id": {"type": "string", "required": True},
+            "reviewer": {"type": "string", "required": True},
+            "notes": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/ci/recommendations/reject": {
+        "description": "Rechaza recomendación de mejora continua.",
+        "parameters": {
+            "queue_item_id": {"type": "string", "required": True},
+            "reviewer": {"type": "string", "required": True},
+            "notes": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "GET /api/v1/ci/recommendations": {
+        "description": "Lista recomendaciones de mejora continua.",
+        "parameters": {},
+    },
+    "GET /api/v1/ci/recommendations/pending": {
+        "description": "Lista recomendaciones pendientes de aprobación.",
+        "parameters": {},
+    },
+    "POST /api/v1/ci/baseline": {
+        "description": "Registra baseline de métrica para medir efectividad.",
+        "parameters": {
+            "metric_name": {"type": "string", "required": True},
+            "value": {"type": "number", "required": True},
+        },
+    },
+    "POST /api/v1/ci/measure": {
+        "description": "Mide efectividad post-mejora.",
+        "parameters": {
+            "recommendation_id": {"type": "string", "required": True},
+            "metric_name": {"type": "string", "required": True},
+            "value": {"type": "number", "required": True},
+        },
+    },
+    "GET /api/v1/ci/dashboard": {
+        "description": "Dashboard de mejora continua.",
         "parameters": {},
     },
 }
@@ -1934,6 +1999,118 @@ def ft_cac_rules():
 
 
 # ---------------------------------------------------------------------------
+# Continuous Improvement & Feedback Loop endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ci/feedback")
+def ft_ci_feedback():
+    data = _body()
+    required = ["source", "category"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    item = _ci_controller.ingest_feedback(data)
+    return _ok(item.to_dict(), 201)
+
+
+@app.post("/api/v1/ci/analyze")
+def ft_ci_analyze():
+    data = _body()
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    from continuous_improvement.models_ci import ExecutionLogRef, IncidentRef
+    log_refs = [ExecutionLogRef(**r) for r in data.get("log_refs", [])]
+    incident_refs = [IncidentRef(**r) for r in data.get("incident_refs", [])]
+    result = _ci_controller.run_analysis(log_refs=log_refs, incident_refs=incident_refs)
+    return _ok(result)
+
+
+@app.post("/api/v1/ci/recommendations/approve")
+def ft_ci_approve_recommendation():
+    data = _body()
+    required = ["queue_item_id", "reviewer"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    item = _ci_controller.approve_recommendation(
+        data["queue_item_id"], data["reviewer"], data.get("notes", "")
+    )
+    if not item:
+        return _err("item no encontrado", 404)
+    return _ok(item.to_dict())
+
+
+@app.post("/api/v1/ci/recommendations/reject")
+def ft_ci_reject_recommendation():
+    data = _body()
+    required = ["queue_item_id", "reviewer"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    item = _ci_controller.reject_recommendation(
+        data["queue_item_id"], data["reviewer"], data.get("notes", "")
+    )
+    if not item:
+        return _err("item no encontrado", 404)
+    return _ok(item.to_dict())
+
+
+@app.get("/api/v1/ci/recommendations")
+def ft_ci_recommendations():
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    return _ok(_ci_controller.list_recommendations())
+
+
+@app.get("/api/v1/ci/recommendations/pending")
+def ft_ci_recommendations_pending():
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    return _ok(_ci_controller.get_pending_recommendations())
+
+
+@app.post("/api/v1/ci/baseline")
+def ft_ci_baseline():
+    data = _body()
+    required = ["metric_name", "value"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    _ci_controller.register_baseline(data["metric_name"], float(data["value"]))
+    return _ok({"metric_name": data["metric_name"], "baseline": data["value"]}, 201)
+
+
+@app.post("/api/v1/ci/measure")
+def ft_ci_measure():
+    data = _body()
+    required = ["recommendation_id", "metric_name", "value"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    measurement = _ci_controller.measure_effectiveness(
+        data["recommendation_id"], data["metric_name"], float(data["value"])
+    )
+    return _ok(measurement.to_dict(), 201)
+
+
+@app.get("/api/v1/ci/dashboard")
+def ft_ci_dashboard():
+    if _ci_controller is None:
+        return _err("continuous improvement controller no configurado", 503)
+    return _ok(_ci_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1961,6 +2138,9 @@ def create_app(
     global _cac_controller
     if _cac_controller is None:
         _cac_controller = ComplianceController()
+    global _ci_controller
+    if _ci_controller is None:
+        _ci_controller = ContinuousImprovementController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
