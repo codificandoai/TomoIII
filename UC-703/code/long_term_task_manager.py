@@ -149,6 +149,8 @@ class LongTermTaskManager:
         task = self._tasks.get(task_id)
         if not task or task.status in ("completed", "failed", "cancelled"):
             return False
+        if task.timeout_seconds <= 0:
+            return True
         return (time.time() - task.last_heartbeat) > task.timeout_seconds
 
     def list_tasks(self, status: Optional[str] = None) -> List[LongRunningTask]:

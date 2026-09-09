@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -15,6 +16,7 @@ from fine_tuning.privacy.models_privacy import DataContract, DPTrainingConfig, N
 from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsController
 from fine_tuning.quality_gate.models_quality import QualitativeReview
 from fine_tuning.quality_gate.quality_gate_controller import QualityGateController
+from fine_tuning.extrinsic_metrics.extrinsic_metrics_controller import ExtrinsicMetricsController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -27,6 +29,7 @@ except Exception as exc:  # pragma: no cover
 app = Flask(__name__)
 _orchestrator: Optional[AgentRuntimeOrchestrator] = None
 _ft_controller: Optional[FineTuningController] = None
+_em_controller: Optional[ExtrinsicMetricsController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -349,6 +352,52 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     "GET /api/v1/ft/quality-gate/reports": {
         "description": "Listar reportes de quality gate por status.",
         "parameters": {"status": {"type": "string", "required": False}},
+    },
+    "POST /api/v1/ft/extrinsic-metrics/app-event": {
+        "description": "Ingesta evento de aplicación (negocio).",
+        "parameters": {
+            "session_id": {"type": "string", "required": True},
+            "event_type": {"type": "string", "required": True},
+            "timestamp": {"type": "number", "required": False},
+            "success": {"type": "boolean", "required": False},
+            "revenue_usd": {"type": "number", "required": False, "default": 0},
+            "metadata": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "POST /api/v1/ft/extrinsic-metrics/inf-event": {
+        "description": "Ingesta evento de inferencia LLM (técnico).",
+        "parameters": {
+            "trace_id": {"type": "string", "required": True},
+            "session_id": {"type": "string", "required": True},
+            "model": {"type": "string", "required": False},
+            "tokens_input": {"type": "integer", "required": False, "default": 0},
+            "tokens_output": {"type": "integer", "required": False, "default": 0},
+            "latency_ms": {"type": "number", "required": False, "default": 0},
+            "cost_usd": {"type": "number", "required": False, "default": 0},
+            "context_chunks_used": {"type": "integer", "required": False, "default": 0},
+            "context_references": {"type": "array", "required": False, "default": []},
+            "llm_judge_context_score": {"type": "number", "required": False},
+        },
+    },
+    "POST /api/v1/ft/extrinsic-metrics/compute": {
+        "description": "Computa métricas extrínsecas y contextuales.",
+        "parameters": {
+            "window_start": {"type": "number", "required": False},
+            "window_end": {"type": "number", "required": False},
+            "baseline_retention_rate": {"type": "number", "required": False},
+        },
+    },
+    "GET /api/v1/ft/extrinsic-metrics/prometheus": {
+        "description": "Render de métricas Prometheus.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/extrinsic-metrics/logs": {
+        "description": "Logs estructurados tipo Loki.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/extrinsic-metrics/sessions/<session_id>": {
+        "description": "Sesión unificada por session_id.",
+        "parameters": {},
     },
 }
 
@@ -1091,6 +1140,75 @@ def ft_quality_gate_list_reports():
 
 
 # ---------------------------------------------------------------------------
+# Extrinsic & Contextual Metrics endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ft/extrinsic-metrics/app-event")
+def ft_em_app_event():
+    data = _body()
+    required = ["session_id", "event_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    session = _em_controller.ingest_application_event(data)
+    return _ok(session.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/extrinsic-metrics/inf-event")
+def ft_em_inf_event():
+    data = _body()
+    required = ["trace_id", "session_id"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    session = _em_controller.ingest_inference_event(data)
+    return _ok(session.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/extrinsic-metrics/compute")
+def ft_em_compute():
+    data = _body()
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    now = time.time()
+    window_start = float(data.get("window_start", now - 3600))
+    window_end = float(data.get("window_end", now))
+    baseline_retention = data.get("baseline_retention_rate")
+    if baseline_retention is not None:
+        baseline_retention = float(baseline_retention)
+    snapshot = _em_controller.compute_metrics(window_start, window_end, baseline_retention)
+    return _ok(snapshot.to_dict())
+
+
+@app.get("/api/v1/ft/extrinsic-metrics/prometheus")
+def ft_em_prometheus():
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    return _em_controller.render_prometheus()
+
+
+@app.get("/api/v1/ft/extrinsic-metrics/logs")
+def ft_em_logs():
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    return _ok(_em_controller.get_logs())
+
+
+@app.get("/api/v1/ft/extrinsic-metrics/sessions/<session_id>")
+def ft_em_session(session_id: str):
+    if _em_controller is None:
+        return _err("extrinsic metrics controller no configurado", 503)
+    session = _em_controller.get_session(session_id)
+    if not session:
+        return _err("session no encontrada", 404)
+    return _ok(session.to_dict())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1106,6 +1224,9 @@ def create_app(
             privacy_controller=PrivacyPreservingLLMOpsController(),
             quality_gate_controller=QualityGateController(),
         )
+    global _em_controller
+    if _em_controller is None:
+        _em_controller = ExtrinsicMetricsController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
