@@ -94,6 +94,16 @@ from risk_management_framework import (
     risk_from_online_quarantine,
     risk_from_supply_chain,
 )
+from llmops_incident_automation import (
+    DrillReport,
+    EscalationReason,
+    Incident,
+    IncidentCategory,
+    IncidentSeverity,
+    IncidentStatus,
+    LLMOpsIncidentManager,
+    PlaybookRegistry,
+)
 
 # --- Funciones inyectables del ecosistema ----------------------------------
 
@@ -187,6 +197,7 @@ class ContinuousTrainingOrchestrator:
         risk_policy: Optional[RiskPolicy] = None,
         proactive_risk_plan: Optional[ProactiveRiskPlan] = None,
         runbook_catalog: Optional[RunbookCatalog] = None,
+        incident_manager: Optional[LLMOpsIncidentManager] = None,
         event_sink: Optional[EventSinkFn] = None,          # UC-309
         mlflow_tracking_uri: Optional[str] = None,
         mlflow_enabled: bool = True,
@@ -236,8 +247,12 @@ class ContinuousTrainingOrchestrator:
             policy=self.risk_policy,
             proactive_plan=self.proactive_risk_plan,
         )
-        self.mlflow = MLflowAdapter(tracking_uri=mlflow_tracking_uri, enabled=mlflow_enabled)
         self.observability = Observability075()
+        self.incident_manager = incident_manager or LLMOpsIncidentManager(
+            risk_register=self.risk_register,
+            observability=self.observability,
+        )
+        self.mlflow = MLflowAdapter(tracking_uri=mlflow_tracking_uri, enabled=mlflow_enabled)
         self.audit = AuditLog()
         self.event_sink = event_sink
         self._runs: Dict[str, PipelineRun] = {}
@@ -799,10 +814,98 @@ class ContinuousTrainingOrchestrator:
             },
             "risk_summary": self.risk_register.summary(),
             "proactive_risk_next_steps": self.proactive_risk_plan.next_steps(self.risk_register),
+            "incident_summary": self.incident_manager.summary(),
         }
 
     def get_online_learner(self, learner_id: str) -> Optional[OnlineIncrementalLearner]:
         return self._online_learners.get(learner_id)
+
+    # ------------------------------------------------------------------
+    # LLMOps incident automation
+    # ------------------------------------------------------------------
+    def report_incident(
+        self,
+        category: str,
+        title: str,
+        description: str,
+        source: str,
+        impact_score: float = 0.5,
+        confidence: Optional[float] = None,
+        affected_artifacts: Optional[List[str]] = None,
+        affected_agents: Optional[List[str]] = None,
+        affected_runs: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        inc = self.incident_manager.detect(
+            category=IncidentCategory(category),
+            title=title,
+            description=description,
+            source=source,
+            impact_score=impact_score,
+            confidence=confidence,
+            affected_artifacts=affected_artifacts,
+            affected_agents=affected_agents,
+            affected_runs=affected_runs,
+        )
+        return inc.to_dict()
+
+    def get_incident(self, incident_id: str) -> Optional[Dict[str, Any]]:
+        inc = self.incident_manager.get(incident_id)
+        return inc.to_dict() if inc else None
+
+    def list_incidents(
+        self,
+        category: Optional[str] = None,
+        status: Optional[str] = None,
+        severity: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        cat = IncidentCategory(category) if category else None
+        st = IncidentStatus(status) if status else None
+        sev = IncidentSeverity(severity) if severity else None
+        return [i.to_dict() for i in self.incident_manager.list(cat, st, sev)]
+
+    def assign_incident(self, incident_id: str, human: str) -> Optional[Dict[str, Any]]:
+        inc = self.incident_manager.assign_human(incident_id, human)
+        return inc.to_dict() if inc else None
+
+    def resolve_incident(
+        self,
+        incident_id: str,
+        resolution_notes: str,
+        policy_learnings: Optional[List[str]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        inc = self.incident_manager.resolve_human(incident_id, resolution_notes, policy_learnings)
+        if inc and policy_learnings:
+            for learning in policy_learnings:
+                # derivar target simple
+                target = "policy"
+                if "guardrail" in learning.lower():
+                    target = "guardrails"
+                elif "tool" in learning.lower():
+                    target = "tool_policy"
+                self.observability.record_policy_learning(target)
+        return inc.to_dict() if inc else None
+
+    def incident_summary(self) -> Dict[str, Any]:
+        return self.incident_manager.summary()
+
+    def run_incident_drill(
+        self,
+        scenario: str,
+        incidents: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        report = self.incident_manager.run_drill(scenario, incidents)
+        self.observability.record_drill(scenario)
+        return report.to_dict()
+
+    def incident_policy_learnings(self) -> List[Dict[str, Any]]:
+        learnings = self.incident_manager.policy_learnings()
+        for item in learnings:
+            self.observability.record_policy_learning(item.get("target", "policy"))
+        return learnings
+
+    def playbook_runbook(self, category: str) -> Dict[str, Any]:
+        from llmops_incident_automation import PlaybookRegistry
+        return PlaybookRegistry().get(IncidentCategory(category))
 
     # ------------------------------------------------------------------
     # Risk management

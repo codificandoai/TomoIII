@@ -307,6 +307,62 @@ INPUT_CARDS: Dict[str, Any] = {
         "description": "Runbook de respuesta para una categoría de riesgo.",
         "parameters": {},
     },
+    "POST /api/v1/ct/incident/report": {
+        "description": "Reporta y triagea un incidente LLMOps.",
+        "parameters": {
+            "category": {"type": "string", "required": True, "description": "data_drift|prompt_injection|tool_abuse|..."},
+            "title": {"type": "string", "required": True},
+            "description": {"type": "string", "required": True},
+            "source": {"type": "string", "required": True},
+            "impact_score": {"type": "number", "required": False, "default": 0.5},
+            "confidence": {"type": "number", "required": False},
+            "affected_artifacts": {"type": "array", "required": False},
+            "affected_agents": {"type": "array", "required": False},
+            "affected_runs": {"type": "array", "required": False},
+        },
+    },
+    "GET /api/v1/ct/incidents": {
+        "description": "Lista incidentes; filtros ?category= &status= &severity=.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/incidents/<incident_id>": {
+        "description": "Detalle de un incidente.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/incidents/<incident_id>/assign": {
+        "description": "Asigna un incidente escalado a un humano.",
+        "parameters": {"human": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/ct/incidents/<incident_id>/resolve": {
+        "description": "Resuelve un incidente con notas y aprendizajes.",
+        "parameters": {
+            "resolution_notes": {"type": "string", "required": True},
+            "policy_learnings": {"type": "array", "required": False},
+        },
+    },
+    "GET /api/v1/ct/incidents/summary": {
+        "description": "Resumen de incidentes y escalaciones.",
+        "parameters": {},
+    },
+    "POST /api/v1/ct/incidents/drill": {
+        "description": "Ejecuta simulacro de incidentes (dry-run).",
+        "parameters": {
+            "scenario": {"type": "string", "required": True},
+            "incidents": {"type": "array", "required": True},
+        },
+    },
+    "GET /api/v1/ct/incidents/drill/<drill_id>": {
+        "description": "Detalle de un simulacro.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/incidents/learnings": {
+        "description": "Aprendizajes de política derivados de incidentes resueltos.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/incidents/playbook/<category>": {
+        "description": "Playbook de respuesta para una categoría.",
+        "parameters": {},
+    },
 }
 
 # ==========================================================================
@@ -500,6 +556,43 @@ OUTPUT_CARDS: Dict[str, Any] = {
         "name": "string",
         "steps": "array<string>",
         "auto_controls": "array<string>",
+    },
+    "incident": {
+        "incident_id": "string",
+        "category": "string",
+        "severity": "critical|high|medium|low",
+        "title": "string",
+        "description": "string",
+        "source": "string",
+        "status": "detected|triaged|auto_resolved|escalated|human_resolved|closed_without_action",
+        "confidence": "number",
+        "impact_score": "number",
+        "affected_artifacts": "array<string>",
+        "affected_agents": "array<string>",
+        "affected_runs": "array<string>",
+        "escalation_reasons": "array<string>",
+        "assigned_human": "string",
+        "playbook_id": "string",
+        "actions_taken": "array<object>",
+        "resolution_notes": "string",
+        "policy_learnings": "array<string>",
+    },
+    "incident_summary": {
+        "total_incidents": "integer",
+        "auto_resolved": "integer",
+        "escalated": "integer",
+        "human_resolved": "integer",
+        "pending_human": "integer",
+        "mean_time_to_resolution_seconds": "number",
+    },
+    "drill_report": {
+        "drill_id": "string",
+        "scenario": "string",
+        "incidents_injected": "integer",
+        "auto_resolved": "integer",
+        "escalated": "integer",
+        "mean_time_to_triage_seconds": "number",
+        "findings": "array<string>",
     },
 }
 
@@ -1002,6 +1095,108 @@ def ct_risk_proactive():
 @app.get("/api/v1/ct/risks/runbook/<category>")
 def ct_risk_runbook(category: str):
     return _ok(_orchestrator.risk_runbook(category))
+
+
+# ---------------------------------------------------------------------------
+# LLMOps incident automation endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/incident/report")
+def ct_incident_report():
+    data = _body()
+    required = ["category", "title", "description", "source"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    return _ok(_orchestrator.report_incident(
+        category=data["category"],
+        title=data["title"],
+        description=data["description"],
+        source=data["source"],
+        impact_score=float(data.get("impact_score", 0.5)),
+        confidence=data.get("confidence"),
+        affected_artifacts=data.get("affected_artifacts"),
+        affected_agents=data.get("affected_agents"),
+        affected_runs=data.get("affected_runs"),
+    ))
+
+
+@app.get("/api/v1/ct/incidents")
+def ct_incidents():
+    return _ok({"incidents": _orchestrator.list_incidents(
+        category=request.args.get("category"),
+        status=request.args.get("status"),
+        severity=request.args.get("severity"),
+    )})
+
+
+@app.get("/api/v1/ct/incidents/<incident_id>")
+def ct_incident_detail(incident_id: str):
+    inc = _orchestrator.get_incident(incident_id)
+    if inc is None:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc)
+
+
+@app.post("/api/v1/ct/incidents/<incident_id>/assign")
+def ct_incident_assign(incident_id: str):
+    human = _body().get("human")
+    if not human:
+        return _err("human requerido")
+    inc = _orchestrator.assign_incident(incident_id, human)
+    if inc is None:
+        return _err("incidente no encontrado o ya resuelto", 404)
+    return _ok(inc)
+
+
+@app.post("/api/v1/ct/incidents/<incident_id>/resolve")
+def ct_incident_resolve(incident_id: str):
+    data = _body()
+    notes = data.get("resolution_notes")
+    if not notes:
+        return _err("resolution_notes requerido")
+    inc = _orchestrator.resolve_incident(
+        incident_id=incident_id,
+        resolution_notes=notes,
+        policy_learnings=data.get("policy_learnings"),
+    )
+    if inc is None:
+        return _err("incidente no encontrado", 404)
+    return _ok(inc)
+
+
+@app.get("/api/v1/ct/incidents/summary")
+def ct_incident_summary():
+    return _ok(_orchestrator.incident_summary())
+
+
+@app.post("/api/v1/ct/incidents/drill")
+def ct_incident_drill():
+    data = _body()
+    scenario = data.get("scenario")
+    incidents = data.get("incidents")
+    if not scenario or not incidents:
+        return _err("scenario e incidents requeridos")
+    return _ok(_orchestrator.run_incident_drill(scenario, incidents))
+
+
+@app.get("/api/v1/ct/incidents/drill/<drill_id>")
+def ct_incident_drill_detail(drill_id: str):
+    from llmops_incident_automation import DrillSimulator
+    report = _orchestrator.incident_manager.drills.get(drill_id)
+    if report is None:
+        return _err("simulacro no encontrado", 404)
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/ct/incidents/learnings")
+def ct_incident_learnings():
+    return _ok({"learnings": _orchestrator.incident_policy_learnings()})
+
+
+@app.get("/api/v1/ct/incidents/playbook/<category>")
+def ct_incident_playbook(category: str):
+    return _ok(_orchestrator.playbook_runbook(category))
 
 
 def main() -> None:

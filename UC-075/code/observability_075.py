@@ -123,8 +123,50 @@ class Observability075:
                 ["learner", "phase"],
                 registry=self.registry,
             )
+            # LLMOps incident automation
+            self.c_incidents = Counter(
+                "uc075_incidents_total",
+                "Incidentes detectados",
+                ["category", "severity", "status"],
+                registry=self.registry,
+            )
+            self.c_incident_escalations = Counter(
+                "uc075_incident_escalations_total",
+                "Escalaciones a humanos",
+                ["category", "reason"],
+                registry=self.registry,
+            )
+            self.c_incident_resolutions = Counter(
+                "uc075_incident_resolutions_total",
+                "Resoluciones de incidentes",
+                ["category", "resolution"],
+                registry=self.registry,
+            )
+            self.h_incident_resolution_seconds = Histogram(
+                "uc075_incident_resolution_duration_seconds",
+                "Tiempo hasta resolución",
+                registry=self.registry,
+            )
+            self.c_drills = Counter(
+                "uc075_drill_runs_total",
+                "Simulacros ejecutados",
+                ["scenario"],
+                registry=self.registry,
+            )
+            self.g_pending_incidents = Gauge(
+                "uc075_pending_incidents",
+                "Incidentes esperando humano",
+                registry=self.registry,
+            )
+            self.c_policy_learnings = Counter(
+                "uc075_policy_learnings_total",
+                "Aprendizajes de política derivados de incidentes",
+                ["target"],
+                registry=self.registry,
+            )
 
         self._pending_hitl_count = 0
+        self._pending_incidents_count = 0
 
     # ------------------------------------------------------------------
     # Registro de eventos
@@ -215,6 +257,72 @@ class Observability075:
         )
 
     # ------------------------------------------------------------------
+    # LLMOps incident automation
+    # ------------------------------------------------------------------
+    def record_incident(
+        self,
+        category: str,
+        severity: str,
+        status: str,
+        confidence: float,
+        escalated: bool,
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_incidents.labels(category=category, severity=severity, status=status).inc()
+        self._log_event(
+            "uc075_incident_detected",
+            category=category,
+            severity=severity,
+            status=status,
+            confidence=confidence,
+            escalated=escalated,
+        )
+
+    def record_incident_escalation(
+        self,
+        category: str,
+        reasons: List[str],
+    ) -> None:
+        self._pending_incidents_count += 1
+        if PROMETHEUS_AVAILABLE:
+            self.g_pending_incidents.set(self._pending_incidents_count)
+            for reason in reasons:
+                self.c_incident_escalations.labels(category=category, reason=reason).inc()
+        self._log_event(
+            "uc075_incident_escalated",
+            category=category,
+            reasons=reasons,
+        )
+
+    def record_incident_resolution(
+        self,
+        category: str,
+        resolution: str,
+        duration_seconds: float,
+    ) -> None:
+        self._pending_incidents_count = max(0, self._pending_incidents_count - 1)
+        if PROMETHEUS_AVAILABLE:
+            self.g_pending_incidents.set(self._pending_incidents_count)
+            self.c_incident_resolutions.labels(category=category, resolution=resolution).inc()
+            self.h_incident_resolution_seconds.observe(max(duration_seconds, 0.0))
+        self._log_event(
+            "uc075_incident_resolved",
+            category=category,
+            resolution=resolution,
+            duration_seconds=duration_seconds,
+        )
+
+    def record_drill(self, scenario: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_drills.labels(scenario=scenario).inc()
+        self._log_event("uc075_drill_run", scenario=scenario)
+
+    def record_policy_learning(self, target: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_policy_learnings.labels(target=target).inc()
+        self._log_event("uc075_policy_learning", target=target)
+
+    # ------------------------------------------------------------------
     # Exporters
     # ------------------------------------------------------------------
     def export_prometheus(self) -> str:
@@ -294,5 +402,23 @@ class Observability075:
                 panel(8, "Duración p95 (s)",
                       "histogram_quantile(0.95, sum(rate(uc075_run_duration_seconds_bucket[5m])) by (le))",
                       {"x": 12, "y": 16, "w": 12, "h": 8}),
+                panel(9, "Incidentes por categoría",
+                      "sum by (category, severity) (rate(uc075_incidents_total[5m]))",
+                      {"x": 0, "y": 24, "w": 8, "h": 8}),
+                panel(10, "Escalaciones a humanos",
+                      "sum by (category, reason) (rate(uc075_incident_escalations_total[5m]))",
+                      {"x": 8, "y": 24, "w": 8, "h": 8}),
+                panel(11, "Incidentes pendientes de humano",
+                      "uc075_pending_incidents",
+                      {"x": 16, "y": 24, "w": 8, "h": 8}),
+                panel(12, "MTTR incidentes (s)",
+                      "histogram_quantile(0.95, sum(rate(uc075_incident_resolution_duration_seconds_bucket[5m])) by (le))",
+                      {"x": 0, "y": 32, "w": 12, "h": 8}),
+                panel(13, "Simulacros ejecutados",
+                      "sum by (scenario) (rate(uc075_drill_runs_total[5m]))",
+                      {"x": 12, "y": 32, "w": 6, "h": 8}),
+                panel(14, "Aprendizajes de política",
+                      "sum by (target) (rate(uc075_policy_learnings_total[5m]))",
+                      {"x": 18, "y": 32, "w": 6, "h": 8}),
             ],
         }

@@ -233,7 +233,7 @@ class TestObservability:
     def test_dashboard_panels(self):
         dash = Observability075.render_grafana_dashboard()
         assert dash["uid"] == "uc075-cto"
-        assert len(dash["panels"]) == 8
+        assert len(dash["panels"]) == 14
 
 
 # ---------------------------------------------------------------------------
