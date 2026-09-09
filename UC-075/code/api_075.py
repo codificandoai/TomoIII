@@ -15,6 +15,7 @@ from flask import Flask, jsonify, request
 
 from continuous_training_orchestrator import ContinuousTrainingOrchestrator
 from observability_075 import Observability075
+from online_incremental_learner import OnlineLearnerPolicy
 
 app = Flask(__name__)
 
@@ -107,6 +108,25 @@ INPUT_CARDS: Dict[str, Any] = {
         "description": "Líneas JSON listas para push a Loki.",
         "parameters": {},
     },
+    "POST /api/v1/ct/online-fit": {
+        "description": "Aplica un micro-lote a un OnlineIncrementalLearner con Circuit Breaker.",
+        "parameters": {
+            "learner_id": {"type": "string", "required": True},
+            "X": {"type": "array", "required": True, "description": "features del micro-lote"},
+            "y": {"type": "array", "required": True, "description": "labels del micro-lote"},
+            "model_type": {"type": "string", "required": False, "default": "mock",
+                           "description": "mock | passthrough (para pruebas)"},
+            "metadata": {"type": "object", "required": False},
+        },
+    },
+    "GET /api/v1/ct/online-learners": {
+        "description": "Estado de todos los OnlineIncrementalLearners.",
+        "parameters": {},
+    },
+    "GET /api/v1/ct/online-learners/<learner_id>": {
+        "description": "Detalle y cuarentena de un OnlineIncrementalLearner.",
+        "parameters": {},
+    },
 }
 
 # ==========================================================================
@@ -174,6 +194,22 @@ OUTPUT_CARDS: Dict[str, Any] = {
         "audit_chain_valid": "boolean",
         "runs_total": "integer",
         "pending_hitl": "integer",
+        "online_learners": "object",
+    },
+    "online_microbatch": {
+        "batch_id": "string",
+        "learner_id": "string",
+        "timestamp": "number",
+        "integrity": {"passed": "boolean", "schema_errors": "array", "null_errors": "array",
+                      "range_errors": "array", "n_rows": "integer"},
+        "circuit_state_before": "closed|open|half_open",
+        "circuit_state_after": "closed|open|half_open",
+        "drift": {"accuracy_pre": "number", "accuracy_post": "number|null",
+                  "drift_score": "number", "breached": "boolean"},
+        "applied": "boolean",
+        "reverted": "boolean",
+        "quarantined": "boolean",
+        "quarantine_reason": "string",
     },
 }
 
@@ -337,6 +373,65 @@ def ct_dashboard():
 @app.get("/api/v1/ct/loki")
 def ct_loki():
     return jsonify({"lines": _orchestrator.observability.to_loki_lines()})
+
+
+# ---------------------------------------------------------------------------
+# Online incremental learner endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ct/online-fit")
+def ct_online_fit():
+    data = _body()
+    learner_id = data.get("learner_id")
+    X = data.get("X")
+    y = data.get("y")
+    if not learner_id or X is None or y is None:
+        return _err("learner_id, X e y requeridos")
+
+    model_type = data.get("model_type", "mock")
+    # Para tests/demo: modelos sintéticos in-memory.
+    if model_type == "mock":
+        from tests_075.test_online_incremental_learner import MockOnlineModel
+        model = MockOnlineModel()
+    elif model_type == "passthrough":
+        from tests_075.test_online_incremental_learner import PassthroughModel
+        model = PassthroughModel()
+    else:
+        return _err(f"model_type no soportado: {model_type}")
+
+    policy_dict = data.get("policy") or {}
+    policy = OnlineLearnerPolicy(**policy_dict)
+
+    result = _orchestrator.online_fit(
+        learner_id=learner_id,
+        model=model,
+        X=X,
+        y=y,
+        metadata=data.get("metadata"),
+        policy=policy,
+    )
+    return _ok(result)
+
+
+@app.get("/api/v1/ct/online-learners")
+def ct_online_learners():
+    return _ok({
+        "learners": [
+            learner.status() for learner in _orchestrator._online_learners.values()
+        ]
+    })
+
+
+@app.get("/api/v1/ct/online-learners/<learner_id>")
+def ct_online_learner_detail(learner_id: str):
+    learner = _orchestrator.get_online_learner(learner_id)
+    if learner is None:
+        return _err("learner no encontrado", 404)
+    return _ok({
+        "status": learner.status(),
+        "history": learner.get_history(),
+        "quarantine": learner.get_quarantine(),
+    })
 
 
 def main() -> None:

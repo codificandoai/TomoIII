@@ -37,6 +37,8 @@ try:
 except Exception:
     PROMETHEUS_AVAILABLE = False
 
+ONLINE_CB_STATES = {"closed": 0.0, "half_open": 0.5, "open": 1.0}
+
 
 class Observability075:
     """Métricas + exporter + dashboard del orquestador de reentrenamiento."""
@@ -96,6 +98,31 @@ class Observability075:
                 "Duración del run completo",
                 registry=self.registry,
             )
+            # online incremental + circuit breaker
+            self.g_cb_state = Gauge(
+                "uc075_circuit_breaker_state",
+                "Estado del circuit breaker (0=closed, 0.5=half_open, 1=open)",
+                ["learner"],
+                registry=self.registry,
+            )
+            self.c_quarantine = Counter(
+                "uc075_quarantined_microbatches_total",
+                "Micro-lotes puestos en cuarentena",
+                ["learner", "reason"],
+                registry=self.registry,
+            )
+            self.g_partial_fit_drift = Gauge(
+                "uc075_partial_fit_drift_score",
+                "Drift score del micro-lote evaluado",
+                ["learner", "phase"],
+                registry=self.registry,
+            )
+            self.g_online_acc = Gauge(
+                "uc075_online_incremental_accuracy",
+                "Accuracy pre/post partial_fit",
+                ["learner", "phase"],
+                registry=self.registry,
+            )
 
         self._pending_hitl_count = 0
 
@@ -138,6 +165,53 @@ class Observability075:
             status=status,
             duration_sec=duration_sec,
             cost_usd=cost_usd,
+        )
+
+    # ------------------------------------------------------------------
+    # Online incremental / circuit breaker
+    # ------------------------------------------------------------------
+    def record_circuit_breaker_state(self, learner: str, state: str) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.g_cb_state.labels(learner=learner).set(ONLINE_CB_STATES.get(state, 0.0))
+        self._log_event("uc075_circuit_breaker_state", learner=learner, state=state)
+
+    def record_quarantine(
+        self,
+        learner: str,
+        reason: str,
+        drift_score: float,
+        accuracy_pre: Optional[float],
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.c_quarantine.labels(learner=learner, reason=reason).inc()
+            self.g_partial_fit_drift.labels(learner=learner, phase="quarantine").set(drift_score)
+        self._log_event(
+            "uc075_quarantine",
+            learner=learner,
+            reason=reason,
+            drift_score=drift_score,
+            accuracy_pre=accuracy_pre,
+        )
+
+    def record_partial_fit(
+        self,
+        learner: str,
+        drift_score: float,
+        accuracy_pre: float,
+        accuracy_post: float,
+        applied: bool,
+    ) -> None:
+        if PROMETHEUS_AVAILABLE:
+            self.g_partial_fit_drift.labels(learner=learner, phase="post").set(drift_score)
+            self.g_online_acc.labels(learner=learner, phase="pre").set(accuracy_pre)
+            self.g_online_acc.labels(learner=learner, phase="post").set(accuracy_post)
+        self._log_event(
+            "uc075_partial_fit",
+            learner=learner,
+            drift_score=drift_score,
+            accuracy_pre=accuracy_pre,
+            accuracy_post=accuracy_post,
+            applied=applied,
         )
 
     # ------------------------------------------------------------------

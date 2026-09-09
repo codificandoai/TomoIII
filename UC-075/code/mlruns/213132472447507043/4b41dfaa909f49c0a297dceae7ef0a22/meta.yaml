@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/utron/Documents/code-books/TomoIII/UC-075/code/mlruns/213132472447507043/4b41dfaa909f49c0a297dceae7ef0a22/artifacts
+end_time: 1788972219830
+entry_point_name: ''
+experiment_id: '213132472447507043'
+lifecycle_stage: active
+run_id: 4b41dfaa909f49c0a297dceae7ef0a22
+run_name: quarantine-mb-8313ca7fc6
+run_uuid: 4b41dfaa909f49c0a297dceae7ef0a22
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1788972219822
+status: 3
+tags: []
+user_id: utron

@@ -55,6 +55,10 @@ from gate_pipeline import (
 from registry_075 import ChampionRegistry, VersionFreezeRegistry
 from mlflow_adapter_075 import MLflowAdapter
 from observability_075 import Observability075
+from online_incremental_learner import (
+    OnlineIncrementalLearner,
+    OnlineLearnerPolicy,
+)
 
 # --- Funciones inyectables del ecosistema ----------------------------------
 
@@ -161,6 +165,7 @@ class ContinuousTrainingOrchestrator:
         self.audit = AuditLog()
         self.event_sink = event_sink
         self._runs: Dict[str, PipelineRun] = {}
+        self._online_learners: Dict[str, OnlineIncrementalLearner] = {}
 
     # ------------------------------------------------------------------
     def _emit(self, event_type: str, payload: Dict[str, Any]) -> None:
@@ -226,6 +231,40 @@ class ContinuousTrainingOrchestrator:
         if trigger is None:
             return None
         return self._execute(agent_id, trigger)
+
+    # ------------------------------------------------------------------
+    # Online incremental learner (Circuit Breaker + partial_fit)
+    # ------------------------------------------------------------------
+    def get_online_learner(
+        self,
+        learner_id: str,
+        model: Any,
+        policy: Optional[OnlineLearnerPolicy] = None,
+    ) -> OnlineIncrementalLearner:
+        """Obtiene o crea un OnlineIncrementalLearner con componentes compartidos."""
+        if learner_id not in self._online_learners:
+            self._online_learners[learner_id] = OnlineIncrementalLearner(
+                learner_id=learner_id,
+                model=model,
+                policy=policy,
+                mlflow=self.mlflow,
+                observability=self.observability,
+                event_sink=self.event_sink,
+            )
+        return self._online_learners[learner_id]
+
+    def online_fit(
+        self,
+        learner_id: str,
+        model: Any,
+        X: Any,
+        y: Any,
+        metadata: Optional[Dict[str, Any]] = None,
+        policy: Optional[OnlineLearnerPolicy] = None,
+    ) -> Dict[str, Any]:
+        """Aplica un micro-lote a través del OnlineIncrementalLearner."""
+        learner = self.get_online_learner(learner_id, model, policy=policy)
+        return learner.fit_micro_batch(X, y, metadata=metadata).to_dict()
 
     # ------------------------------------------------------------------
     # Pipeline
@@ -430,4 +469,11 @@ class ContinuousTrainingOrchestrator:
             "audit_chain_valid": self.audit.verify_chain(),
             "runs_total": len(self._runs),
             "pending_hitl": len(self.pending_hitl()),
+            "online_learners": {
+                lid: learner.status()
+                for lid, learner in self._online_learners.items()
+            },
         }
+
+    def get_online_learner(self, learner_id: str) -> Optional[OnlineIncrementalLearner]:
+        return self._online_learners.get(learner_id)

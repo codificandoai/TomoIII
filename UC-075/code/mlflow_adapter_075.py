@@ -36,14 +36,12 @@ class MLflowAdapter:
         self.enabled = enabled
         self._use_mlflow = MLFLOW_AVAILABLE and enabled
 
+        os.makedirs(fallback_dir, exist_ok=True)
+        self.fallback_path = os.path.join(fallback_dir, "runs.jsonl")
         if self._use_mlflow:
             if tracking_uri:
                 mlflow.set_tracking_uri(tracking_uri)
             mlflow.set_experiment(self.EXPERIMENT)
-            self.fallback_path = None
-        else:
-            os.makedirs(fallback_dir, exist_ok=True)
-            self.fallback_path = os.path.join(fallback_dir, "runs.jsonl")
 
     # ------------------------------------------------------------------
     def start_run(self, run_name: str) -> str:
@@ -102,6 +100,45 @@ class MLflowAdapter:
             "tags": tags,
             "run": run,
         })
+
+    # ------------------------------------------------------------------
+    def log_quarantine(
+        self,
+        batch_id: str,
+        reason: str,
+        metrics: Dict[str, float],
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Registra un micro-lote cuarentenado con status QUARANTINED.
+
+        Siempre escribe fallback JSONL (auditoría), y también intenta MLflow
+        cuando está habilitado.
+        """
+        record = {
+            "batch_id": batch_id,
+            "update_status": "QUARANTINED",
+            "reason": reason,
+            "metrics": metrics,
+            "metadata": metadata or {},
+            "timestamp": time.time(),
+        }
+        if self.enabled and self._use_mlflow:
+            try:
+                active = mlflow.start_run(run_name=f"quarantine-{batch_id}")
+                mlflow.log_param("batch_id", batch_id)
+                mlflow.log_param("update_status", "QUARANTINED")
+                mlflow.log_param("reason", reason)
+                for k, v in (metadata or {}).items():
+                    mlflow.log_param(k, v)
+                for k, v in metrics.items():
+                    mlflow.log_metric(k, v)
+                mlflow.set_tag("status", "QUARANTINED")
+                mlflow.end_run()
+                record["mlflow_run_id"] = active.info.run_id
+            except Exception:
+                pass
+        # Fallback JSONL siempre escribe para garantizar evidencia de cuarentena.
+        self._write_fallback({"type": "quarantine", **record})
 
     # ------------------------------------------------------------------
     def end_run(self, status: str = "FINISHED") -> None:
