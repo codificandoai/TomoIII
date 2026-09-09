@@ -25,6 +25,8 @@ from continuous_improvement.continuous_improvement_controller import ContinuousI
 from enterprise_qa.models_qa import TestCase
 from enterprise_qa.qa_driver import EnterpriseQADriver
 from incident_management.incident_management_controller import IncidentManagementController
+from aiops_self_healing.aiops_controller import AIOpsController
+from aiops_self_healing.models_aiops import RemediationPolicy, RemediationType
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -44,6 +46,7 @@ _cac_controller: Optional[ComplianceController] = None
 _ci_controller: Optional[ContinuousImprovementController] = None
 _qa_driver: Optional[EnterpriseQADriver] = None
 _incident_controller: Optional[IncidentManagementController] = None
+_aiops_controller: Optional[AIOpsController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -826,6 +829,45 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     },
     "GET /api/v1/incidents/dashboard": {
         "description": "Dashboard de incidentes.",
+        "parameters": {},
+    },
+    "POST /api/v1/aiops/events": {
+        "description": "Ingesta evento y devuelve alerta normalizada.",
+        "parameters": {
+            "source": {"type": "string", "required": True},
+            "payload": {"type": "object", "required": True},
+        },
+    },
+    "POST /api/v1/aiops/correlate": {
+        "description": "Correlaciona alertas en grupos.",
+        "parameters": {},
+    },
+    "POST /api/v1/aiops/groups/<group_id>/process": {
+        "description": "Diagnostica y remedia un grupo.",
+        "parameters": {
+            "approver": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/aiops/pipeline": {
+        "description": "Ejecuta pipeline completo ingest -> correlate -> remediate.",
+        "parameters": {
+            "events": {"type": "array", "required": True},
+            "approver": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/aiops/policies": {
+        "description": "Registra política de remediación.",
+        "parameters": {
+            "action_type": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "severity": {"type": "string", "required": True},
+            "max_frequency_minutes": {"type": "number", "required": False, "default": 5},
+            "requires_approval": {"type": "boolean", "required": False, "default": False},
+            "conditions": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "GET /api/v1/aiops/dashboard": {
+        "description": "Dashboard de AIOps.",
         "parameters": {},
     },
 }
@@ -2460,6 +2502,85 @@ def ft_incident_dashboard():
 
 
 # ---------------------------------------------------------------------------
+# AIOps Self-Healing endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/aiops/events")
+def ft_aiops_ingest():
+    data = _body()
+    required = ["source", "payload"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    alert = _aiops_controller.ingest_event(data["source"], data["payload"])
+    return _ok(alert.to_dict(), 201)
+
+
+@app.post("/api/v1/aiops/correlate")
+def ft_aiops_correlate():
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    groups = _aiops_controller.correlate_alerts()
+    return _ok([g.to_dict() for g in groups])
+
+
+@app.post("/api/v1/aiops/groups/<group_id>/process")
+def ft_aiops_process(group_id: str):
+    data = _body()
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    try:
+        report = _aiops_controller.process_group(group_id, approver=data.get("approver", ""))
+    except ValueError as e:
+        return _err(str(e), 404)
+    return _ok(report.to_dict())
+
+
+@app.post("/api/v1/aiops/pipeline")
+def ft_aiops_pipeline():
+    data = _body()
+    if "events" not in data or not isinstance(data["events"], list):
+        return _err("events array required")
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    reports = _aiops_controller.run_full_pipeline(
+        data["events"],
+        approver=data.get("approver", ""),
+    )
+    return _ok([r.to_dict() for r in reports])
+
+
+@app.post("/api/v1/aiops/policies")
+def ft_aiops_register_policy():
+    data = _body()
+    required = ["action_type", "category", "severity"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    policy = RemediationPolicy(
+        action_type=data["action_type"],
+        category=data["category"],
+        severity=data["severity"],
+        max_frequency_minutes=float(data.get("max_frequency_minutes", 5.0)),
+        requires_approval=bool(data.get("requires_approval", False)),
+        conditions=data.get("conditions", {}),
+    )
+    _aiops_controller.register_policy(policy)
+    return _ok(policy.to_dict(), 201)
+
+
+@app.get("/api/v1/aiops/dashboard")
+def ft_aiops_dashboard():
+    if _aiops_controller is None:
+        return _err("aiops controller no configurado", 503)
+    return _ok(_aiops_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -2496,6 +2617,9 @@ def create_app(
     global _incident_controller
     if _incident_controller is None:
         _incident_controller = IncidentManagementController()
+    global _aiops_controller
+    if _aiops_controller is None:
+        _aiops_controller = AIOpsController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
