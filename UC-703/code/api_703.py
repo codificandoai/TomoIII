@@ -29,6 +29,7 @@ from aiops_self_healing.aiops_controller import AIOpsController
 from aiops_self_healing.models_aiops import RemediationPolicy, RemediationType
 from rbac_audit.rbac_audit_controller import RBACAuditController
 from production_serving.production_serving_controller import ProductionServingController
+from postmortem_loop.postmortem_loop_controller import PostMortemLoopController
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -51,6 +52,7 @@ _incident_controller: Optional[IncidentManagementController] = None
 _aiops_controller: Optional[AIOpsController] = None
 _rbac_audit_controller: Optional[RBACAuditController] = None
 _production_serving_controller: Optional[ProductionServingController] = None
+_postmortem_controller: Optional[PostMortemLoopController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -1030,6 +1032,53 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     },
     "GET /api/v1/serving/dashboard": {
         "description": "Dashboard de serving.",
+        "parameters": {},
+    },
+    "POST /api/v1/postmortem/incidents": {
+        "description": "Congela contexto de incidente.",
+        "parameters": {
+            "incident_id": {"type": "string", "required": True},
+            "title": {"type": "string", "required": True},
+            "description": {"type": "string", "required": False, "default": ""},
+            "severity": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+            "output": {"type": "string", "required": True},
+            "model_version": {"type": "string", "required": False, "default": ""},
+            "prompt_version": {"type": "string", "required": False, "default": ""},
+            "tool_logs": {"type": "array", "required": False, "default": []},
+            "config_diffs": {"type": "array", "required": False, "default": []},
+            "metadata": {"type": "object", "required": False, "default": {}},
+        },
+    },
+    "POST /api/v1/postmortem/incidents/<record_id>/analyze": {
+        "description": "Analiza causa raíz del incidente.",
+        "parameters": {},
+    },
+    "POST /api/v1/postmortem/incidents/<record_id>/run": {
+        "description": "Ejecuta pipeline completo de post-mortem.",
+        "parameters": {
+            "approver": {"type": "string", "required": False, "default": ""},
+            "auto_approve_low_risk": {"type": "boolean", "required": False, "default": True},
+        },
+    },
+    "POST /api/v1/postmortem/hypotheses/<hypothesis_id>/approve": {
+        "description": "Aprueba hipótesis de causa raíz.",
+        "parameters": {
+            "approver": {"type": "string", "required": True},
+            "notes": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/postmortem/proposals/<proposal_id>/approve": {
+        "description": "Aprueba propuesta correctiva.",
+        "parameters": {"approver": {"type": "string", "required": True}},
+    },
+    "POST /api/v1/postmortem/proposals/<proposal_id>/reject": {
+        "description": "Rechaza propuesta correctiva.",
+        "parameters": {"approver": {"type": "string", "required": True}},
+    },
+    "GET /api/v1/postmortem/dashboard": {
+        "description": "Dashboard de post-mortem.",
         "parameters": {},
     },
 }
@@ -3064,6 +3113,96 @@ def ft_serving_dashboard():
 
 
 # ---------------------------------------------------------------------------
+# Autonomous Post-Mortem Loop endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/postmortem/incidents")
+def ft_pm_freeze():
+    data = _body()
+    required = ["incident_id", "title", "severity", "category", "prompt", "output"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    record = _postmortem_controller.freeze_incident(data)
+    return _ok(record.to_dict(), 201)
+
+
+@app.post("/api/v1/postmortem/incidents/<record_id>/analyze")
+def ft_pm_analyze(record_id: str):
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    result = _postmortem_controller.analyze(record_id)
+    if not result:
+        return _err("record no encontrado", 404)
+    return _ok(result)
+
+
+@app.post("/api/v1/postmortem/incidents/<record_id>/run")
+def ft_pm_run(record_id: str):
+    data = _body()
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    result = _postmortem_controller.run_postmortem(
+        record_id,
+        approver=data.get("approver", ""),
+        auto_approve_low_risk=data.get("auto_approve_low_risk", True),
+    )
+    if not result:
+        return _err("record no encontrado", 404)
+    return _ok(result)
+
+
+@app.post("/api/v1/postmortem/hypotheses/<hypothesis_id>/approve")
+def ft_pm_approve_hypothesis(hypothesis_id: str):
+    data = _body()
+    if "approver" not in data:
+        return _err("approver required")
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    hyp = _postmortem_controller.approve_hypothesis(
+        hypothesis_id, data["approver"], data.get("notes", "")
+    )
+    if not hyp:
+        return _err("hipótesis no encontrada", 404)
+    return _ok(hyp.to_dict())
+
+
+@app.post("/api/v1/postmortem/proposals/<proposal_id>/approve")
+def ft_pm_approve_proposal(proposal_id: str):
+    data = _body()
+    if "approver" not in data:
+        return _err("approver required")
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    prop = _postmortem_controller.approve_proposal(proposal_id, data["approver"])
+    if not prop:
+        return _err("propuesta no encontrada", 404)
+    return _ok(prop.to_dict())
+
+
+@app.post("/api/v1/postmortem/proposals/<proposal_id>/reject")
+def ft_pm_reject_proposal(proposal_id: str):
+    data = _body()
+    if "approver" not in data:
+        return _err("approver required")
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    prop = _postmortem_controller.reject_proposal(proposal_id, data["approver"])
+    if not prop:
+        return _err("propuesta no encontrada", 404)
+    return _ok(prop.to_dict())
+
+
+@app.get("/api/v1/postmortem/dashboard")
+def ft_pm_dashboard():
+    if _postmortem_controller is None:
+        return _err("postmortem controller no configurado", 503)
+    return _ok(_postmortem_controller.dashboard())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -3109,6 +3248,9 @@ def create_app(
     global _production_serving_controller
     if _production_serving_controller is None:
         _production_serving_controller = ProductionServingController()
+    global _postmortem_controller
+    if _postmortem_controller is None:
+        _postmortem_controller = PostMortemLoopController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
