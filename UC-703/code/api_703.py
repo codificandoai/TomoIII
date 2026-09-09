@@ -17,6 +17,8 @@ from fine_tuning.privacy.privacy_controller import PrivacyPreservingLLMOpsContro
 from fine_tuning.quality_gate.models_quality import QualitativeReview
 from fine_tuning.quality_gate.quality_gate_controller import QualityGateController
 from fine_tuning.extrinsic_metrics.extrinsic_metrics_controller import ExtrinsicMetricsController
+from fine_tuning.evaluation_matrix.evaluation_matrix_controller import EvaluationMatrixController
+from fine_tuning.evaluation_matrix.models_cem import HumanReview
 
 # Preferir Flask local si existe, sino mock mínimo.
 try:
@@ -30,6 +32,7 @@ app = Flask(__name__)
 _orchestrator: Optional[AgentRuntimeOrchestrator] = None
 _ft_controller: Optional[FineTuningController] = None
 _em_controller: Optional[ExtrinsicMetricsController] = None
+_cem_controller: Optional[EvaluationMatrixController] = None
 
 
 def _body() -> Dict[str, Any]:
@@ -397,6 +400,80 @@ INPUT_CARDS: Dict[str, Dict[str, Any]] = {
     },
     "GET /api/v1/ft/extrinsic-metrics/sessions/<session_id>": {
         "description": "Sesión unificada por session_id.",
+        "parameters": {},
+    },
+    "POST /api/v1/ft/evaluation-matrix/checkpoint": {
+        "description": "Crea un checkpoint de evaluación.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "prompt_ids": {"type": "array", "required": False},
+            "golden_set_ids": {"type": "array", "required": False},
+            "cell_ids": {"type": "array", "required": False},
+            "risk_signals": {"type": "array", "required": False},
+            "version": {"type": "string", "required": False, "default": "1.0.0"},
+        },
+    },
+    "GET /api/v1/ft/evaluation-matrix/checkpoints": {
+        "description": "Lista checkpoints.",
+        "parameters": {},
+    },
+    "POST /api/v1/ft/evaluation-matrix/prompt": {
+        "description": "Crea un prompt estático.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "prompt": {"type": "string", "required": True},
+            "category": {"type": "string", "required": True},
+            "risk_level": {"type": "string", "required": False, "default": "medium"},
+            "tags": {"type": "array", "required": False, "default": []},
+        },
+    },
+    "POST /api/v1/ft/evaluation-matrix/golden-set": {
+        "description": "Crea un golden set.",
+        "parameters": {
+            "name": {"type": "string", "required": True},
+            "records": {"type": "array", "required": True},
+            "version": {"type": "string", "required": False, "default": "1.0.0"},
+        },
+    },
+    "POST /api/v1/ft/evaluation-matrix/evaluate": {
+        "description": "Ejecuta evaluación híbrida del checkpoint.",
+        "parameters": {
+            "run_id": {"type": "string", "required": True},
+            "checkpoint_id": {"type": "string", "required": True},
+            "model_version": {"type": "string", "required": True},
+            "trigger_evolution": {"type": "boolean", "required": False, "default": False},
+        },
+    },
+    "POST /api/v1/ft/evaluation-matrix/human-review": {
+        "description": "Agrega revisión humana.",
+        "parameters": {
+            "sample_id": {"type": "string", "required": True},
+            "reviewer_role": {"type": "string", "required": True},
+            "correctness": {"type": "integer", "required": True},
+            "helpfulness": {"type": "integer", "required": True},
+            "safety": {"type": "integer", "required": True},
+            "fairness": {"type": "integer", "required": False, "default": 0},
+            "comments": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "POST /api/v1/ft/evaluation-matrix/user-feedback": {
+        "description": "Ingesta feedback implícito de usuario.",
+        "parameters": {
+            "session_id": {"type": "string", "required": True},
+            "feedback_type": {"type": "string", "required": True},
+            "reason": {"type": "string", "required": False, "default": ""},
+        },
+    },
+    "GET /api/v1/ft/evaluation-matrix/reports/<report_id>": {
+        "description": "Obtener reporte CEM.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/evaluation-matrix/prometheus": {
+        "description": "Métricas Prometheus de CEM.",
+        "parameters": {},
+    },
+    "GET /api/v1/ft/evaluation-matrix/logs": {
+        "description": "Logs estructurados de CEM.",
         "parameters": {},
     },
 }
@@ -1209,6 +1286,154 @@ def ft_em_session(session_id: str):
 
 
 # ---------------------------------------------------------------------------
+# Continuous Evaluation Matrix endpoints
+# ---------------------------------------------------------------------------
+
+@app.post("/api/v1/ft/evaluation-matrix/checkpoint")
+def ft_cem_create_checkpoint():
+    data = _body()
+    required = ["name"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    cp = _cem_controller.create_checkpoint(
+        name=data["name"],
+        prompt_ids=data.get("prompt_ids"),
+        golden_set_ids=data.get("golden_set_ids"),
+        cell_ids=data.get("cell_ids"),
+        risk_signals=data.get("risk_signals"),
+        version=data.get("version", "1.0.0"),
+    )
+    return _ok(cp.to_dict(), 201)
+
+
+@app.get("/api/v1/ft/evaluation-matrix/checkpoints")
+def ft_cem_list_checkpoints():
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    return _ok([c.to_dict() for c in _cem_controller.test_design.list_checkpoints()])
+
+
+@app.post("/api/v1/ft/evaluation-matrix/prompt")
+def ft_cem_create_prompt():
+    data = _body()
+    required = ["name", "prompt", "category"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    sp = _cem_controller.create_static_prompt(
+        name=data["name"],
+        prompt=data["prompt"],
+        category=data["category"],
+        risk_level=data.get("risk_level", "medium"),
+        tags=data.get("tags"),
+        version=data.get("version", "1.0.0"),
+    )
+    return _ok(sp.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/evaluation-matrix/golden-set")
+def ft_cem_create_golden_set():
+    data = _body()
+    required = ["name", "records"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    gs = _cem_controller.create_golden_set(
+        name=data["name"],
+        records=data["records"],
+        version=data.get("version", "1.0.0"),
+    )
+    return _ok(gs.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/evaluation-matrix/evaluate")
+def ft_cem_evaluate():
+    data = _body()
+    required = ["run_id", "checkpoint_id", "model_version"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    now = time.time()
+    report = _cem_controller.run_evaluation(
+        run_id=data["run_id"],
+        checkpoint_id=data["checkpoint_id"],
+        model_version=data["model_version"],
+        window_start=float(data.get("window_start", now - 3600)),
+        window_end=float(data.get("window_end", now)),
+        trigger_evolution=bool(data.get("trigger_evolution", False)),
+    )
+    return _ok(report.to_dict())
+
+
+@app.post("/api/v1/ft/evaluation-matrix/human-review")
+def ft_cem_human_review():
+    data = _body()
+    required = ["sample_id", "reviewer_role", "correctness", "helpfulness", "safety"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    review = HumanReview(
+        sample_id=data["sample_id"],
+        reviewer_role=data["reviewer_role"],
+        correctness=int(data["correctness"]),
+        helpfulness=int(data["helpfulness"]),
+        safety=int(data["safety"]),
+        fairness=int(data.get("fairness", 0)),
+        comments=data.get("comments", ""),
+    )
+    _cem_controller.add_human_review(review)
+    return _ok(review.to_dict(), 201)
+
+
+@app.post("/api/v1/ft/evaluation-matrix/user-feedback")
+def ft_cem_user_feedback():
+    data = _body()
+    required = ["session_id", "feedback_type"]
+    missing = [f for f in required if f not in data]
+    if missing:
+        return _err(f"campos requeridos: {', '.join(missing)}")
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    fb = _cem_controller.ingest_user_feedback(data)
+    return _ok(fb.to_dict(), 201)
+
+
+@app.get("/api/v1/ft/evaluation-matrix/reports/<report_id>")
+def ft_cem_get_report(report_id: str):
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    report = _cem_controller.get_report(report_id)
+    if not report:
+        return _err("report no encontrado", 404)
+    return _ok(report.to_dict())
+
+
+@app.get("/api/v1/ft/evaluation-matrix/prometheus")
+def ft_cem_prometheus():
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    return _cem_controller.render_prometheus()
+
+
+@app.get("/api/v1/ft/evaluation-matrix/logs")
+def ft_cem_logs():
+    if _cem_controller is None:
+        return _err("evaluation matrix controller no configurado", 503)
+    return _ok(_cem_controller.get_logs())
+
+
+# ---------------------------------------------------------------------------
 # Bootstrap
 # ---------------------------------------------------------------------------
 
@@ -1227,6 +1452,9 @@ def create_app(
     global _em_controller
     if _em_controller is None:
         _em_controller = ExtrinsicMetricsController()
+    global _cem_controller
+    if _cem_controller is None:
+        _cem_controller = EvaluationMatrixController()
     _orchestrator = orchestrator
     _ft_controller = ft_controller
     return app
