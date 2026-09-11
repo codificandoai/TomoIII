@@ -1,8 +1,8 @@
 [
   {
-    "version_id": "cad84956-d5d",
-    "timestamp": 1788911810.050855,
-    "path": ".uc087_models/model_cad84956-d5d.json",
+    "version_id": "c5ca37fe-987",
+    "timestamp": 1789002583.310762,
+    "path": ".uc087_models/model_c5ca37fe-987.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -14,9 +14,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "0c9c5962-305",
-    "timestamp": 1788911810.0604758,
-    "path": ".uc087_models/model_0c9c5962-305.json",
+    "version_id": "577ce1b9-199",
+    "timestamp": 1789002583.3186991,
+    "path": ".uc087_models/model_577ce1b9-199.json",
     "metrics": {
       "baseline": true
     },
@@ -26,9 +26,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "747b6cb0-714",
-    "timestamp": 1788911810.06127,
-    "path": ".uc087_models/model_747b6cb0-714.json",
+    "version_id": "ae4fd560-bc8",
+    "timestamp": 1789002583.3194911,
+    "path": ".uc087_models/model_ae4fd560-bc8.json",
     "metrics": {
       "baseline": true
     },
@@ -38,9 +38,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "6658a849-413",
-    "timestamp": 1788911810.0619462,
-    "path": ".uc087_models/model_6658a849-413.json",
+    "version_id": "c5fe35eb-553",
+    "timestamp": 1789002583.3201878,
+    "path": ".uc087_models/model_c5fe35eb-553.json",
     "metrics": {
       "baseline": true
     },
@@ -50,9 +50,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "45d76948-5c7",
-    "timestamp": 1788911810.06271,
-    "path": ".uc087_models/model_45d76948-5c7.json",
+    "version_id": "a41f2e8c-fa1",
+    "timestamp": 1789002583.321085,
+    "path": ".uc087_models/model_a41f2e8c-fa1.json",
     "metrics": {
       "baseline": true
     },
@@ -62,9 +62,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "bbeefb30-4a8",
-    "timestamp": 1788911810.063741,
-    "path": ".uc087_models/model_bbeefb30-4a8.json",
+    "version_id": "fac126c0-bf2",
+    "timestamp": 1789002583.321843,
+    "path": ".uc087_models/model_fac126c0-bf2.json",
     "metrics": {
       "baseline": true
     },
@@ -74,9 +74,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "0e6be969-755",
-    "timestamp": 1788911810.075822,
-    "path": ".uc087_models/model_0e6be969-755.json",
+    "version_id": "c4ec8177-949",
+    "timestamp": 1789002583.333329,
+    "path": ".uc087_models/model_c4ec8177-949.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -88,9 +88,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "85302e80-503",
-    "timestamp": 1788911810.0890749,
-    "path": ".uc087_models/model_85302e80-503.json",
+    "version_id": "e5ca6679-42d",
+    "timestamp": 1789002583.345272,
+    "path": ".uc087_models/model_e5ca6679-42d.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -102,9 +102,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "997b247b-161",
-    "timestamp": 1788911810.102378,
-    "path": ".uc087_models/model_997b247b-161.json",
+    "version_id": "fde68f6c-a5c",
+    "timestamp": 1789002583.357177,
+    "path": ".uc087_models/model_fde68f6c-a5c.json",
     "metrics": {
       "robustness_approved": null,
       "slice_alerts": 0,
@@ -116,9 +116,9 @@
     "rejection_reason": ""
   },
   {
-    "version_id": "38837407-ea2",
-    "timestamp": 1788911810.1029491,
-    "path": ".uc087_models/model_38837407-ea2.json",
+    "version_id": "337c1f94-b22",
+    "timestamp": 1789002583.35753,
+    "path": ".uc087_models/model_337c1f94-b22.json",
     "metrics": {},
     "is_canary": false,
     "promoted": false,

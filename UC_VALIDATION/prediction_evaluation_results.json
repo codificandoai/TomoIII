@@ -1,0 +1,37 @@
+{
+  "seed": 42,
+  "symbol": "AAPL",
+  "total_ticks": 500,
+  "train_ticks": 350,
+  "test_points": 150,
+  "price_prediction": {
+    "mse": 259.5435705691801,
+    "rmse": 16.110356003800167,
+    "mae": 14.565744786666668,
+    "mape": 0.051292047631245494,
+    "directional_accuracy": 0.0,
+    "coverage_95_approx": 1.0
+  },
+  "spread_prediction": {
+    "mse": 4.86168346836841e-28,
+    "rmse": 2.20492255382551e-14,
+    "mae": 1.7243151351209463e-14,
+    "mape": 3.08929802140171e-13
+  },
+  "risk_adjusted_utility": {
+    "mean_strategy_return": 0.0,
+    "std_strategy_return": 1e-12,
+    "sharpe": 0.0,
+    "cumulative_return": 0.0
+  },
+  "leakage_check": {
+    "train_end_index": 350,
+    "first_test_target_index": 350,
+    "history_for_first_prediction": 350,
+    "notes": [
+      "Train/test split es puramente temporal.",
+      "Solo se usan ticks <= i para predecir el tick i+1.",
+      "No se consulta target_tick en la entrada de la predicción."
+    ]
+  }
+}

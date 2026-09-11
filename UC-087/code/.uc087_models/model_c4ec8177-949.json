@@ -1,0 +1,37 @@
+{
+  "weights": [
+    0.3563388301242706,
+    0.347872279238756,
+    -0.11289429917689289,
+    -0.06750110081523526
+  ],
+  "bias": 0.059579938981562774,
+  "dim": 4,
+  "trained": true,
+  "robustness_report": {
+    "reports": {
+      "pgd": {
+        "clean_accuracy": 0.9756,
+        "adversarial_accuracy": 0.9024,
+        "robustness_gap": 0.0732,
+        "passed": true,
+        "attack_type": "pgd",
+        "details": {
+          "n_clean": 41,
+          "n_adversarial": 41,
+          "threshold": 0.15
+        }
+      }
+    },
+    "worst_attack": "pgd",
+    "worst_gap": 0.07317073170731703,
+    "passed_all": true
+  },
+  "backdoor_report": {
+    "entropy_alert": true,
+    "entropy_zscore": 3.4528,
+    "slice_alerts": [],
+    "suspicious_features": []
+  },
+  "source": "uc308_concept_drift"
+}

@@ -1,0 +1,142 @@
+[
+  {
+    "version_id": "e5c4351c-a92",
+    "timestamp": 1789002381.446561,
+    "path": ".uc087_models/model_e5c4351c-a92.json",
+    "metrics": {
+      "clean_acc": 0.9461538461538461,
+      "adv_acc": 0.9307692307692308,
+      "robustness_gap": 0.01538461538461533
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "c9725a02-5c7",
+    "timestamp": 1789002381.465935,
+    "path": ".uc087_models/model_c9725a02-5c7.json",
+    "metrics": {
+      "clean_acc": 1.0,
+      "adv_acc": 0.972972972972973,
+      "robustness_gap": 0.027027027027026973
+    },
+    "is_canary": true,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "f5a38a05-6e2",
+    "timestamp": 1789002381.4831092,
+    "path": ".uc087_models/model_f5a38a05-6e2.json",
+    "metrics": {
+      "clean_acc": 1.0,
+      "adv_acc": 0.9692307692307692,
+      "robustness_gap": 0.03076923076923077
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "151aa57b-e6b",
+    "timestamp": 1789002381.5344892,
+    "path": ".uc087_models/model_151aa57b-e6b.json",
+    "metrics": {
+      "clean_acc": 0.9076923076923077,
+      "adv_acc": 0.8923076923076924,
+      "robustness_gap": 0.01538461538461533
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "26e475bd-727",
+    "timestamp": 1789002381.600495,
+    "path": ".uc087_models/model_26e475bd-727.json",
+    "metrics": {
+      "clean_acc": 0.9166666666666666,
+      "adv_acc": 0.9027777777777778,
+      "robustness_gap": 0.01388888888888884
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "9258abde-a19",
+    "timestamp": 1789002381.623041,
+    "path": ".uc087_models/model_9258abde-a19.json",
+    "metrics": {
+      "clean_acc": 0.9491525423728814,
+      "adv_acc": 0.9322033898305084,
+      "robustness_gap": 0.016949152542372947
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "a72df296-121",
+    "timestamp": 1789002398.615044,
+    "path": ".uc087_models/model_a72df296-121.json",
+    "metrics": {
+      "clean_acc": 0.9324324324324325,
+      "adv_acc": 0.9054054054054054,
+      "robustness_gap": 0.027027027027027084
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  },
+  {
+    "version_id": "bf9526ae-2d4",
+    "timestamp": 1789002398.66113,
+    "path": ".uc087_models/model_bf9526ae-2d4.json",
+    "metrics": {
+      "clean_acc": 0.9615384615384616,
+      "adv_acc": 0.9307692307692308,
+      "robustness_gap": 0.03076923076923077
+    },
+    "is_canary": true,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "1ea2287f-368",
+    "timestamp": 1789002398.6794088,
+    "path": ".uc087_models/model_1ea2287f-368.json",
+    "metrics": {
+      "clean_acc": 1.0,
+      "adv_acc": 0.972972972972973,
+      "robustness_gap": 0.027027027027026973
+    },
+    "is_canary": true,
+    "promoted": false,
+    "rejected": false,
+    "rejection_reason": ""
+  },
+  {
+    "version_id": "78a61bd6-555",
+    "timestamp": 1789002398.7361321,
+    "path": ".uc087_models/model_78a61bd6-555.json",
+    "metrics": {
+      "clean_acc": 0.6858974358974359,
+      "adv_acc": 0.6794871794871795,
+      "robustness_gap": 0.0064102564102563875
+    },
+    "is_canary": false,
+    "promoted": false,
+    "rejected": true,
+    "rejection_reason": "Detectado posible backdoor o anomal\u00eda de entrop\u00eda."
+  }
+]

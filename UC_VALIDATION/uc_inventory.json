@@ -1,0 +1,3290 @@
+[
+  {
+    "uc": "UC-075",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-075 — Continuous Training Orchestrator  #### USO: INTERNO  UC-075 es una **capa externa** del ecosistema AGI que orquesta el reentrenamiento continuo de modelos desplegados en producci",
+    "api_files": [
+      "api_075.py"
+    ],
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/api/v1/health"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/cards"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/scheduled"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/event"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/on-demand"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/incremental"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/runs/<run_id>/resolve-hitl"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/runs"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/runs/<run_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/pending-hitl"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/audit"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/metrics"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/dashboard"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/loki"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/online-fit"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/online-learners"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/online-learners/<learner_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/regulatory/domain"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/regulatory/stakeholder-requirement"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/regulatory/sign-off"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/regulatory/select-model"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/regulatory/explainability"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/regulatory/requirements"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/register-artifact"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/global/artifacts"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/replicate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/detect-conflicts"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/resolve-conflict"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/lifecycle/gc"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/lifecycle/legal-hold"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/dr/backup"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/global/dr/failover"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/global/dr/status"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/global/status"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/risk/register"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/risks"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/risks/<risk_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/risks/<risk_id>/update"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/risks/summary"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/risks/proactive"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/risks/runbook/<category>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/incident/report"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents/<incident_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/incidents/<incident_id>/assign"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/incidents/<incident_id>/resolve"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents/summary"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/incidents/drill"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents/drill/<drill_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents/learnings"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/incidents/playbook/<category>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/threat-intel/sync"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/mine-patterns"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/feedback"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/playbook/pr"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/playbook/merge"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/adaptive/playbook/history/<playbook_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/chaos"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/adaptive/chaos/<run_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/release-gate"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/adaptive/metrics"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/challenge-scenario"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/adaptive/threat-vector"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/incident"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/incident/<icc_id>/status"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/action"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/action/<action_id>/execute"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/action/<action_id>/rollback"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/postmortem"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ct/icc/runbook/sync"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/icc/unified-view/<incident_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ct/icc/status-board"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-083",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-083 Describa un incidente crítico en el que tuvo que diagnosticar y mitigar, con alta prioridad, la falla de un proce-so nocturno de inferencia por lotes que afectaba la actualizac",
+    "api_files": [
+      "api_083.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/declare"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/triage"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/diagnose"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/mitigate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/reprocess"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/postmortem"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/full-response"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/incident/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/incident/declare",
+      "POST /api/v1/incident/logs",
+      "POST /api/v1/incident/metrics",
+      "POST /api/v1/incident/validate",
+      "POST /api/v1/incident/triage",
+      "POST /api/v1/incident/diagnose",
+      "POST /api/v1/incident/mitigate",
+      "POST /api/v1/incident/reprocess",
+      "POST /api/v1/incident/postmortem",
+      "POST /api/v1/incident/full-response",
+      "GET /api/v1/incident/status",
+      "POST /api/v1/incident/reset"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-087",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-087 ¿El cerebro AGI tiene un NeuralTransitionModel\tRed neuronal para predecir transiciones/recompensas y un GPTransitionModel\tProceso Gaussiano para transiciones con estimación de ",
+    "api_files": [
+      "api_087.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/train-candidate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate-robustness"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/detect-backdoors"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/process-batch"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/approve-canary"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/rollback"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/validate",
+      "POST /api/v1/train-candidate",
+      "POST /api/v1/evaluate-robustness",
+      "POST /api/v1/detect-backdoors",
+      "POST /api/v1/process-batch",
+      "POST /api/v1/approve-canary",
+      "POST /api/v1/rollback",
+      "POST /api/v1/reset",
+      "GET /api/v1/status",
+      "GET /api/v1/schema",
+      "GET /metrics"
+    ],
+    "tests": [
+      "test_mlops_hitl_feedback_loop.py",
+      "test_mlops_self_healing.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-119",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-119 ¿Qué métricas de calidad, seguridad, coste y trazabilidad son esenciales para monitorizar una aplicación basada en LLM, y en qué se diferencian de la monitorización del aprendi",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api_integration.py",
+      "test_bias.py",
+      "test_cost.py",
+      "test_diversity.py",
+      "test_evasion.py",
+      "test_hallucination.py",
+      "test_monitoring_system.py",
+      "test_quality.py",
+      "test_security.py",
+      "test_toxicity.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-127",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-127 ¿Qué buenas prácticas de LLMOps y respuesta automatizada a incidentes permiten detectar y mitigar alucinaciones, prompt injection, filtraciones de datos, degradación de calidad",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api_integration.py",
+      "test_chaos_engineering.py",
+      "test_classifier.py",
+      "test_integrations.py",
+      "test_orchestrator.py",
+      "test_playbook_loader.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-129",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-129 ¿Cómo deben definirse y analizarse métricas como MTTD, MTTR, tasa de resolución, tasa de falsos positivos, frecuencia de escalamiento, distribución de incidentes por categoría ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api_integration.py",
+      "test_classifier.py",
+      "test_connectors.py",
+      "test_incident_service.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-162",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC  #### USO: . EXTERNO  #### EXECUTION ```bash   ``` # DESCRIPTION  En el contexto de **LLMOps**, el **modelado lógico de datos** (cómo estructuras conceptualmente los datos antes de",
+    "api_files": [
+      "api_162.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/process-corpus"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate-response"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/check-drift"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/set-baseline"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/register-prompt"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/approve-prompt"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate-prompt"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/prompts"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/lineage"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/process-corpus",
+      "POST /api/v1/evaluate-response",
+      "POST /api/v1/check-drift",
+      "POST /api/v1/set-baseline",
+      "POST /api/v1/register-prompt",
+      "POST /api/v1/approve-prompt",
+      "POST /api/v1/evaluate-prompt",
+      "POST /api/v1/reset",
+      "GET /api/v1/status",
+      "GET /api/v1/schema",
+      "GET /api/v1/prompts",
+      "GET /api/v1/lineage",
+      "GET /metrics"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-179",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-179 Sistema autónomo de reentrenamiento continuo — ¿cómo diseñar un pipeline reutilizable que recolecte y filtre datos de múltiples fuentes (feedback de usuarios, anotaciones human",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api_integration.py",
+      "test_data_collector.py",
+      "test_deployment_manager.py",
+      "test_knowledge_base.py",
+      "test_model_validator.py",
+      "test_pipeline_service.py",
+      "test_trainer.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-251",
+    "readme_preview": "# TomoIII — UC-251: Arquitectura RAG robusta, escalable y auditable  ## AI-Native Operations & Agentic Patterns ### Caso: ¿Cómo diseñar e implementar una arquitectura RAG robusta, escalable y auditable para procesar documentos empresariales largos, h",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_chunker.py",
+      "test_pipeline.py",
+      "test_ragas.py",
+      "test_retriever.py",
+      "test_security.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-257",
+    "readme_preview": "# TomoIII — UC-257: Asistente dependiente vs. Agente autónomo en planificación de viajes ## AI-Native Operations & Agentic Patterns ### Caso: ¿En una plataforma de planificación de viajes, cómo se puede diferenciar un agente autónomo de un asistente ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adapters.py",
+      "test_api.py",
+      "test_orchestrator.py",
+      "test_services.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-258",
+    "readme_preview": "# TomoIII — UC-258: Meta-framework de agentes adaptativos  ## AI-Native Operations & Agentic Patterns ### Caso: Diseño e implementación de un meta-framework de agentes adaptativos basado en propiedades del entorno  **Uso:** Externo / Referencia arqui",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_agent.py",
+      "test_api.py",
+      "test_environments.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-259",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-259 - Agentic Flight Planner  #### USO: . EXTERNO  ---  ## Descripción  UC-259 implementa un **sistema agentic AI de planificación de viajes autónomo** construido sobre **LangGraph**. ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_graph.py",
+      "test_safety.py",
+      "test_world.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-260",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-260 - BDI Flight Agent  #### USO: . EXTERNO python UC-260.py plan --origin Madrid --destination Barcelona --departure-date 2026-09-15 --return-date 2026-09-17 --travelers 1 --budget 20",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_bdi.py",
+      "test_predictor.py",
+      "test_safety.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-261",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-261 - Adaptive BDI Flight Agent  #### USO: . EXTERNO  ---  ## Descripción  UC-261 evoluciona los agentes de UC-259 y UC-260 hacia un **agente BDI adaptativo con memoria a largo plazo**",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adaptive.py",
+      "test_api.py",
+      "test_bdi.py",
+      "test_checkpointer.py",
+      "test_predictor.py",
+      "test_safety.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-262",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-262 - IA Genérica (Generic AI) con razonamiento, autorreflexión y evolución multi-agente  #### USO: . EXTERNO  ---  ## Descripción UC-262 representa el siguiente nivel de madurez despu",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_cognitive.py",
+      "test_evolution.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-263",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-263 - Agente de recomendaciones turísticas con Q-Learning vectorial y RL  #### USO: . EXTERNO  ---  ## Descripción  UC-263 implementa un **agente de recomendación turística que aprende",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_environment.py",
+      "test_graph.py",
+      "test_vector_q_learner.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-264",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-264 - Model-Based Multi-Agent Travel Planner  #### USO: . EXTERNO  ---  ## Descripción  UC-264 implementa un **agente basado en modelo** para planificación de viajes. A diferencia de l",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_graph.py",
+      "test_planner.py",
+      "test_simulator.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-265",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-265 - World Model Probabilístico, MCTS y Entornos Parcialmente Observables  #### USO: . EXTERNO  ---  ## Descripción  UC-265 mejora el agente basado en modelo de **UC-264** reemplazand",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_enhancements.py",
+      "test_graph.py",
+      "test_mcts.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-266",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-266 - Agente Resiliente y Robusto ante Cambios del Entorno  #### USO: . EXTERNO  ---  ## Descripción  UC-266 mejora el agente de **UC-265** convirtiéndolo en un sistema **resiliente y ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_enhancements.py",
+      "test_graph.py",
+      "test_mcts.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_resilience.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-268",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-268 - Protocolo de Comunicación Segura entre Agentes con A2A  #### USO: . EXTERNO  ---  ## Descripción  UC-268 implementa un **protocolo de comunicación segura entre agentes** para Mus",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_bus_and_agents.py",
+      "test_security.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-269",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-269 - Protocolo Contract Net con Métricas para Grafana  #### USO: . EXTERNO  ---  ## Descripción  UC-269 implementa el **protocolo Contract Net** para sistemas multiagente. En este pro",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_contract_net.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-270",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-270 — Resolución de Conflictos entre Agentes  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar escenario de conflicto (CLI) cd code/ python UC-270.py run --resource GPU_1 --need-a ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_detector.py",
+      "test_negotiation.py",
+      "test_resolver.py",
+      "test_shared_state.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-271",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-271 — Multi-Agent AI on Kubernetes con Seguridad y HPA  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar tarea con el pipeline multi-agent cd code/ python UC-271.py run --task \"Ana",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_hpa.py",
+      "test_manifests.py",
+      "test_security.py",
+      "test_supervisor.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-272",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-272 — Negociación y Compartición de Conocimiento entre Agentes  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar escenario Nash Bargaining (vuelo MAD→CUN) cd code/ python UC-272.py",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_blackboard.py",
+      "test_gossip.py",
+      "test_nash.py",
+      "test_negotiation.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-273",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-273 — Seguridad Multi-Agente: Framework Integral de Defensa en Profundidad  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar demo de seguridad multi-agente cd code/ python UC-273.p",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_crypto.py",
+      "test_guardrails.py",
+      "test_ledger.py",
+      "test_rate_limiter.py",
+      "test_trust.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-274",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-274 — Web3 Multi-Agent Blockchain: Ecosistema Descentralizado BFT  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar demo del ecosistema Web3 multi-agente cd code/ python UC-274.py ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_blockchain.py",
+      "test_consensus.py",
+      "test_contracts.py",
+      "test_marketplace.py",
+      "test_wallet.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-275",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-275 — ¿Cómo mejora la autorreflexión el rendimiento de la IA agéntica? Sistema Avanzado Self-Refine + Reflexion  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar demo del sistema d",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_critic.py",
+      "test_evaluator.py",
+      "test_memory.py",
+      "test_models.py",
+      "test_refiner.py",
+      "test_reflexion_loop.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-276",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-276 — ¿Podrías explicar la solicitud recursiva y su función en los flujos de trabajo basados en agentes?  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar demo del sistema de recur",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_models.py",
+      "test_quality.py",
+      "test_recursive_prompter.py",
+      "test_refiner.py",
+      "test_stagnation.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-277",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-277 — Como utilizan los agentes la memoria de multiples turnos para mantener objetivos a largo plazo?  #### USO: EXTERNO  #### EXECUTION ```bash # Ejecutar demo del sistema de memoria ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_embeddings.py",
+      "test_episodic.py",
+      "test_goals.py",
+      "test_memory_system.py",
+      "test_procedural.py",
+      "test_semantic.py",
+      "test_working_memory.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-279",
+    "readme_preview": "# Tomo III — UC-279  ## TrackPrice.ai: Gemelos Digitales de Pricing Multiagente  UC-279 implementa un gemelo digital por SKU que conserva un estado vivo del mercado y coordina seis agentes especializados para observar, estimar, optimizar, detectar ri",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_core.py",
+      "test_pricing_engine.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-280",
+    "readme_preview": "# Tomo III — UC-280  ## Descomposición de objetivos en sistemas de IA agéntica  UC-280 convierte objetivos humanos abstractos en DAGs ejecutables, asigna tareas a agentes especializados y ejecuta en paralelo las ramas independientes. Para producción ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_executor.py",
+      "test_planners.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-281",
+    "readme_preview": "# Tomo III — UC-281  ## Sincronización multi-framework para TrackPrice.ai  UC-281 implementa un plano de control común para coordinar **LangGraph, CrewAI, Microsoft Agent Framework/AutoGen, Google ADK y AWS Strands Agents**. Cada framework conserva s",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_orchestrator.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-283",
+    "readme_preview": "# Tomo III — UC-283  ## Bucle gobernado de autocorrección para TrackPrice.ai  UC-283 implementa un sistema de autocorrección con evidencia determinista para decisiones de pricing. El generador no evalúa su propio resultado: un crítico independiente e",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_loop.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-284",
+    "readme_preview": "# Tomo III — UC-284  ## Middleware resiliente para sistemas de IA agéntica  UC-284 detalla cómo el middleware Qbex debe invocar mecanismos especializados para mitigar las limitaciones actuales de los agentes: alucinaciones, pérdida de contexto, sobre",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_middleware.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-289",
+    "readme_preview": "# Tomo III — UC-289  ## Gobernanza, riesgo y accountability para agentes autónomos  UC-289 ¿Qué riesgos éticos son exclusivos o cualitativamente nuevos en los agentes autónomos de IA (agentic AI) Cómo mitigar los riesgos de esta autonomía con respect",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_governance.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-290",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-290 Human-in-the-Loop (HITL) con Razonamiento Transparente  #### USO: . INTERNO PATENTE  ![Arquitectura](./uc-290-brain.png)  # DESCRIPTION  > **Integración UC-308:** el adaptador ",
+    "api_files": [
+      "api_290.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/process-decision"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/submit-review"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pending-reviews"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/dossier/<dossier_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/present/<dossier_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/audit-trail"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/results"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/safe-hold"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/safe-hold/<dossier_id>/release"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/process-decision",
+      "POST /api/v1/submit-review",
+      "POST /api/v1/reset",
+      "GET /api/v1/pending-reviews",
+      "GET /api/v1/dossier/:id",
+      "GET /api/v1/present/:id",
+      "GET /api/v1/audit-trail",
+      "GET /api/v1/status",
+      "GET /api/v1/schema",
+      "GET /api/v1/results",
+      "GET /metrics"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-292",
+    "readme_preview": "# TomoIII — UC-292  ## Multi-Agente de Trading: Percepción del Entorno y Ciclo Agente-Entorno  UC-292 implementa un sistema **agentic AI** para mercados financieros. Un agente asesor de trading percibe datos brutos de mercado, los transforma en un mo",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_brain.py",
+      "test_central_brain.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_risk.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-293",
+    "readme_preview": "# UC-293 — LLM Juice: Filtro Adversarial BDI + ReAct + CoT para Trading de Tick de Acciones  ## Resumen  UC-293 eleva el agente de trading de UC-292 de \"reactivo\" a **cognitivo y autocrítico**. El modelo propone planes de trading, pero antes de compr",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_central_brain.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_risk.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-294",
+    "readme_preview": "# UC-294 — Situational Awareness Middleware (SAM): AGI funcional para trading de ticks  ## Resumen  UC-294 extiende UC-293 añadiendo una **capa de conciencia situacional funcional** inspirada en la **Global Workspace Theory (GWT)** y en modelos de me",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_central_brain.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_risk.py",
+      "test_sam.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-295",
+    "readme_preview": "# UC-295 — ReAct Híbrido con Árbol de Pensamientos (Tree of Thoughts - ToT)  ## Resumen  UC-295 añade una capa al cerebro AGI del sistema de trading multi-agente para superar la limitación clásica del **ReAct lineal**. Un bucle ReAct tradicional sobr",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_central_brain.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_react_tot.py",
+      "test_risk.py",
+      "test_sam.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-296",
+    "readme_preview": "# UC-296 — Gestión de Memoria AGI para el Cerebro de Trading  ## Resumen  UC-296 añade una **capa de gestión de memoria** al cerebro AGI del sistema de trading multi-agente. El objetivo es dotar al agente de:  1. **Persistencia del self-model** entre",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_central_brain.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_memory_layers.py",
+      "test_memory_snapshot.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_react_tot.py",
+      "test_risk.py",
+      "test_sam.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-300",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-300 Secure Tool Gateway — capa defensiva entre UC-290 (HITL/approval) y UC-317 (ejecución de agentes), con Pre-Intent Gate determinista antes de UC-315 y Constitutional Interceptor ent",
+    "api_files": [
+      "api_300.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/authorize"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/execute"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/human-approval"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/audit-trail"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kill-switch"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/prefilter-intent"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/prefilter-intent/approve"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/intercept-proposal"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/intercept-proposal/approve"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-307",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-307 ¿Cómo evaluarías el rendimiento de un agente autónomo, especialmente cuando la respuesta correcta no es una sola cadena de texto?  #### USO: EXTERNO  #### EXECUTION ```bash # Levan",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_decision_engine.py",
+      "test_evaluator.py",
+      "test_evolution.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-308",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-308 — SANIDAD DEL ECOSISTEMA AGI: Agent Drift / Environmental Degradation  **Uso:** INTERNO **Versión:** 1.0.0 **Ambito:** capa externa de evaluación continua. No forma parte de UC",
+    "api_files": [
+      "api_308.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/run-evaluation"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/baseline"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/baseline"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/datasets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/alerts"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/alerts/acknowledge"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/register"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/start"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/ingest"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/evaluate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/recommend"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/approve"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/shutdown"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/cc-experiments/<exp_id>/generate-events"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-309",
+    "readme_preview": "# UC-309 — Capa Transversal y Externa de Observabilidad Agentic  ## 1. Propósito  UC-309 responde la pregunta: **¿qué ocurrió dentro de una ejecución concreta del agente y por qué terminó así?**  - **UC-308** detecta degradación histórica comparando ",
+    "api_files": [
+      "api_309.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/events"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/batch"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/traces"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/traces/<trace_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/trace/<trace_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/traces/<trace_id>/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/alerts"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/alerts/<alert_id>/ack"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/retention"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/reset"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-313",
+    "readme_preview": "# UC-313 PLASTICIDAD SINAPTICA DIGITAL ## USO INTERNO PATENTADO #### Resumen UC-313 U T R O N .AI tiene una arquitectura AGI modular orientada al aprendizaje continuo, la autoobservación y la continuidad temporal del estado interno, sustentada en una",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_api_plasticity.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_brain_plasticity_interface.py",
+      "test_central_brain.py",
+      "test_cnp_middleware.py",
+      "test_cognitive_evolution_layer.py",
+      "test_compatibility_validator.py",
+      "test_curiosity.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_global_workspace.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_memory_layers.py",
+      "test_metacognitive_monitor.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_react_tot.py",
+      "test_risk.py",
+      "test_sam.py",
+      "test_self_awareness_loop.py",
+      "test_simulator.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-314",
+    "readme_preview": "# UC-314 — Razonamiento Causal y Planificación Recursiva Neuro-Simbólica  ## AI-Native Operations & Agentic Patterns — TomoIII  **USO:** EXTERNO (API + CLI) **Propósito:** Integrar modelos causales simbólicos con el razonamiento de un LLM para mejora",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_causal_model.py",
+      "test_evaluator.py",
+      "test_recursive_planner.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-315",
+    "readme_preview": "# UC-315 — Núcleo cognitivo-orquestador común + habilidades especializadas por dominio  ## AI-Native Operations & Agentic Patterns — TomoIII  **USO:** INTERNO PATENTADO **Propósito:** Diseñar una arquitectura de agentes con un **núcleo cognitivo-orqu",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_adversarial_juice.py",
+      "test_api.py",
+      "test_api_plasticity.py",
+      "test_bdi.py",
+      "test_brain.py",
+      "test_brain_plasticity_interface.py",
+      "test_central_brain.py",
+      "test_cnp_middleware.py",
+      "test_cognitive_evolution_layer.py",
+      "test_compatibility_validator.py",
+      "test_curiosity.py",
+      "test_enhancements.py",
+      "test_exchange.py",
+      "test_global_workspace.py",
+      "test_graph.py",
+      "test_indicators.py",
+      "test_juice.py",
+      "test_mcts.py",
+      "test_memory_layers.py",
+      "test_metacognitive_monitor.py",
+      "test_orchestrator.py",
+      "test_perception.py",
+      "test_planner.py",
+      "test_probabilistic_model.py",
+      "test_risk.py",
+      "test_safety.py",
+      "test_sam.py",
+      "test_self_awareness_loop.py",
+      "test_simulator.py",
+      "test_skill_registry.py",
+      "test_storage.py",
+      "test_strategy.py",
+      "test_train.py",
+      "test_world_model.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-317",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-317  #### USO: . EXTERNO  #### EXECUTION ```bash cd /Users/utron/Documents/code-books/TomoIII/UC-317/code python3 -m venv .venv source .venv/bin/activate pip install -r requirement",
+    "api_files": [
+      "api_317.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/models"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/tools"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/roles"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/scheduler/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/sessions"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/chat"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/syscall"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/schedule"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/tools/call"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/storage"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/kernel/storage/<key>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_kernel.py",
+      "test_kernel_shutdown.py",
+      "test_paper_execution_service.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-320",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-320  #### USO: . INTERNO  #### EXECUTION ```bash cd /Users/utron/Documents/code-books/TomoIII/UC-320/code python3 -m venv .venv source .venv/bin/activate pip install -r requirement",
+    "api_files": [
+      "api_320.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/login"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/whoami"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/logout"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/sessions"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/models"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/templates"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/templates/<template_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/sentiment"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/embedding"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/classify"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/benchmark"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/training/submit"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/training/run"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/training/promote"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/training/jobs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/audit"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/hf/status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/endpoints"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/endpoints"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/endpoints/<endpoint_id>/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/endpoints/<endpoint_id>/stop"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/endpoints/<endpoint_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/datasets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/datasets/load"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/datasets/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/datasets/transform"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/trainer/train"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/trainer/jobs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/peft/adapters"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/peft/adapters"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/peft/adapters/<adapter_id>/save"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate/compute"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate/compare"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/evaluate/results"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/spaces"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/spaces"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/spaces/<space_id>/stop"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/spaces/<space_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards/<path:model_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards/<path:model_id>/markdown"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards/<path:model_id>/approve"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/model-cards/<path:model_id>/push"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/models"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/datasets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/spaces"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/search"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/models/<path:model_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/datasets/<path:dataset_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/spaces/<path:space_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/catalog/models/<path:model_id>/gated"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/download/<path:repo_id>/resolve"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/download/<path:repo_id>/files"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/download/<path:repo_id>/info"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/download/<path:repo_id>/snippets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/finetune/generate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/oauth/login"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/oauth/callback"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/auth/oauth/scopes"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/vram"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/vram/estimate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/playground"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/license"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/k8s-manifest"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/benchmarks"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/benchmarks/compare"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/lineage"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/lineage/register"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/panel/<path:model_id>/training-history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/execute"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/pkce"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/jwt/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/secrets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/secrets"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/secrets/<secret_name>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/preflight"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/cluster/nodes"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/manifest/vllm"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/manifest/pytorchjob"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/manifest/rayjob"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/manifest/pvc"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/apply"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/cache/check"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/cache"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/cache/prefetch"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/jobs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/jobs/<job_name>/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/jobs/<job_name>/metrics/subscribe"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/package"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/publish"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/pipeline/cleanup"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_auth.py",
+      "test_catalog.py",
+      "test_hf_services.py",
+      "test_k8s_pipeline.py",
+      "test_model_panel.py",
+      "test_unit.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-322",
+    "readme_preview": "# UC-322 Cerebro AGI Multi-Agente Multi-Dominio Para Resolución Óptima de Conflictos ## AI-Native Operations & Agentic Patterns — TomoIII  **USO:** INTERNO PATENTADO  **Propósito:** Capa AGI de resolución de conflictos que envuelve al cerebro AGI (UC",
+    "api_files": [
+      "api_322.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/conflicts/resolve"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reputation/record"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reputation/ranking"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reputation/<agent_id>"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/duplicate/check"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/deadlock/check"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/conflicts/history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/escalation/history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/escalation/circuit-breaker"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/escalation/circuit-breaker/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/summary"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/tasks/active"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-324",
+    "readme_preview": "# UC-324 — Protocolo de Contención de Sandbox para el Cerebro AGI  ## AI-Native Operations & Agentic Patterns — TomoIII  **USO:** INTERNO PATENTADO **Propósito:** Extender el núcleo cognitivo-orquestador de UC-315 con un **protocolo de contención de ",
+    "api_files": [
+      "api_324.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/orchestrate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/check"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/stress-test"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/red-team"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/red-team-eval"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/post-check"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/monitor-status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/circuit-breaker"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/sign-intent"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/verify-intent"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/scan-content"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/llm-judge"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/devops-guardrails"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/llm-guardrails"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/trajectory-eval"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/stage-wise-eval"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/kill-switch"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/safe-shutdown"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/safe-hold"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/resume-safe-hold"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/shutdown-status"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/shutdown-postmortem"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/shutdown-evidence"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/reactivation-request"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/audit"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/containment/sre-status"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [
+      "test_containment.py",
+      "test_llm_private_gateway.py",
+      "test_safe_shutdown.py"
+    ],
+    "has_venv": true
+  },
+  {
+    "uc": "UC-325",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-325 ¿Cómo mejoran los bucles de razonamiento la precisión en la recuperación de información por parte de los agentes?  #### USO: . INTERNO PATENTE  #### EXECUTION ```bash cd /Users/utr",
+    "api_files": [
+      "api_325.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reasoning/run"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reasoning/evaluate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reasoning/detect-hallucinations"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reasoning/refine-query"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/reasoning/history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/summary"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/observability/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/reasoning/run",
+      "POST /api/v1/reasoning/evaluate",
+      "POST /api/v1/reasoning/detect-hallucinations",
+      "POST /api/v1/reasoning/refine-query"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-326",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-326 Los recuerdos, experiencias, memoria episódica y semántica son principios de auto-conciencia  #### USO: . INTERNO PATENTE  #### EXECUTION ```bash cd /Users/utron/Documents/code-boo",
+    "api_files": [
+      "api_326.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/search"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/documents"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/experience"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/critic"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/refine"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/history"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/stats"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/governed/submit"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/governed/validate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/maqri/governed"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/maqri/search",
+      "POST /api/v1/maqri/documents",
+      "POST /api/v1/maqri/experience",
+      "POST /api/v1/maqri/critic",
+      "POST /api/v1/maqri/refine"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-328",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-328 Orquestador Resiliente con Gestión de Sobrecarga (ORQUESTA-R)  **Uso:** INTERNO PATENTE  **Descripción:** ORQUESTA-R es la capa empresarial de orquestación de RAG (Retrieval-Augmen",
+    "api_files": [
+      "api_328.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/execute"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/sources"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/cache/invalidate"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/stats"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/orquesta/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/orquesta/execute",
+      "POST /api/v1/orquesta/sources",
+      "POST /api/v1/orquesta/cache/invalidate",
+      "GET /api/v1/orquesta/stats",
+      "GET /api/v1/orquesta/logs",
+      "GET /api/v1/orquesta/spans"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-329",
+    "readme_preview": "# TomoIII ## AI-Native Operations & Agentic Patterns ### CASE: UC-329 GraphRAG-GoT — Razonamiento sobre Grafos de Conocimiento  **Uso:** INTERNO PATENTE  **Descripción:** UC-329 GraphRAG-GoT es una capa externa especializada en razonamiento sobre gra",
+    "api_files": [
+      "api_329.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/ingest"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/reason"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/feedback"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/stats"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/logs"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/graphrag-got/spans"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/graphrag-got/ingest",
+      "POST /api/v1/graphrag-got/reason",
+      "POST /api/v1/graphrag-got/feedback",
+      "GET /api/v1/graphrag-got/stats",
+      "GET /api/v1/graphrag-got/logs",
+      "GET /api/v1/graphrag-got/spans"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-330",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-330: Exploitation–Exploration Governance  #### USO: . INTERNO PATENTE  #### EXECUTION ```bash   ``` # DESCRIPTION Integrada esta capa en el cerebro AGI, dentro del ecosistema exist",
+    "api_files": [
+      "api_330.py"
+    ],
+    "routes": [
+      {
+        "method": "ROUTE",
+        "path": "/health"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/schema"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/decide"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/update"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/episode"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/stats"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/recommend"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/api/v1/balance-ex/reset"
+      },
+      {
+        "method": "ROUTE",
+        "path": "/metrics"
+      }
+    ],
+    "input_card_keys": [
+      "POST /api/v1/balance-ex/decide",
+      "POST /api/v1/balance-ex/update",
+      "POST /api/v1/balance-ex/episode",
+      "GET /api/v1/balance-ex/stats",
+      "GET /api/v1/balance-ex/recommend",
+      "POST /api/v1/balance-ex/reset"
+    ],
+    "tests": [],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-700",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-700  Caso de uso 4: autosanación avanzada del entrenamiento \"El nodo N-482 presenta riesgo elevado de fallo de memoria en las próximas 24 horas; evacuar workloads no tolerantes a f",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_core.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-701",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-701 trackprice prediccion declive financiero y/ó sostenimiento a futuro #### USO: . INTERNO TRACKPRICE #### EXECUTION ```bash python UC-701.py predict-from-emis \"TAKODA\" --pais CO ",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_core.py",
+      "test_emis_scraper.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-702",
+    "readme_preview": "# TomoIII ## AI-Native Operations &amp; Agentic Patterns ### CASE: UC-702 Disponibilidad de recursos subutilizados (CPU/GPU/memoria/disco) en tiempo real, on-premise y en la nube  #### USO: . INTERNO  #### EXECUTION ```bash cd /Users/utron/Documents/",
+    "api_files": [],
+    "routes": [],
+    "input_card_keys": [],
+    "tests": [
+      "test_api.py",
+      "test_capacity_pool.py",
+      "test_resource_monitor.py",
+      "test_spot_watcher.py",
+      "test_underutilization.py"
+    ],
+    "has_venv": false
+  },
+  {
+    "uc": "UC-703",
+    "readme_preview": "# UC-703 — AGI Agent Runtime & Orchestrator  ## AI-Native Operations & Agentic Patterns — TomoIII  **USO:** INTERNO PATENTADO  ![UC-703](./UC-703-BRAIN.png)  ## Ejecución  ```bash cd /Users/utron/Documents/code-books/TomoIII/UC-703/code  # Tests pyth",
+    "api_files": [
+      "api_703.py"
+    ],
+    "routes": [
+      {
+        "method": "GET",
+        "path": "/health"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/cards"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/plan"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/approve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/approve/<step_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/execute"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/pause"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/resume"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/objective/<task_id>/cancel"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/objective/<task_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/objectives"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/runtime/status"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/temporal/workflow"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/temporal/workflow/<workflow_id>/run"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/temporal/workflow/<workflow_id>/signal"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/stackstorm/execute"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/n8n/execute"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/metrics"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/curate-and-register"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/plan-resources"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/run-hp-search"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/create-training-config"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/simulate-training-step"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/alignment-recommendation"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/deploy-canary"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/assess-canary"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/detect-drift"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/feedback"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/pipelines/<pipeline_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/pipelines"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/apply-contract"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/deidentify"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/dp-config"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/apply-dp"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/membership-inference"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/network-policy"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/encryption-lease"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/inference-preflight"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/inference-postflight"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/privacy/artifacts"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/privacy/pipelines/<pipeline_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/quality-gate/run"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/quality-gate/approve"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/quality-gate/reports/<report_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/quality-gate/reports"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/extrinsic-metrics/app-event"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/extrinsic-metrics/inf-event"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/extrinsic-metrics/compute"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/extrinsic-metrics/prometheus"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/extrinsic-metrics/logs"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/extrinsic-metrics/sessions/<session_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/checkpoint"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/evaluation-matrix/checkpoints"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/prompt"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/golden-set"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/evaluate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/human-review"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ft/evaluation-matrix/user-feedback"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/evaluation-matrix/reports/<report_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/evaluation-matrix/prometheus"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ft/evaluation-matrix/logs"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/runtime/recovery/register-tool"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/runtime/recovery/invoke"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/runtime/recovery/reports/<report_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/runtime/recovery/reports"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/runtime/recovery/prometheus"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/runtime/recovery/logs"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/runtime/recovery/hitl-decide"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/prompt/commit"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/prompt/approve"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/prompt/history/<prompt_name>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/dataset/register"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/dataset/transformation"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/dataset/<dataset_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/access/grant"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/access/evaluate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/inference/record"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/inference/query"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/ledger/verify"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/metrics/ingest"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/compliance/alerts/acknowledge"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/report"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/dashboard"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/compliance/rules"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/feedback"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/analyze"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/recommendations/approve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/recommendations/reject"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ci/recommendations"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ci/recommendations/pending"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/baseline"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/ci/measure"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/ci/dashboard"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/qa/run"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/incidents"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/incidents/<incident_id>"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/triage"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/contain"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/resolve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/alerts"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/oncall"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/communicate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/runbook"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/<incident_id>/post-mortem"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/slos"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/sli/register"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/incidents/slos/<slo_id>/sample"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/incidents/dashboard"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/aiops/events"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/aiops/correlate"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/aiops/groups/<group_id>/process"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/aiops/pipeline"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/aiops/policies"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/aiops/dashboard"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/roles"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/permissions"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/principals"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/resources"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/sod"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/access"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/approvals"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/approvals/<request_id>/approve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/rbac/approvals/<request_id>/reject"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/audit/events"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/audit/query"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/audit/verify"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/rbac/dashboard"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/sessions"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/chat"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/chat/enterprise"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/tokens"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/feedback"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/serving/re-evaluate/<request_id>"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/serving/dashboard"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/incidents"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/incidents/<record_id>/analyze"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/incidents/<record_id>/run"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/hypotheses/<hypothesis_id>/approve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/proposals/<proposal_id>/approve"
+      },
+      {
+        "method": "POST",
+        "path": "/api/v1/postmortem/proposals/<proposal_id>/reject"
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/postmortem/dashboard"
+      }
+    ],
+    "input_card_keys": [],
+    "tests": [
+      "test_aiops_self_healing.py",
+      "test_compliance_as_code.py",
+      "test_continuous_improvement.py",
+      "test_enterprise_qa.py",
+      "test_evaluation_matrix.py",
+      "test_extrinsic_metrics.py",
+      "test_fine_tuning_controller.py",
+      "test_incident_management.py",
+      "test_postmortem_loop.py",
+      "test_privacy_pipeline.py",
+      "test_production_serving.py",
+      "test_quality_gate.py",
+      "test_rbac_audit.py",
+      "test_resilience_recovery.py",
+      "test_uc703.py"
+    ],
+    "has_venv": false
+  }
+]

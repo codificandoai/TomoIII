@@ -1,0 +1,429 @@
+[
+  {
+    "uc": "UC-075",
+    "status": "ok",
+    "passed": 167,
+    "failed": 0,
+    "output": "........................................................................ [ 43%]\n........................................................................ [ 86%]\n.......................                                                  [100%]\n167 passed in 2.01s\n"
+  },
+  {
+    "uc": "UC-083",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-087",
+    "status": "ok",
+    "passed": 31,
+    "failed": 0,
+    "output": "...............................                                          [100%]\n31 passed in 0.06s\n"
+  },
+  {
+    "uc": "UC-119",
+    "status": "ok",
+    "passed": 44,
+    "failed": 0,
+    "output": "============================= test session starts ==============================\nplatform darwin -- Python 3.11.4, pytest-9.1.1, pluggy-1.6.0\nrootdir: /Users/utron/Documents/code-books/TomoIII/UC-119/code\nconfigfile: pytest.ini\nplugins: cov-7.1.0\ncollected 44 items\n\ntests/test_api_integration.py ........                                   [ 18%]\ntests/test_bias.py ...                                                   [ 25%]\ntests/test_cost.py ....                                                  [ 34%]\ntests/test_diversity.py ....                                             [ 43%]\ntests/test_evasion.py ....                                               [ 52%]\ntests/test_hallucination.py ...                                          [ 59%]\ntests/test_monitoring_system.py ......                                   [ 72%]\ntests/test_quality.py ....                                               [ 81%]\ntests/test_security.py .....                                             [ 93%]\ntests/test_toxicity.py ...                                               [100%]\n\n============================== 44 passed in 0.06s ==============================\n"
+  },
+  {
+    "uc": "UC-127",
+    "status": "ok",
+    "passed": 51,
+    "failed": 0,
+    "output": "============================= test session starts ==============================\nplatform darwin -- Python 3.11.4, pytest-8.4.2, pluggy-1.6.0\nrootdir: /Users/utron/Documents/code-books/TomoIII/UC-127/code\nconfigfile: pytest.ini\nplugins: cov-5.0.0\ncollected 51 items\n\ntests/test_api_integration.py .................                          [ 33%]\ntests/test_chaos_engineering.py ....                                     [ 41%]\ntests/test_classifier.py .......                                         [ 54%]\ntests/test_integrations.py .........                                     [ 72%]\ntests/test_orchestrator.py ..........                                    [ 92%]\ntests/test_playbook_loader.py ....                                       [100%]\n\n============================== 51 passed in 0.32s ==============================\n"
+  },
+  {
+    "uc": "UC-129",
+    "status": "ok",
+    "passed": 46,
+    "failed": 0,
+    "output": "============================= test session starts ==============================\nplatform darwin -- Python 3.11.4, pytest-8.4.2, pluggy-1.6.0\nrootdir: /Users/utron/Documents/code-books/TomoIII/UC-129/code\nconfigfile: pytest.ini\nplugins: cov-5.0.0\ncollected 46 items\n\ntests/test_api_integration.py .................                          [ 36%]\ntests/test_classifier.py ........                                        [ 54%]\ntests/test_connectors.py .........                                       [ 73%]\ntests/test_incident_service.py ............                              [100%]\n\n============================== 46 passed in 0.06s ==============================\n"
+  },
+  {
+    "uc": "UC-162",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-179",
+    "status": "ok",
+    "passed": 70,
+    "failed": 0,
+    "output": "============================= test session starts ==============================\nplatform darwin -- Python 3.11.4, pytest-8.4.2, pluggy-1.6.0\nrootdir: /Users/utron/Documents/code-books/TomoIII/UC-179/code\nconfigfile: pytest.ini\nplugins: cov-5.0.0\ncollected 70 items\n\ntests/test_api_integration.py .................                          [ 24%]\ntests/test_data_collector.py ..........                                  [ 38%]\ntests/test_deployment_manager.py ......                                  [ 47%]\ntests/test_knowledge_base.py ...........                                 [ 62%]\ntests/test_model_validator.py ........                                   [ 74%]\ntests/test_pipeline_service.py .............                             [ 92%]\ntests/test_trainer.py .....                                              [100%]\n\n============================== 70 passed in 2.21s ==============================\n"
+  },
+  {
+    "uc": "UC-251",
+    "status": "ok",
+    "passed": 29,
+    "failed": 0,
+    "output": ".............................                                            [100%]\n29 passed in 0.12s\n"
+  },
+  {
+    "uc": "UC-257",
+    "status": "ok",
+    "passed": 17,
+    "failed": 0,
+    "output": ".................                                                        [100%]\n17 passed in 0.04s\n"
+  },
+  {
+    "uc": "UC-258",
+    "status": "ok",
+    "passed": 18,
+    "failed": 0,
+    "output": "..................                                                       [100%]\n18 passed in 0.04s\n"
+  },
+  {
+    "uc": "UC-259",
+    "status": "ok",
+    "passed": 23,
+    "failed": 0,
+    "output": ".......................                                                  [100%]\n23 passed in 0.17s\n"
+  },
+  {
+    "uc": "UC-260",
+    "status": "ok",
+    "passed": 18,
+    "failed": 0,
+    "output": "..................                                                       [100%]\n18 passed in 0.21s\n"
+  },
+  {
+    "uc": "UC-261",
+    "status": "ok",
+    "passed": 20,
+    "failed": 0,
+    "output": "....................                                                     [100%]\n20 passed in 0.37s\n"
+  },
+  {
+    "uc": "UC-262",
+    "status": "ok",
+    "passed": 11,
+    "failed": 0,
+    "output": "...........                                                              [100%]\n11 passed in 0.13s\n"
+  },
+  {
+    "uc": "UC-263",
+    "status": "ok",
+    "passed": 14,
+    "failed": 0,
+    "output": "..............                                                           [100%]\n14 passed in 0.71s\n"
+  },
+  {
+    "uc": "UC-264",
+    "status": "ok",
+    "passed": 15,
+    "failed": 0,
+    "output": "...............                                                          [100%]\n15 passed in 0.36s\n"
+  },
+  {
+    "uc": "UC-265",
+    "status": "ok",
+    "passed": 33,
+    "failed": 0,
+    "output": ".................................                                        [100%]\n33 passed in 6.55s\n"
+  },
+  {
+    "uc": "UC-266",
+    "status": "ok",
+    "passed": 38,
+    "failed": 0,
+    "output": "......................................                                   [100%]\n38 passed in 6.46s\n"
+  },
+  {
+    "uc": "UC-268",
+    "status": "ok",
+    "passed": 19,
+    "failed": 0,
+    "output": "...................                                                      [100%]\n19 passed in 0.06s\n"
+  },
+  {
+    "uc": "UC-269",
+    "status": "ok",
+    "passed": 11,
+    "failed": 0,
+    "output": "...........                                                              [100%]\n11 passed in 0.37s\n"
+  },
+  {
+    "uc": "UC-270",
+    "status": "ok",
+    "passed": 22,
+    "failed": 0,
+    "output": "......................                                                   [100%]\n22 passed in 0.04s\n"
+  },
+  {
+    "uc": "UC-271",
+    "status": "ok",
+    "passed": 32,
+    "failed": 0,
+    "output": "................................                                         [100%]\n32 passed in 0.78s\n"
+  },
+  {
+    "uc": "UC-272",
+    "status": "ok",
+    "passed": 36,
+    "failed": 0,
+    "output": "....................................                                     [100%]\n36 passed in 0.05s\n"
+  },
+  {
+    "uc": "UC-273",
+    "status": "ok",
+    "passed": 59,
+    "failed": 0,
+    "output": "...........................................................              [100%]\n59 passed in 0.07s\n"
+  },
+  {
+    "uc": "UC-274",
+    "status": "ok",
+    "passed": 69,
+    "failed": 0,
+    "output": ".....................................................................    [100%]\n69 passed in 0.09s\n"
+  },
+  {
+    "uc": "UC-275",
+    "status": "ok",
+    "passed": 78,
+    "failed": 0,
+    "output": "........................................................................ [ 92%]\n......                                                                   [100%]\n78 passed in 0.06s\n"
+  },
+  {
+    "uc": "UC-276",
+    "status": "ok",
+    "passed": 78,
+    "failed": 0,
+    "output": "........................................................................ [ 92%]\n......                                                                   [100%]\n78 passed in 0.06s\n"
+  },
+  {
+    "uc": "UC-277",
+    "status": "ok",
+    "passed": 93,
+    "failed": 0,
+    "output": "........................................................................ [ 77%]\n.....................                                                    [100%]\n93 passed in 0.08s\n"
+  },
+  {
+    "uc": "UC-279",
+    "status": "ok",
+    "passed": 26,
+    "failed": 0,
+    "output": "..........................                                               [100%]\n26 passed in 0.07s\n"
+  },
+  {
+    "uc": "UC-280",
+    "status": "ok",
+    "passed": 19,
+    "failed": 0,
+    "output": "...................                                                      [100%]\n19 passed in 0.15s\n"
+  },
+  {
+    "uc": "UC-281",
+    "status": "fail",
+    "passed": 7,
+    "failed": 5,
+    "output": "apters.items()},\n                                          ^^^^^^^^^^^\nadapters.py:30: in available\n    return importlib.util.find_spec(MODULES[self.framework]) is not None\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ \n\nname = 'google.adk', package = None\n\n>   ???\nE   ModuleNotFoundError: No module named 'google'\n\n<frozen importlib.util>:94: ModuleNotFoundError\n_______________________ test_all_five_frameworks_respond _______________________\n\n    def test_all_five_frameworks_respond():\n        run = pipeline().run(idempotency_key=\"one\")\n>       assert {r.framework for r in run.responses} == set(Framework)\nE       AssertionError: assert {<Framework.A...maf_autogen'>} == {<Framework.A...maf_autogen'>}\nE         \nE         Extra items in the right set:\nE         <Framework.GOOGLE_ADK: 'google_adk'>\nE         Use -v to get more diff\n\ntests/test_orchestrator.py:15: AssertionError\n__________________________ test_events_cover_barrier ___________________________\n\n    def test_events_cover_barrier():\n        p = pipeline()\n        run = p.run()\n        events = p.bus.events(run.run_id)\n        assert events[0][\"type\"] == \"run.started\"\n>       assert sum(e[\"type\"] == \"framework.completed\" for e in events) == 5\nE       assert 4 == 5\nE        +  where 4 = sum(<generator object test_events_cover_barrier.<locals>.<genexpr> at 0x109d53e00>)\n\ntests/test_orchestrator.py:56: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_api.py::test_full_pipeline_api - ModuleNotFoundError: No mo...\nFAILED tests/test_api.py::test_list_endpoints - ModuleNotFoundError: No modul...\nFAILED tests/test_api.py::test_validation - ModuleNotFoundError: No module na...\nFAILED tests/test_orchestrator.py::test_all_five_frameworks_respond - Asserti...\nFAILED tests/test_orchestrator.py::test_events_cover_barrier - assert 4 == 5\n5 failed, 7 passed in 0.24s\n"
+  },
+  {
+    "uc": "UC-283",
+    "status": "ok",
+    "passed": 11,
+    "failed": 0,
+    "output": "...........                                                              [100%]\n11 passed in 0.13s\n"
+  },
+  {
+    "uc": "UC-284",
+    "status": "ok",
+    "passed": 11,
+    "failed": 0,
+    "output": "...........                                                              [100%]\n11 passed in 0.04s\n"
+  },
+  {
+    "uc": "UC-289",
+    "status": "ok",
+    "passed": 13,
+    "failed": 0,
+    "output": ".............                                                            [100%]\n13 passed in 0.04s\n"
+  },
+  {
+    "uc": "UC-290",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-292",
+    "status": "ok",
+    "passed": 47,
+    "failed": 0,
+    "output": "...............................................                          [100%]\n47 passed in 4.66s\n"
+  },
+  {
+    "uc": "UC-293",
+    "status": "ok",
+    "passed": 61,
+    "failed": 0,
+    "output": ".............................................................            [100%]\n61 passed in 4.77s\n"
+  },
+  {
+    "uc": "UC-294",
+    "status": "ok",
+    "passed": 70,
+    "failed": 0,
+    "output": "......................................................................   [100%]\n70 passed in 4.78s\n"
+  },
+  {
+    "uc": "UC-295",
+    "status": "ok",
+    "passed": 82,
+    "failed": 0,
+    "output": "........................................................................ [ 87%]\n..........                                                               [100%]\n82 passed in 4.90s\n"
+  },
+  {
+    "uc": "UC-296",
+    "status": "ok",
+    "passed": 91,
+    "failed": 0,
+    "output": "........................................................................ [ 79%]\n...................                                                      [100%]\n91 passed in 4.79s\n"
+  },
+  {
+    "uc": "UC-300",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-307",
+    "status": "ok",
+    "passed": 30,
+    "failed": 0,
+    "output": "..............................                                           [100%]\n30 passed in 0.26s\n"
+  },
+  {
+    "uc": "UC-308",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-309",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-313",
+    "status": "ok",
+    "passed": 131,
+    "failed": 0,
+    "output": "........................................................................ [ 54%]\n...........................................................              [100%]\n131 passed in 6.80s\n"
+  },
+  {
+    "uc": "UC-314",
+    "status": "ok",
+    "passed": 19,
+    "failed": 0,
+    "output": "...................                                                      [100%]\n19 passed in 0.15s\n"
+  },
+  {
+    "uc": "UC-315",
+    "status": "ok",
+    "passed": 130,
+    "failed": 0,
+    "output": "........................................................................ [ 55%]\n..........................................................               [100%]\n130 passed in 6.18s\n"
+  },
+  {
+    "uc": "UC-317",
+    "status": "ok",
+    "passed": 44,
+    "failed": 0,
+    "output": "............................................                             [100%]\n44 passed in 0.13s\n"
+  },
+  {
+    "uc": "UC-320",
+    "status": "ok",
+    "passed": 360,
+    "failed": 0,
+    "output": "........................................................................ [ 20%]\n........................................................................ [ 40%]\n........................................................................ [ 60%]\n........................................................................ [ 80%]\n........................................................................ [100%]\n360 passed in 0.42s\n"
+  },
+  {
+    "uc": "UC-322",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-324",
+    "status": "ok",
+    "passed": 110,
+    "failed": 0,
+    "output": "........................................................................ [ 65%]\n......................................                                   [100%]\n110 passed in 1.11s\n"
+  },
+  {
+    "uc": "UC-325",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-326",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-328",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-329",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-330",
+    "status": "no_tests",
+    "passed": null,
+    "failed": null,
+    "output": ""
+  },
+  {
+    "uc": "UC-700",
+    "status": "ok",
+    "passed": 20,
+    "failed": 0,
+    "output": "....................                                                     [100%]\n20 passed in 0.05s\n"
+  },
+  {
+    "uc": "UC-701",
+    "status": "ok",
+    "passed": 18,
+    "failed": 0,
+    "output": "..................                                                       [100%]\n18 passed in 1.15s\n"
+  },
+  {
+    "uc": "UC-702",
+    "status": "ok",
+    "passed": 42,
+    "failed": 0,
+    "output": "..........................................                               [100%]\n42 passed in 0.91s\n"
+  },
+  {
+    "uc": "UC-703",
+    "status": "ok",
+    "passed": 252,
+    "failed": 0,
+    "output": "........................................................................ [ 28%]\n........................................................................ [ 57%]\n........................................................................ [ 85%]\n....................................                                     [100%]\n252 passed in 0.21s\n"
+  }
+]
